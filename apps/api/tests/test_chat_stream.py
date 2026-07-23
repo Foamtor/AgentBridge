@@ -1,0 +1,1 @@
+"""Stream lifecycle tests."""
