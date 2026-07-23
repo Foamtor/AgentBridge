@@ -1,0 +1,1 @@
+"""Outbound protocols (events, SSE)."""
