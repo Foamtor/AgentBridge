@@ -1,0 +1,67 @@
+---
+description: Python 后端目录与分层（成熟项目惯例 + 本仓约定）
+globs: "**/*.py"
+alwaysApply: false
+---
+
+# Python 后端代码结构
+
+成熟 FastAPI/Python 后端通常是：**按业务模块分目录**，模块内再按职责拆文件；不是长期按 `routers/`、`models/` 全局堆文件。
+
+本仓对应：`apps/api`（宿主）+ `packages/core`（可复用内核）+ `apps/api/domains/*`（业务插件）。
+
+## 模块内角色（写代码时对号入座）
+
+| 角色 | 放什么 | 禁止 |
+|------|--------|------|
+| **router / routes** | HTTP 入参、状态码、调 service | 业务编排、直接跑 LangGraph、写 SQL |
+| **service / application** | 用例流程（加锁→跑图→收尾） | import 具体 Postgres/锁实现类 |
+| **ports（接口）** | `Protocol`/`ABC`（含 GraphRuntime、RunCancelRegistry） | 具体技术实现 |
+| **adapters / infrastructure** | 锁、DB、LangGraph、SSE 队列实现 | 被 application 直接 import（应经构造注入） |
+| **schemas / protocol** | Pydantic 请求响应、SSE Event | 夹带业务副作用 |
+| **registry** | `register` / `get` 图与工具 | 写死 `if route == ...` |
+| **domains/\*** | 某业务的 graph + tools + bootstrap | 被 core 反向 import |
+
+## 依赖与注入
+
+```text
+routes → application/service → ports（接口）
+adapters 实现 ports；只在 lifespan（组装根）里 new 并注入
+domains 只 register 进 registry；core 禁止 import domains
+```
+
+- 构造注入：`RunLifecycle(locks=..., checkpointers=...)`
+- 换实现（Memory/Postgres）只改组装处，不改 service
+
+## 正面 / 反面
+
+```python
+# ❌ 路由里跑业务 + 写死实现
+@router.post("/stream")
+async def stream(...):
+    lock = InProcessThreadLock()  # 别在路由 new 基础设施
+    async for x in build_map_graph().astream(...):  # 别在路由绑死某业务图
+        ...
+
+# ✅ 路由薄；流程在 service；实现启动时注入
+@router.post("/stream")
+async def stream(..., lifecycle: RunLifecycle = Depends(get_lifecycle)):
+    return await sse_response(lifecycle.start_stream(...))
+```
+
+```python
+# ❌ 核心/工厂按 route 分支堆业务
+if route == "map":
+    from ai_map_chat import ...
+
+# ✅ 开闭：新业务只注册
+graphs.register("echo", build_echo_graph)
+```
+
+## 本仓目录锚点
+
+- 内核：`packages/core/src/agent_base_core/{application,ports,adapters,registry,protocol}`
+- 组装根：`apps/api/lifespan.py`（唯一集中 new 适配器处）
+- 业务：`apps/api/domains/<name>/`（`bootstrap.py` + graph/tools）
+- 详解：`docs/superpowers/specs/2026-07-23-backend-oop-architecture.md`
+- 完整目录树：`docs/superpowers/specs/2026-07-23-code-structure.md`
