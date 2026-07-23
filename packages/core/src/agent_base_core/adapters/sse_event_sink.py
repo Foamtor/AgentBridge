@@ -1,0 +1,1 @@
+"""SseEventSink: Event -> asyncio.Queue."""
