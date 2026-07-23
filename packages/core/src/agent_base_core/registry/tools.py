@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from agent_base_core.application.errors import UnknownRoute
+from agent_base_core.errors import UnknownRoute
 
 
 class ToolRegistry:
