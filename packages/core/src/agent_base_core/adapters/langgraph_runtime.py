@@ -59,3 +59,11 @@ class LangGraphRuntime:
                     trace_id=trace_id,
                 )
                 sequence += 1
+            elif kind == "on_chain_end" and event.get("name") == "echo_node":
+                output = data.get("output") or {}
+                result = output.get("result") if isinstance(output, dict) else None
+                if result:
+                    yield map_text_delta(
+                        str(result), run_id=run_id, sequence=sequence, trace_id=trace_id
+                    )
+                    sequence += 1
