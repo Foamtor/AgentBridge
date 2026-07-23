@@ -1,13 +1,5 @@
-"""Application errors: ThreadBusy, UnknownRoute, RunNotFound."""
+"""Application errors — re-export shared exception types."""
 
+from agent_base_core.errors import RunNotFound, ThreadBusy, UnknownRoute
 
-class ThreadBusy(Exception):
-    """Raised when a thread already has an active run."""
-
-
-class UnknownRoute(Exception):
-    """Raised when a registry key (route) is not registered."""
-
-
-class RunNotFound(Exception):
-    """Raised when cancel targets a missing run."""
+__all__ = ["ThreadBusy", "UnknownRoute", "RunNotFound"]

@@ -1,0 +1,54 @@
+name: ci
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  architecture-gates:
+    name: architecture gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install core (editable) + dev tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e "packages/core[dev]"
+
+      - name: import-linter (layer + forbidden contracts)
+        run: lint-imports
+
+      - name: Scan core for forbidden business imports
+        run: python scripts/import_scan_core.py
+
+      - name: pytest core
+        run: python -m pytest packages/core/tests -v
+
+      - name: ruff core
+        run: ruff check packages/core/src
+
+  api-tests:
+    name: api tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install core + api
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e "packages/core"
+          python -m pip install -e "apps/api[dev]"
+
+      - name: pytest api
+        run: python -m pytest tests -v
+        working-directory: apps/api

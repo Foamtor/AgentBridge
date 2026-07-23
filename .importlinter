@@ -1,0 +1,37 @@
+[importlinter]
+root_package = agent_base_core
+
+[importlinter:contract:core_layers]
+name = core layered dependencies (high -> low)
+type = layers
+layers =
+    application
+    registry
+    ports
+    protocol
+containers =
+    agent_base_core
+
+[importlinter:contract:application_must_not_import_adapters]
+name = application must not import adapters
+type = forbidden
+source_modules =
+    agent_base_core.application
+forbidden_modules =
+    agent_base_core.adapters
+
+[importlinter:contract:adapters_must_not_import_application]
+name = adapters must not import application
+type = forbidden
+source_modules =
+    agent_base_core.adapters
+forbidden_modules =
+    agent_base_core.application
+
+[importlinter:contract:adapters_must_not_import_registry]
+name = adapters must not import registry
+type = forbidden
+source_modules =
+    agent_base_core.adapters
+forbidden_modules =
+    agent_base_core.registry
