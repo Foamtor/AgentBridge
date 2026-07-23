@@ -70,6 +70,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.graphs = graphs
     app.state.tools = tools
     app.state.input_builders = input_builders
+    app.state.locks = locks
+    app.state.cancels = cancels
     try:
         yield
     finally:
