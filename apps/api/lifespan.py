@@ -50,7 +50,19 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     input_builders = InputBuilderRegistry()
     register_all(graphs, tools, input_builders)
 
-    checkpointers = MemoryCheckpointerFactory()
+    checkpointers: Any
+    if settings.use_memory_checkpointer:
+        checkpointers = MemoryCheckpointerFactory()
+    else:
+        from agent_base_core.adapters.postgres_checkpointer import (
+            PostgresCheckpointerFactory,
+        )
+
+        dsn = (
+            f"postgresql://{settings.pg_user}:{settings.pg_password}"
+            f"@{settings.pg_host}:{settings.pg_port}/{settings.pg_database}"
+        )
+        checkpointers = PostgresCheckpointerFactory(dsn)
     await checkpointers.setup()
 
     runtime: Any = ApiFakeRuntime() if settings.fake_runtime else LangGraphRuntime()
