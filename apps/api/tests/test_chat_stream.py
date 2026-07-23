@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 import json
+import os
+
+import pytest
+from fastapi.testclient import TestClient
 
 
 def _parse_sse_types(body: str) -> list[str]:
@@ -55,3 +59,23 @@ def test_thread_busy_409(client):
     )
     assert r.status_code == 409
     assert r.json()["detail"]["code"] == "thread_busy"
+
+
+def test_real_echo_stream_has_text_and_done(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("AGENT_BASE_FAKE_RUNTIME", "0")
+    # Settings reads bool from env; ensure create_app sees real runtime.
+    os.environ["AGENT_BASE_FAKE_RUNTIME"] = "0"
+    from main import create_app
+
+    app = create_app()
+    with TestClient(app) as c:
+        r = c.post(
+            "/chat/stream",
+            json={"query": "hello-echo", "thread_id": "t-echo-real", "route": "echo"},
+        )
+    assert r.status_code == 200
+    types = _parse_sse_types(r.text)
+    assert types[0] == "start"
+    assert "text_delta" in types
+    assert types[-1] == "done"
+    assert "hello-echo" in r.text
