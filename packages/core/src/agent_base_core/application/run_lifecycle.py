@@ -626,7 +626,11 @@ class RunLifecycle:
         sink: EventSink | None,
         reason: str | None = None,
     ) -> dict[str, Any]:
-        """Resolve pending approval (approve/deny/timeout); re-acquire storage_key."""
+        """Resolve pending approval (approve/deny/timeout); re-acquire storage_key.
+
+        Acquire lock first so HTTP resume can 409 while still pending. Timeout that
+        cannot acquire (new run holds the lock) still force-claims and writes EventLog.
+        """
         if self._approval_store is None:
             raise RuntimeError("approval_store not configured")
         rec = await self._approval_store.get(approval_id, tenant_id=tenant_id)
@@ -641,11 +645,15 @@ class RunLifecycle:
         sequence = int(rec.get("sequence") or 0)
         query = str(rec.get("query") or "")
 
-        if not await self._locks.try_acquire(storage_key, run_id):
-            existing = await self._approval_store.get(approval_id, tenant_id=tenant_id)
-            if existing is not None and existing.get("status") != "pending":
-                return existing
-            raise ThreadBusy(thread_id)
+        acquired = await self._locks.try_acquire(storage_key, run_id)
+        if not acquired:
+            if reason != "timeout":
+                raise ThreadBusy(thread_id)
+            logger.warning(
+                "approval timeout without lock approval_id=%s run_id=%s",
+                approval_id,
+                run_id,
+            )
 
         class _NullSink:
             async def emit(self, evt: dict[str, Any]) -> None:
@@ -726,7 +734,8 @@ class RunLifecycle:
                 )
             return updated
         finally:
-            await self._locks.release(storage_key, run_id)
+            if acquired:
+                await self._locks.release(storage_key, run_id)
 
     async def cancel(
         self,

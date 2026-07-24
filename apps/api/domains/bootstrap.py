@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from domains.demo_approval_write import bootstrap as demo_approval_write
 from domains.demo_llm import bootstrap as demo_llm
 from domains.demo_rag import bootstrap as demo_rag
 from domains.demo_readonly import bootstrap as demo_readonly
@@ -21,3 +22,4 @@ def register_all(
     demo_readonly.register(graphs, tools, input_builders)
     demo_llm.register(graphs, tools, input_builders)
     demo_rag.register(graphs, tools, input_builders)
+    demo_approval_write.register(graphs, tools, input_builders)

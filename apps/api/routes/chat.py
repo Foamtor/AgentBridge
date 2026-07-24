@@ -55,6 +55,8 @@ async def chat_stream(
                 "data_source": request.app.state.data_source,
                 "llm_gateway": request.app.state.llm_gateway,
                 "retriever": request.app.state.retriever,
+                # Run-scoped reversible mask tokens (DataMasker); not checkpointed.
+                "token_map": dict(ctx.metadata.get("token_map") or {}),
             }
         }
     )
