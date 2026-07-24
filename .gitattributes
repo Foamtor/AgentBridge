@@ -1,0 +1,2 @@
+# Keep shell scripts LF so bash CI (set -euo pipefail) does not break on Windows.
+*.sh text eol=lf
