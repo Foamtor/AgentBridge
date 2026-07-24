@@ -80,18 +80,23 @@
 
 **必须改** `docs/contracts.md` §2 末句：删除「type 可为自定义字符串；核心原样透传」；改为本节规则。
 
-### 3.2 OutboundFragment
+### 3.2 OutboundFragment（protocol 层，Pydantic）
 
-```text
-OutboundFragment:
-  type: str
-  data: dict = {}
-  step: str | None = None
-  status: str | None = None
+- **位置（硬性）：** `packages/core/src/agent_base_core/protocol/fragments.py`  
+  **禁止**放在 `adapters/` 或 `application/`。
+- **形态：** Pydantic v2 `BaseModel`，`model_config = ConfigDict(extra="forbid")`，字段：
+
+```python
+class OutboundFragment(BaseModel):
+    type: str
+    data: dict[str, Any] = Field(default_factory=dict)
+    step: str | None = None
+    status: str | None = None
 ```
 
-Runtime/mapper **只产 Fragment**，不写权威 `sequence`/`event_id`。
-
+- Runtime/mapper **只产** `OutboundFragment`，不写权威 `sequence`/`event_id`。  
+- 完整字段级定义与测试见实施计划 Task 2：  
+  `docs/superpowers/plans/2026-07-24-template-hardening-optimization-implementation.md`
 ### 3.3 Builder：Option B（已拍板）
 
 | 函数 | 职责 |
