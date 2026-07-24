@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     oidc_jwt_secret: str = Field(default="", validation_alias="OIDC_JWT_SECRET")
     llm_api_key: str = ""
     use_memory_checkpointer: bool = True
+    enable_data_source: bool = Field(
+        default=False, validation_alias="ENABLE_DATA_SOURCE"
+    )
+    data_source_dsn: str = Field(default="", validation_alias="DATA_SOURCE_DSN")
     fake_runtime: bool = Field(default=False, validation_alias="AGENT_BASE_FAKE_RUNTIME")
     hooks_backend: str = Field(default="noop", validation_alias="HOOKS_BACKEND")
 

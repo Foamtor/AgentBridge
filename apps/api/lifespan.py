@@ -16,6 +16,7 @@ from agent_base_core.adapters.memory_checkpointer import MemoryCheckpointerFacto
 from agent_base_core.adapters.memory_event_log import MemoryEventLog
 from agent_base_core.adapters.memory_message_store import MemoryMessageStore
 from agent_base_core.adapters.memory_run_store import MemoryRunStore
+from agent_base_core.adapters.noop_data_source import NoopDataSource
 from agent_base_core.adapters.noop_hooks import NoopHooks
 from agent_base_core.adapters.role_policy import RolePolicyEngine
 from agent_base_core.application.pipeline import RequestPipeline, ToolPolicyPlugin
@@ -35,6 +36,15 @@ def _resolve_postgres_dsn(settings: Settings) -> str:
         f"postgresql://{settings.pg_user}:{settings.pg_password}"
         f"@{settings.pg_host}:{settings.pg_port}/{settings.pg_database}"
     )
+
+
+def _build_data_source(settings: Settings) -> Any:
+    if not settings.enable_data_source:
+        return NoopDataSource()
+    dsn = settings.data_source_dsn or _resolve_postgres_dsn(settings)
+    from adapters.postgres_data_source import PostgresDataSource
+
+    return PostgresDataSource(dsn)
 
 
 @asynccontextmanager
@@ -78,6 +88,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     event_log = MemoryEventLog()
     message_store = MemoryMessageStore()
     run_store = MemoryRunStore()
+    data_source = _build_data_source(settings)
 
     lifecycle = RunLifecycle(
         locks=locks,
@@ -113,8 +124,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.event_log = event_log
     app.state.message_store = message_store
     app.state.run_store = run_store
+    app.state.data_source = data_source
     app.state.tools = tools
     try:
         yield
     finally:
+        await data_source.close()
         await checkpointers.teardown()
