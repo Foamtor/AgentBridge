@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 from agent_base_core.adapters.role_policy import RolePolicyEngine
 from agent_base_core.protocol.context import RunContext
-from agent_base_core.registry.tool_meta import attach_tool_meta
+from agent_base_core.protocol.tool_meta import attach_tool_meta
 
 
 def _tool(name: str, **meta):
