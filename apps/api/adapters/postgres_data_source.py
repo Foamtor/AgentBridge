@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 
@@ -9,12 +10,18 @@ class PostgresDataSource:
     def __init__(self, dsn: str) -> None:
         self._dsn = dsn
         self._pool: Any | None = None
+        self._pool_lock = asyncio.Lock()
 
     async def _ensure_pool(self) -> Any:
-        if self._pool is None:
-            import asyncpg
+        if self._pool is not None:
+            return self._pool
+        async with self._pool_lock:
+            if self._pool is None:
+                import asyncpg
 
-            self._pool = await asyncpg.create_pool(dsn=self._dsn, min_size=1, max_size=5)
+                self._pool = await asyncpg.create_pool(
+                    dsn=self._dsn, min_size=1, max_size=5
+                )
         return self._pool
 
     async def query(self, sql: str, *params: Any) -> list[dict[str, Any]]:
@@ -35,6 +42,7 @@ class PostgresDataSource:
         return 0
 
     async def close(self) -> None:
-        if self._pool is not None:
-            await self._pool.close()
-            self._pool = None
+        async with self._pool_lock:
+            if self._pool is not None:
+                await self._pool.close()
+                self._pool = None

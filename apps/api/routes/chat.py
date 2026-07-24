@@ -42,6 +42,7 @@ async def chat_stream(
     settings = request.app.state.settings
     claims = getattr(request.state, "auth_claims", None)
     ctx = claims_to_run_context(claims, auth_required=settings.auth_required)
+    # data_source is a process-local handle (not JSON-serializable); keep in metadata only.
     ctx = ctx.model_copy(
         update={
             "metadata": {

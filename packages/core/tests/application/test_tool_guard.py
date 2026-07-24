@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+from typing import Annotated
+
 import pytest
 
 from agent_base_core.adapters.memory_audit_logger import MemoryAuditLogger
 from agent_base_core.adapters.role_policy import RolePolicyEngine
 from agent_base_core.application.tool_guard import guard_tools
-from agent_base_core.protocol.context import RunContext
-from agent_base_core.registry.tool_meta import attach_tool_meta
+from agent_base_core.protocol.context import RUN_CONTEXT_KEY, RunContext, get_run_context
+from agent_base_core.protocol.tool_meta import attach_tool_meta
+from langchain_core.runnables import RunnableConfig
+from langchain_core.tools import InjectedToolArg, tool
 
 
 class _T:
@@ -24,6 +28,15 @@ class _T:
     async def ainvoke(self, args):  # noqa: ANN001
         self.called = True
         return "did-delete"
+
+
+@tool
+async def _echo_tenant(config: Annotated[RunnableConfig, InjectedToolArg]) -> str:
+    """Return tenant_id from injected RunContext (guard regression)."""
+    return get_run_context(config).tenant_id
+
+
+_echo_tenant = attach_tool_meta(_echo_tenant, required_roles=["admin"])
 
 
 @pytest.mark.asyncio
@@ -57,3 +70,13 @@ def test_guard_sync_invoke_denies_and_audits() -> None:
     assert result == "forbidden"
     assert raw.called is False
     assert any(r["result"] == "denied" for r in audit.records)
+
+
+@pytest.mark.asyncio
+async def test_guard_preserves_injected_tool_arg_on_structured_tool() -> None:
+    """Wrapping must not strip InjectedToolArg (RunnableConfig) from BaseTool."""
+    ctx = RunContext(tenant_id="acme", roles=["admin"])
+    guarded = guard_tools([_echo_tenant], policy=RolePolicyEngine(), ctx=ctx)
+    config = {"configurable": {RUN_CONTEXT_KEY: ctx}}
+    result = await guarded[0].ainvoke({}, config=config)
+    assert result == "acme"
