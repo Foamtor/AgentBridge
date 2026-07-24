@@ -1,5 +1,6 @@
 # Agent-Base 全栈 AI 基底模板 — 设计规格
 
+> **历史规格。** 当前产品真源：[00-AgentBridge完整方案.md](../../00-AgentBridge完整方案.md) **v4.1**；冲突时以 v4.1 为准。  
 > 状态：**审阅高优项已修复**（见 §19）；可写实施计划；P0 待填 contracts JSON 样例  
 > 日期：2026-07-23  
 > 仓库：`D:\WorkSpace\code\project\Agent-Base`（模板仓，绿场）  

@@ -1,5 +1,16 @@
 # Deploy
 
+> 对齐 [00-AgentBridge完整方案.md](./00-AgentBridge完整方案.md) v4.1 **§9**。  
+> **v1.0 = M0–M4**（单机）。多机见 **M9**。
+
+## 部署矩阵
+
+| 模式 | 锁 | 限流 | 事件存储 | 说明 |
+|------|----|------|----------|------|
+| 本地 | 进程内 | 可选 | 内存或 PG | 默认开发 |
+| 单机生产 | 进程内 | 进程内或 Redis | Postgres | 主承诺 |
+| 多机 | Redis/DB | Redis | 集中 Postgres | M9 |
+
 ## Local (memory checkpointer)
 
 ```bash
@@ -9,35 +20,42 @@ cp .env.example .env
 cd apps/api && uvicorn main:app --reload --port 8000
 ```
 
-Web:
-
-```bash
-cd apps/web && npm install && npm run dev
-```
-
-Or from repo root: `./start-dev.sh` / `.\start-dev.ps1`.
+Web: `cd apps/web && npm install && npm run dev`  
+或根目录：`./start-dev.sh` / `.\start-dev.ps1`。
 
 ## Postgres checkpointer
 
 ```bash
 docker compose up -d postgres
-# wait healthy
-# .env: USE_MEMORY_CHECKPOINTER=false
-# Prefer PG_DSN=postgresql://user:pass@host:5432/db (recommended);
-# if empty, falls back to PG_HOST/PORT/DATABASE/USER/PASSWORD.
+# USE_MEMORY_CHECKPOINTER=false
+# PG_DSN=postgresql://user:pass@host:5432/db
 pip install -e "packages/core[postgres]"
 ```
 
-**副本与锁：** 当前默认进程内锁，**一期模板可用 ≠ 多副本生产**。水平扩展前须换分布式锁（二期 Redis），见 hardening 规格。
-
-`HOOKS_BACKEND=noop|logging` 可切换运行钩子。
+`HOOKS_BACKEND=noop|logging` 切换运行钩子。
 
 ## Authentik（可选）
 
-见 `infra/authentik/README.md`。`docker compose --profile auth up -d`。本地 smoke **不要求**。
+见 `infra/authentik/README.md`。`AUTH_REQUIRED=true` 时配置 `OIDC_ISSUER` 或 `OIDC_JWT_SECRET`；本地可用 `AUTH_DEV_STUB=1`（**禁止生产**）。
 
-`AUTH_REQUIRED=true` 时必须配置其一：
+### JWT → RunContext（M2a+）
 
-- `OIDC_ISSUER`（JWKS 验签），或
-- `OIDC_JWT_SECRET`（HS256），或
-- 仅本地：`AUTH_DEV_STUB=1`（任意非空 Bearer；**禁止生产**）
+| claim | 字段 |
+|-------|------|
+| `sub` | `user_id` |
+| `tenant_id` / `tid` | `tenant_id` |
+| `roles` | `roles` |
+| `permissions` / `perms` | `permissions` |
+
+两阶段注入与 checkpointer 键 `{tenant_id}::{thread_id}` 见完整方案 §4.1。  
+`AUTH_REQUIRED=false` 时开发默认 admin。
+
+## 单机上线检查清单（L3 = M2 审计 + M4）
+
+- [ ] 需要会话持久化时关闭 memory checkpointer，Postgres 可达
+- [ ] `AUTH_REQUIRED=true`，关闭 `AUTH_DEV_STUB`
+- [ ] 确认单实例，或已接受无分布式锁风险
+- [ ] `/ready`、`/metrics`（M4）与限流已验证
+- [ ] 审计可用（M2a）；EventLog/消息可查（M2b，若已交付）
+- [ ] 日志不落用户原文 / LLM 全文
+- [ ] 管理面/审批 API 权限已按 §4.7 配置（若已交付）

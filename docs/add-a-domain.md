@@ -1,6 +1,8 @@
 # Add a domain
 
-新业务场景只加域插件。**硬化完成后**不改 `packages/core`（一期硬化本身会改 core，见规格 §1.1）。
+新业务场景只加域插件。尽量不改 `packages/core`。
+
+产品方向与冻结契约见 [00-AgentBridge完整方案.md](./00-AgentBridge完整方案.md) **v4.1**（尤其 §4）。历史规格在 `docs/superpowers/`（冲突时以 v4.1 为准）。
 
 ## 步骤
 

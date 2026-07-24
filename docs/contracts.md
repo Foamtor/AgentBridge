@@ -1,17 +1,27 @@
 # Contracts（对外契约）
 
-> 状态：P0 初稿（字段级样例已定；与产品仓对照见 [parity-with-product.md](./parity-with-product.md)）  
-> 实现真源：本文件；`packages/core` 的 `protocol/events.py` 必须与此一致
+> 状态：SSE / chat 契约已实现；与产品仓对照见 [parity-with-product.md](./parity-with-product.md)  
+> 实现真源：本文件；`packages/core` 的 `protocol/events.py` 必须与此一致  
+> 产品真源：[00-AgentBridge完整方案.md](./00-AgentBridge完整方案.md) **v4.1**；端点总表见 [api-reference.md](./api-reference.md)
 
 ---
 
 ## 1. HTTP 入口
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/health` | `{"status":"ok"}` |
-| POST | `/chat/stream` | SSE 流式对话 |
-| POST | `/chat/cancel` | 取消进行中的 run |
+| 方法 | 路径 | 说明 | 状态 |
+|------|------|------|------|
+| GET | `/health` | `{"status":"ok"}` | 已有 |
+| POST | `/chat/stream` | SSE 流式对话 | 已有 |
+| POST | `/chat/cancel` | 取消进行中的 run | 已有 |
+| GET | `/ready` | 依赖就绪 | 规划 M4 |
+| GET | `/threads` | 对话列表 | 规划 M2b |
+| GET | `/threads/{id}/messages` | 消息历史（投影） | 规划 M2b |
+| GET | `/runs`、`/runs/{id}` | Run 状态 | 规划 M2b |
+| GET | `/runs/{id}/events` | EventLog 回放 | 规划 M2b |
+| GET | `/metrics` | Prometheus | 规划 M4 |
+| GET/POST | `/approvals/*` | 人机审批 | 规划 M6 |
+| POST | `/ingest` | 文档摄取 | 规划 M7 |
+| GET/POST | `/admin/*` | 域/配置/策略 | 规划 M8 |
 
 ### 1.1 `POST /chat/stream`
 
@@ -278,8 +288,41 @@
 
 - Header：`Authorization: Bearer <access_token>`
 - `AUTH_REQUIRED=false`：不校验（本地默认）
-- `AUTH_REQUIRED=true`：校验 Authentik OIDC JWT（`OIDC_ISSUER` / `OIDC_AUDIENCE`）
+- `AUTH_REQUIRED=true`：校验 Authentik OIDC JWT（`OIDC_ISSUER` / `OIDC_AUDIENCE`）或 HS256
 - 未授权：`401` + `{"detail":{"code":"unauthorized"}}`
+
+### 3.1 JWT → RunContext（规划 M2a）
+
+| claim | RunContext |
+|-------|------------|
+| `sub` | `user_id` |
+| `tenant_id` 或 `tid` | `tenant_id` |
+| `roles` | `roles` |
+| `permissions` 或 `perms` | `permissions` |
+
+`AUTH_REQUIRED=false` 时开发默认：`user_id=dev`、`roles=["admin"]`、`permissions=["*"]`。
+
+**两阶段**：JWT 只填身份字段；Lifecycle 创建 `run_id` 后再写入 configurable（完整方案 §4.1）。
+
+**Checkpointer 存储键**：`{tenant_id}::{thread_id}`（对外 API 的 `thread_id` 不变）。
+
+### 3.2 事件真源与消息投影（规划 M2b）
+
+- **EventLog** = **已成功 append** 的出站事件；为 run 真源  
+- **顺序**：先 `append` 成功，再 SSE `emit`；append 失败则终止，不得继续推业务事件  
+- **MessageStore**：终端事件已提交后的对话摘要投影  
+- `text_delta` 不强制逐 token 投影；EventLog 可对 delta 采样/合并（见完整方案 §4.2）  
+- **断连**：表示 run 未完整终端；已提交前缀仍可回放，不是「真源不可信」
+
+### 3.3 规划中的治理类 SSE
+
+- `x.bridge.approval_required` / `x.bridge.approval_resolved`（审批等待默认**释放** thread 锁，见完整方案 §4.6）  
+- `x.bridge.citation`  
+- 多 Agent：**单流**，`data.agent_id` / `parent_run_id`（§4.8）
+
+### 3.4 管理面鉴权（规划）
+
+`/admin/*`、写 `/prompts`、写 `/ingest` 需 admin 类 permission；`/approvals/*` 需 `approval:decide`（或配置等价物）。见完整方案 §4.7。
 
 ---
 
@@ -292,3 +335,7 @@ cancel_run(lifecycle, *, thread_id, run_id=None)
 
 - 只转发已注入的 `RunLifecycle`
 - **禁止**在 `public.py` 内 `new` 任何 adapter
+- M2a+：可经 Pipeline 入口调用；`public.py` 同时兼容 lifecycle 与 pipeline  
+- M2a+：Policy 过滤 tool list（`list_tools`）+ 执行期再检（`invoke_tool`）  
+- M2b+：emit 路径 **append-before-emit** 写 EventLog  
+- M5+：`LLM_BACKEND=direct|gateway`（见完整方案 §5.2）
