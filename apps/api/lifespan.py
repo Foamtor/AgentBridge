@@ -52,6 +52,25 @@ def _build_data_source(settings: Settings) -> Any:
     return PostgresDataSource(dsn)
 
 
+def _build_llm_gateway(settings: Settings) -> Any:
+    """Build gateway; default FakeChatModel keeps CI offline."""
+    from agent_base_core.adapters.alias_llm_gateway import AliasLLMGateway
+    from agent_base_core.adapters.direct_llm_gateway import DirectLLMGateway
+    from agent_base_core.adapters.fake_chat_model import FakeChatModel
+
+    default_model = FakeChatModel(["direct-ok"])
+    if settings.llm_backend == "gateway":
+        # Aliases are host-wired; domains only pass model= alias strings.
+        return AliasLLMGateway(
+            {
+                "default": FakeChatModel(["gateway-default"]),
+                "fast": FakeChatModel(["gateway-fast"]),
+            },
+            default_alias="default",
+        )
+    return DirectLLMGateway(default_model)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     configure_logging()
@@ -94,6 +113,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     message_store = MemoryMessageStore()
     run_store = MemoryRunStore()
     data_source = _build_data_source(settings)
+    llm_gateway = _build_llm_gateway(settings)
     from adapters.prometheus_metrics import PrometheusMetrics
     from observability.tracing import make_run_span_factory
 
@@ -138,6 +158,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.message_store = message_store
     app.state.run_store = run_store
     app.state.data_source = data_source
+    app.state.llm_gateway = llm_gateway
     app.state.metrics = metrics
     app.state.tools = tools
     # Expose checkpointer factory for /ready (memory always "ready" after setup).
