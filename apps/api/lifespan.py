@@ -7,6 +7,7 @@ from typing import Any, AsyncIterator
 
 from fastapi import FastAPI
 
+from agent_base_core.adapters.basic_input_validator import BasicInputValidator
 from agent_base_core.adapters.inprocess_cancel import InProcessCancelRegistry
 from agent_base_core.adapters.inprocess_lock import InProcessThreadLock
 from agent_base_core.adapters.langgraph_runtime import LangGraphRuntime
@@ -19,7 +20,11 @@ from agent_base_core.adapters.memory_run_store import MemoryRunStore
 from agent_base_core.adapters.noop_data_source import NoopDataSource
 from agent_base_core.adapters.noop_hooks import NoopHooks
 from agent_base_core.adapters.role_policy import RolePolicyEngine
-from agent_base_core.application.pipeline import RequestPipeline, ToolPolicyPlugin
+from agent_base_core.application.pipeline import (
+    InputValidatorPlugin,
+    RequestPipeline,
+    ToolPolicyPlugin,
+)
 from agent_base_core.application.run_lifecycle import RunLifecycle
 from agent_base_core.registry.graphs import GraphRegistry
 from agent_base_core.registry.input_builders import InputBuilderRegistry
@@ -90,8 +95,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     run_store = MemoryRunStore()
     data_source = _build_data_source(settings)
     from adapters.prometheus_metrics import PrometheusMetrics
+    from observability.tracing import make_run_span_factory
 
     metrics = PrometheusMetrics()
+    span_factory = make_run_span_factory(enabled=settings.otel_enabled)
 
     lifecycle = RunLifecycle(
         locks=locks,
@@ -108,15 +115,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         message_store=message_store,
         run_store=run_store,
         metrics=metrics,
+        span_factory=span_factory,
     )
     pipeline = RequestPipeline(
         lifecycle=lifecycle,
         plugins=[
+            InputValidatorPlugin(BasicInputValidator()),
             ToolPolicyPlugin(
                 policy=policy,
                 audit=audit,
                 tools_registry=tools,
-            )
+            ),
         ],
     )
 

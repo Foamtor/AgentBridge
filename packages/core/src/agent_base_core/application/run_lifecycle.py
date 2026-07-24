@@ -28,6 +28,7 @@ from agent_base_core.protocol.fragments import OutboundFragment
 from agent_base_core.registry.graphs import GraphRegistry
 from agent_base_core.registry.input_builders import InputBuilderRegistry
 from agent_base_core.registry.tools import ToolRegistry
+from contextlib import nullcontext
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,7 @@ class RunLifecycle:
         message_store: Any | None = None,
         run_store: Any | None = None,
         metrics: Any | None = None,
+        span_factory: Any | None = None,
     ) -> None:
         self._locks = locks
         self._checkpointers = checkpointers
@@ -68,6 +70,7 @@ class RunLifecycle:
         self._message_store = message_store
         self._run_store = run_store
         self._metrics = metrics
+        self._span_factory = span_factory
 
     def replace_runtime(self, runtime: GraphRuntime) -> None:
         """Test/host hook to swap GraphRuntime without private attribute access."""
@@ -167,10 +170,6 @@ class RunLifecycle:
     ) -> None:
         run_id = f"r-{uuid.uuid4().hex[:12]}"
         trace_id = run_id
-        sequence = 0
-        terminal_sent = False
-        terminal_status: str | None = None
-        pre_start_failure = False
         run_ctx = ctx or RunContext()
         run_ctx = run_ctx.model_copy(
             update={"run_id": run_id, "trace_id": run_ctx.trace_id or run_id}
@@ -184,8 +183,59 @@ class RunLifecycle:
             raise ThreadBusy(thread_id)
 
         cancel_token = asyncio.Event()
-        cancelled = False
         await self._cancels.register(storage_key, run_id, cancel_token)
+        span_cm: Any = nullcontext()
+        if self._span_factory is not None:
+            try:
+                span_cm = self._span_factory(
+                    run_id=run_id, route=route, tenant_id=tenant_id
+                )
+            except Exception:  # noqa: BLE001 — span must never block runs
+                logger.exception(
+                    "span_factory failed thread_id=%s run_id=%s", thread_id, run_id
+                )
+                span_cm = nullcontext()
+        with span_cm:
+            await self._run_stream_body(
+                query=query,
+                thread_id=thread_id,
+                route=route,
+                sink=sink,
+                model=model,
+                extra=extra,
+                run_ctx=run_ctx,
+                tools_override=tools_override,
+                run_id=run_id,
+                trace_id=trace_id,
+                tenant_id=tenant_id,
+                storage_key=storage_key,
+                graph_cfg=graph_cfg,
+                cancel_token=cancel_token,
+            )
+
+    async def _run_stream_body(
+        self,
+        *,
+        query: str,
+        thread_id: str,
+        route: str,
+        sink: EventSink,
+        model: str | None,
+        extra: dict[str, Any] | None,
+        run_ctx: RunContext,
+        tools_override: list[Any] | None,
+        run_id: str,
+        trace_id: str,
+        tenant_id: str,
+        storage_key: str,
+        graph_cfg: dict[str, Any],
+        cancel_token: asyncio.Event,
+    ) -> None:
+        sequence = 0
+        terminal_sent = False
+        terminal_status: str | None = None
+        pre_start_failure = False
+        cancelled = False
         try:
             builder = self._graphs.get(route)
             if tools_override is not None:
