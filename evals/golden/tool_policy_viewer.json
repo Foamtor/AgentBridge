@@ -1,0 +1,50 @@
+{
+  "name": "tool_policy_viewer",
+  "description": "Viewer must be denied admin-only tools; admin allowed",
+  "cases": [
+    {
+      "id": "viewer_deny_delete_records",
+      "roles": ["viewer"],
+      "permissions": [],
+      "action": "invoke_tool",
+      "resource": {
+        "required_roles": ["admin"],
+        "required_permissions": []
+      },
+      "expect": "deny"
+    },
+    {
+      "id": "admin_allow_delete_records",
+      "roles": ["admin"],
+      "permissions": [],
+      "action": "invoke_tool",
+      "resource": {
+        "required_roles": ["admin"],
+        "required_permissions": []
+      },
+      "expect": "allow"
+    },
+    {
+      "id": "viewer_allow_open_tool",
+      "roles": ["viewer"],
+      "permissions": [],
+      "action": "invoke_tool",
+      "resource": {
+        "required_roles": [],
+        "required_permissions": []
+      },
+      "expect": "allow"
+    },
+    {
+      "id": "star_perm_allows_admin_tool",
+      "roles": ["viewer"],
+      "permissions": ["*"],
+      "action": "invoke_tool",
+      "resource": {
+        "required_roles": ["admin"],
+        "required_permissions": []
+      },
+      "expect": "allow"
+    }
+  ]
+}
