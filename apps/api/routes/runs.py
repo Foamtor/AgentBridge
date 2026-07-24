@@ -15,7 +15,11 @@ router = APIRouter(prefix="/runs", tags=["runs"])
 def _ctx(request: Request):
     settings = request.app.state.settings
     claims = getattr(request.state, "auth_claims", None)
-    return claims_to_run_context(claims, auth_required=settings.auth_required)
+    return claims_to_run_context(
+        claims,
+        auth_required=settings.auth_required,
+        policy_bundle_version=settings.policy_bundle_version,
+    )
 
 
 @router.get("/{run_id}")

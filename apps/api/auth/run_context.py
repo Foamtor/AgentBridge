@@ -11,12 +11,14 @@ def claims_to_run_context(
     claims: Mapping[str, Any] | None,
     *,
     auth_required: bool,
+    policy_bundle_version: str = "",
 ) -> RunContext:
     """Build identity RunContext from optional JWT claims.
 
     Dev default (admin + ``*``) only when ``auth_required`` is False.
     When auth is required and claims are missing, return an empty identity
     (no elevated roles/permissions).
+    ``policy_bundle_version`` comes from host config (not JWT).
     """
     if not auth_required:
         return RunContext(
@@ -24,10 +26,11 @@ def claims_to_run_context(
             tenant_id="dev",
             roles=["admin"],
             permissions=["*"],
+            policy_bundle_version=policy_bundle_version,
         )
 
     if claims is None:
-        return RunContext()
+        return RunContext(policy_bundle_version=policy_bundle_version)
 
     roles_raw = claims.get("roles") or []
     if isinstance(roles_raw, str):
@@ -49,4 +52,5 @@ def claims_to_run_context(
         tenant_id=str(tenant),
         roles=roles,
         permissions=permissions,
+        policy_bundle_version=policy_bundle_version,
     )
