@@ -157,7 +157,16 @@ class LangGraphRuntime:
                 "graph builder did not return a compiled graph with astream_events"
             )
 
-        config = {"configurable": {"thread_id": thread_id}}
+        graph_cfg = extra.get("graph_config")
+        if isinstance(graph_cfg, dict) and isinstance(graph_cfg.get("configurable"), dict):
+            config = {
+                "configurable": {
+                    **graph_cfg["configurable"],
+                    "thread_id": graph_cfg["configurable"].get("thread_id", thread_id),
+                }
+            }
+        else:
+            config = {"configurable": {"thread_id": thread_id}}
         stream = compiled.astream_events(graph_input, config=config, version="v2")
         aiter = stream.__aiter__()
         streamed_model_text = False
