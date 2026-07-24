@@ -1,6 +1,6 @@
 # Agent-Base 后端架构调研
 
-> 日期：2026-07-23  
+> **阅读提示：** 这是历史设计/实施记录。文中若仍有偏内部的说法，请以仓库根目录 README、docs/roadmap.md、docs/add-a-domain.md 的白话为准。\n\n> 日期：2026-07-23  
 > 目的：为绿场重写提供依据——对照业界实践与开源项目，选定分层、模式与技术边界  
 > 结论已吸收进：[`2026-07-23-agent-ai-base-design.md`](./2026-07-23-agent-ai-base-design.md)
 
@@ -13,7 +13,7 @@
 | Agent 运行时 | LangGraph vs OpenAI Agents SDK 等 |
 | 服务分层 | 整洁/六边形、垂直模块、插件域 |
 | 生产能力 | checkpoint、流式、取消、并发、可观测 |
-| 门禁 | import 方向强制、测试边界 |
+| 验收条件 | import 方向强制、测试边界 |
 | 开源参照 | 可学结构，禁止照抄实现进本仓 |
 
 产品仓 `RAG_Agent` 只作**能力清单与行为对照**，不作代码母版。
@@ -60,7 +60,7 @@
 |------|------|----------|
 | [python-hexagonal-architecture-template](https://github.com/MatthiasEg/python-hexagonal-architecture-template) | **import-linter 强制分层**；内向依赖 | 过重的纯 domain 仪式（Agent 图无法完全脱离框架） |
 | [langgraph-agent-clean-architecture](https://github.com/eng-mostafa-alrahal/langgraph-agent-clean-architecture) | `api` / `modules` / `infrastructure` 垂直切分；会话与 orchestration 分模块 | Celery 默认承载对话流、全家桶 RAG/MCP 第一期不进 |
-| [fastapi-agent-blueprint](https://github.com/ZachDreamZ/fastapi-agent-blueprint) | 域四层 + worker 边界意识；AGENTS.md 协作 | Admin/MCP/多云适配器超出底座范围 |
+| [fastapi-agent-blueprint](https://github.com/ZachDreamZ/fastapi-agent-blueprint) | 域四层 + worker 边界意识；AGENTS.md 协作 | Admin/MCP/多云适配器超出本平台范围 |
 | [agentea](https://github.com/kasundularaam/agentea) | Ports + DI 思路 | 绑定特定云 Agent 栈 |
 | 生产文实践（PostgresSaver、瘦 State、recursion_limit） | 见 §4 | 博客示例代码不直接入库 |
 
@@ -71,7 +71,7 @@
 - **内核**管「一次 Run 怎么跑完、怎么推事件、怎么锁会话」——不写业务问答逻辑。  
 - **端口（Ports）**是内核对外依赖的接口：锁、checkpoint、事件出口、跑图、取消、时钟等。  
 - **适配器（Adapters）**用具体技术实现端口：LangGraph、Postgres、内存锁、SSE。  
-- **域插件**只负责「注册哪张图、哪些工具」；启动时挂上，运行时内核通过注册表调用。
+- **业务插件**只负责「注册哪张图、哪些工具」；启动时挂上，运行时内核通过注册表调用。
 
 **刻意不做：** 每个小功能都拆 Entity/Repository/UseCase 四件套；用复杂 DI 容器堆生命周期。组装放在 `apps/api` 的 lifespan / composition 即可。
 
@@ -127,7 +127,7 @@
 | **策略** | RouteResolver（可选） | 路由规则可外置，默认显式 route |
 | **观察者 / 钩子** | `on_run_end` 等 | 观测、落库不进核心必选路径 |
 | **防腐层** | SSE Event Mapper | LangGraph 内部流 → 稳定对外事件 |
-| **脚手架复制** | `domains/_scaffold` | 新域标准形状，避免复制粘贴核心 |
+| **脚手架复制** | `domains/_scaffold` | 新业务插件标准形状，避免复制粘贴核心 |
 
 反模式（产品仓已出现、本仓禁止）：
 
@@ -190,7 +190,7 @@ packages/core/src/agent_base_core/
 
 `apps/api`：delivery（路由、鉴权、DTO）+ composition（组装端口实现）+ `domains/`。
 
-门禁：
+验收条件：
 
 - **import-linter**：`application` 不依赖 `adapters`；`adapters` 可依赖 ports；domains 互不强制依赖；core 禁止 domains。  
 - 另保留简单「禁止业务包名」扫描（防产品仓包名泄漏）。
@@ -235,7 +235,7 @@ packages/core/src/agent_base_core/
 2. **分层 + 接口 + 构造注入**：application + ports + adapters + registry；域为插件。  
 3. **import-linter + 测试** 防止结构再次散乱。  
 4. **生产约束**（瘦 State、PG checkpoint、recursion_limit、取消/409）写进核心默认行为。  
-5. **开源只借鉴结构与门禁，不复制仓库代码。**
+5. **开源只借鉴结构与验收条件，不复制仓库代码。**
 
 ---
 
@@ -243,7 +243,7 @@ packages/core/src/agent_base_core/
 
 - LangGraph Streaming / Event streaming（LangChain docs）  
 - Import Linter：https://import-linter.readthedocs.io/  
-- Hexagonal FastAPI template（import 门禁）：MatthiasEg/python-hexagonal-architecture-template  
+- Hexagonal FastAPI template（import 验收条件）：MatthiasEg/python-hexagonal-architecture-template  
 - LangGraph Clean Architecture 示例：eng-mostafa-alrahal/langgraph-agent-clean-architecture  
 - OpenAI Agents SDK vs LangGraph 对比文（选型背景）  
 - 产品仓文档：`RAG_Agent/docs/Agent技术/05-编排核心提取与可迁移方案.md`（能力边界参考，非实现蓝本）

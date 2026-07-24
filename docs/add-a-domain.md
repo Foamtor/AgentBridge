@@ -1,53 +1,60 @@
-# Add a domain
+# 怎么加一个业务插件
 
-新业务场景只加域插件。尽量不改 `packages/core`。
+新业务场景只加一个插件目录，尽量不要改 `packages/core`。
 
-产品方向与冻结契约见 [00-AgentBridge完整方案.md](./00-AgentBridge完整方案.md) **v4.1**（尤其 §4）。历史规格在 `docs/superpowers/`（冲突时以 v4.1 为准）。
+产品约定见 [00-AgentBridge完整方案.md](./00-AgentBridge完整方案.md)。历史材料在 `docs/superpowers/`（冲突时以完整方案为准）。
+
+## 「业务插件」是什么
+
+就是 `apps/api/domains/<名字>/` 下面那一套代码：对话状态、流程图、工具。  
+请求里的 `route` 填这个名字，平台就知道走哪套逻辑。
+
+（文件夹仍叫 `domains`，只是历史目录名；阅读时把它想成「业务插件」即可。）
 
 ## 步骤
 
-1. 复制 `apps/api/domains/_scaffold` 为 `apps/api/domains/<name>/`（或参照 `echo` / `demo_tools`）
-2. 改 `state.py`（类型化 State）、`tools.py`、`graph.py`（`build_<name>_graph`）
-3. 在 `bootstrap.py` 里 `tools.register` / `graphs.register` / `input_builders.register`
-4. 在 `apps/api/domains/bootstrap.py` 的 `register_all` 里调用该域的 `register`
-5. 重启 API，用调试台或 `POST /chat/stream` 以 `route="<name>"` 验证
+1. 复制 `apps/api/domains/_scaffold` 为 `apps/api/domains/<名字>/`（或参照 `echo` / `demo_tools`）
+2. 改 `state.py`（状态结构）、`tools.py`、`graph.py`（`build_<名字>_graph`）
+3. 在该目录的 `bootstrap.py` 里注册：tools / graphs / input_builders
+4. 在 `apps/api/domains/bootstrap.py` 的 `register_all` 里调用上面的 `register`
+5. 重启 API，用调试台或 `POST /chat/stream`，`route` 填你的名字做验证
 
-样板：
+可参考的示例：
 
-- `echo` — 最小图，无 tool SSE
-- `demo_tools` — 无 LLM；Fake AIMessage + ToolNode；State 写入 `OUTBOUND_EXTENSIONS_KEY` → `x.demo_tools.*`
+- `echo` — 最小流程，没有工具
+- `demo_tools` — 无真实大模型；演示工具调用和扩展事件 `x.demo_tools.*`
+- `demo_rag` — 演示检索与引用事件 `x.bridge.citation`
 
 ## 扩展事件怎么发
 
-1. **默认（推荐）：** 图 State 用 `OUTBOUND_EXTENSIONS_KEY`（来自 `agent_base_core.protocol.fragments`）存 `list[{type, data}]`；runtime 在跑完后用 `compiled.aget_state` 读取。`type` 必须合法 `x.<domain>.*`。
-2. **同级高级选项：** `event_hook`（流中途推扩展；一期未实现）。简单域用 State；嵌套子图/中途推送可开 hook——二者同级，不是失败后的迫不得已。
-3. **禁止：** 域持有 / 直接调用 `EventSink`。
+1. **推荐：** 把事件列表写在图状态的 `OUTBOUND_EXTENSIONS_KEY` 里（来自 `agent_base_core.protocol.fragments`）。类型必须是合法的 `x.<业务名>.*`。运行时会在跑完后读出并推给客户端。
+2. **不要：** 在业务插件里直接推 SSE，或拿着底层事件发送对象乱发。
 
-## hooks 示例
+## 运行钩子
 
-默认 `HOOKS_BACKEND=noop`。设 `HOOKS_BACKEND=logging` 使用 `LoggingHooks`。
+默认 `HOOKS_BACKEND=noop`。需要日志钩子时设 `HOOKS_BACKEND=logging`。
 
-## 什么时候必须改 core？（决策树）
+## 什么时候才必须改核心库？
 
 ```text
-新需求只影响某个业务图 / 工具 / State？
-  └─ 是 → 只改 domains/<name> + bootstrap。停。
+新需求只影响某个业务的流程 / 工具 / 状态？
+  └─ 是 → 只改 domains/<名字> 并注册。结束。
 
-需要新的「对外 SSE 稳定类型」（不是 x.*）？
-  └─ 是 → 改 contracts.md + protocol/events.py（及文档）。这是契约变更，需评审。
+需要新增「对外固定事件类型」（不是 x.* 这种扩展）？
+  └─ 是 → 改 contracts.md 和协议代码，这是接口变更，要评审。
 
-需要新的框架信号映射（例如某种 LangGraph 事件 → Fragment）？
-  └─ 是 → 改 adapters/event_mapper.py + langgraph_runtime.py（防腐层）。
+需要改「LangGraph 某种内部信号 → 对外事件」的映射？
+  └─ 是 → 改适配层（event_mapper / langgraph_runtime）。
 
-需要改锁 / cancel / 编号 / 终端保证？
-  └─ 是 → 改 application/run_lifecycle.py（或二期换 Redis 适配器）。
+需要改锁、取消、事件编号、结束保证？
+  └─ 是 → 改 application/run_lifecycle（或换 Redis 锁等适配器）。
 
-只是换 Postgres / hooks / 鉴权配置？
-  └─ 是 → 改 apps/api lifespan / settings / .env，不改 core 业务逻辑。
+只是换数据库、钩子、登录配置？
+  └─ 是 → 改 apps/api 的启动组装 / settings / .env，不要改核心业务逻辑。
 ```
 
 ## 约束
 
-- 域之间默认互不 import
-- `application` 不得 import 域代码；core **不得**出现业务域名 / 节点名硬编码（如 `demo_tools`、`echo_node`）
-- recursion_limit 等图配置写在域的 `graph.py`，不要塞进路由层
+- 不同业务插件之间默认不要互相 import
+- 核心库的 `application` 不能 import 业务代码；核心源码里不能写死业务名（例如 `demo_tools`）
+- 图自己的 recursion_limit 等配置写在业务的 `graph.py`，不要塞进 HTTP 路由层

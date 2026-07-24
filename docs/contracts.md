@@ -1,8 +1,8 @@
-# Contracts（对外契约）
+# 对外接口约定（Contracts）
 
-> 状态：SSE / chat 契约已实现；与产品仓对照见 [parity-with-product.md](./parity-with-product.md)  
-> 实现真源：本文件；`packages/core` 的 `protocol/events.py` 必须与此一致  
-> 产品真源：[00-AgentBridge完整方案.md](./00-AgentBridge完整方案.md) **v4.1**；端点总表见 [api-reference.md](./api-reference.md)
+> 状态：SSE / chat 约定已实现；与产品仓对照见 [parity-with-product.md](./parity-with-product.md)  
+> **以本文件 + `packages/core` 的 `protocol/events.py` 为准**（两边必须一致）  
+> 产品总说明：[00-AgentBridge完整方案.md](./00-AgentBridge完整方案.md)；接口列表见 [api-reference.md](./api-reference.md)
 
 ---
 
@@ -13,15 +13,15 @@
 | GET | `/health` | `{"status":"ok"}` | 已有 |
 | POST | `/chat/stream` | SSE 流式对话 | 已有 |
 | POST | `/chat/cancel` | 取消进行中的 run | 已有 |
-| GET | `/ready` | 依赖就绪 | 规划 M4 |
-| GET | `/threads` | 对话列表 | 规划 M2b |
-| GET | `/threads/{id}/messages` | 消息历史（投影） | 规划 M2b |
-| GET | `/runs`、`/runs/{id}` | Run 状态 | 规划 M2b |
-| GET | `/runs/{id}/events` | EventLog 回放 | 规划 M2b |
-| GET | `/metrics` | Prometheus | 规划 M4 |
-| GET/POST | `/approvals/*` | 人机审批 | 规划 M6 |
-| POST | `/ingest` | 文档摄取 | 规划 M7 |
-| GET/POST | `/admin/*` | 域/配置/策略 | 规划 M8 |
+| GET | `/ready` | 依赖就绪 | 已有 |
+| GET | `/threads` | 对话列表 | 已有 |
+| GET | `/threads/{id}/messages` | 消息历史 | 已有 |
+| GET | `/runs`、`/runs/{id}` | Run 状态 | 已有 |
+| GET | `/runs/{id}/events` | 事件回放 | 已有 |
+| GET | `/metrics` | Prometheus | 已有 |
+| GET/POST | `/approvals/*` | 人工审批 | 已有 |
+| POST | `/ingest` | 文档摄取 | 视部署是否提供 |
+| GET/POST | `/admin/*` | 管理接口 | 已有（如 domains / audit export） |
 
 ### 1.1 `POST /chat/stream`
 
@@ -41,7 +41,7 @@
 |------|------|------|------|
 | `query` | string | 是 | 用户输入 |
 | `thread_id` | string | 是 | 会话键（锁与 checkpoint 粒度） |
-| `route` | string | 是 | 已注册图名 |
+| `route` | string | 是 | 已注册的业务插件名 |
 | `model` | string | 否 | 模型别名，默认 `default` |
 | `extra` | object | 否 | 传给 input_builder / configurable |
 
@@ -278,7 +278,7 @@
 **扩展集**（域自定义，经 `build_extension_event` 出站）：
 
 - `type` 必须匹配：`^x\.[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$`  
-  （域名段后至少一段；**禁止**连续点 `..` 与尾部点 `.`）
+  （业务插件名段后至少一段；**禁止**连续点 `..` 与尾部点 `.`）
 - 示例：`x.demo_tools.finished`
 - 非法扩展 type（如 `X.UPPER.x`、`x.`、`custom`）**不得出站**；应用层拒绝，禁止静默透传
 
@@ -308,13 +308,13 @@
 
 **Checkpointer 存储键**：`{tenant_id}::{thread_id}`（对外 API 的 `thread_id` 不变）。
 
-### 3.2 事件真源与消息投影（规划 M2b）
+### 3.2 事件权威说明与消息投影（规划 M2b）
 
-- **EventLog** = **已成功 append** 的出站事件；为 run 真源  
+- **EventLog** = **已成功 append** 的出站事件；为 run 权威说明  
 - **顺序**：先 `append` 成功，再 SSE `emit`；append 失败则终止，不得继续推业务事件  
 - **MessageStore**：终端事件已提交后的对话摘要投影  
 - `text_delta` 不强制逐 token 投影；EventLog 可对 delta 采样/合并（见完整方案 §4.2）  
-- **断连**：表示 run 未完整终端；已提交前缀仍可回放，不是「真源不可信」
+- **断连**：表示 run 未完整终端；已提交前缀仍可回放，不是「权威说明不可信」
 
 ### 3.3 规划中的治理类 SSE
 

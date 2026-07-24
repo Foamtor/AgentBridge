@@ -1,70 +1,68 @@
 # 路线图（AgentBridge）
 
-> 与 [00-AgentBridge完整方案.md](./00-AgentBridge完整方案.md) **v4.1.1** 对齐。  
-> **不计人天**：能力里程碑 + 验收演示。细节契约以完整方案 §4 为准。  
-> 实施计划（Plan r3）与依赖：[superpowers/plans/README.md](./superpowers/plans/README.md) · [DEPENDENCIES.md](./superpowers/plans/DEPENDENCIES.md)
+> 与 [00-AgentBridge完整方案.md](./00-AgentBridge完整方案.md) 对齐。  
+> 这里按「能力做到哪一步」划分，不按人天估工期。  
+> 实施记录：[superpowers/plans/README.md](./superpowers/plans/README.md)
 
-## 实施计划（工程拆分）
+## 怎么拆成几期做
 
-不计人天后的能力里程碑，按 5 个可交付 Plan 施工（详见 [`docs/superpowers/plans/README.md`](./superpowers/plans/README.md)）：
+| 顺序 | 内容 | 对应能力 | 版本含义 |
+|------|------|----------|----------|
+| 1 | 可安全接入 | 包装、身份、工具权限、事件与回放 | → v0.2 |
+| 2 | 可查库 | 业务库只读示例 | → v0.3 |
+| 3 | 单机可运维 | 就绪检查、指标、限流等 | → **v1.0（单机）** |
+| 4 | 智能与治理 | 模型出口、审批、过滤、知识库示例 | → v1.x |
+| 5 | 协作与扩展 | 多 Agent、TS 客户端、管理接口、多机、评测导出 | → 多机 / v2.0 |
 
-| Plan | 里程碑 | 目标版本 |
-|------|--------|----------|
-| [Plan1 可安全接入](./superpowers/plans/2026-07-24-plan1-secure-access.md) | M1+M2a+M2b | v0.2 |
-| [Plan2 可查库](./superpowers/plans/2026-07-24-plan2-datasource.md) | M3 | v0.3 |
-| [Plan3 单机生产](./superpowers/plans/2026-07-24-plan3-single-node-prod.md) | M4 | **v1.0** |
-| [Plan4 智能与治理](./superpowers/plans/2026-07-24-plan4-intelligence-governance.md) | M5–M7 | v1.x |
-| [Plan5 协作与扩展](./superpowers/plans/2026-07-24-plan5-collaboration-scale.md) | M8–M10 | 多机 / v2.0 |
+详细任务文件在 `docs/superpowers/plans/`。
 
 ---
 
-## 里程碑总览
+## 能力一览
 
-| 里程碑 | 主题 | 状态 |
-|--------|------|------|
-| **M0** | 编排底座 | ✅ 已有 |
-| **M1** | 开源包装 + AI 友好 | ✅ Plan1 |
-| **M2a** | 身份 + Tool Policy（list+invoke 双检）+ 审计 + Pipeline | ✅ Plan1 |
-| **M2b** | EventLog（全量已提交）+ 投影（delta 合并）+ replay | ✅ Plan1 |
-| **M3** | DataSource + demo_readonly | ✅ Plan2 |
-| **M4** | 单机生产面（ready/metrics/限流/OTel） | ✅ Plan3 |
-| **M5** | Gateway（direct\|gateway 过渡）+ ContextManager + Prompt | ✅ Plan4 |
-| **M6** | DataFilter、双轨脱敏、Approval（释放锁/同 run resume） | ✅ Plan4 |
-| **M7** | Memory extra、RAG、citation | ✅ Plan4 |
-| **M8** | 多 Agent（单流 agent_id）、TS SDK、管理 API 鉴权 | ✅ Plan5 |
-| **M9** | 多机（Redis 锁/限流） | ✅ Plan5 |
-| **M10** | Eval、策略包版本、合规导出 | ✅ Plan5 |
+| 编号 | 主题 | 状态 |
+|------|------|------|
+| **M0** | 编排基础（对话、冲突、取消） | ✅ 已有 |
+| **M1** | 开源包装 + AI 协作说明 | ✅ |
+| **M2a** | 身份 + 工具权限（列表与执行都要检查）+ 审计 + 请求流水线 | ✅ |
+| **M2b** | 事件先落库再推送、消息/Run 投影、回放 | ✅ |
+| **M3** | 业务库访问 + 只读示例插件 | ✅ |
+| **M4** | 单机运维面（ready / metrics / 限流 / 链路） | ✅ |
+| **M5** | 模型出口（可切换）+ 上下文裁剪 + Prompt | ✅ |
+| **M6** | 数据过滤、脱敏、人工审批 | ✅ |
+| **M7** | 记忆扩展、检索接口、引用事件 | ✅ |
+| **M8** | 多 Agent（同一条流里区分发言者）、TS 客户端、管理接口权限 | ✅ |
+| **M9** | 多机（Redis 锁与限流） | ✅ |
+| **M10** | 策略评测、策略版本号、审计导出 | ✅ |
 
-## 验收演示
+## 现场怎么验收（说人话）
 
-> 状态列「✅ PlanN」表示已合入默认分支的实现与单测门禁（以本仓库 `master` 为准）。
+| 编号 | 你应该能当场演示 |
+|------|------------------|
+| M0 | echo / demo_tools 能聊；同一会话冲突返回 409；能取消 |
+| M1 | 按说明搭起来能对话；指令路径检查能过 |
+| M2a | 两种角色工具可见性不同；无权限执行会被拒绝；有审计记录 |
+| M2b | 能查到上一轮消息；回放与已写入事件一致；写入失败时不推业务事件 |
+| M3 | 有权限能查库；无权限既不出现在工具列表，执行也会被拒 |
+| M4 | `/ready`、`/metrics`；触发限流有明确错误码；非法输入 400 |
+| M5 | 切换 `LLM_BACKEND=gateway` 不用改业务插件；历史裁剪可测 |
+| M6 | 审批等待时释放会话锁；超时拒绝；同意后同一 run 继续；脱敏用例 |
+| M7 | 能写入示例知识并带引用事件；跨租户搜不到 |
+| M8 | 一条流里出现多个 `agent_id`；客户端能把 allow 映射成 approve；管理接口无权限 403 |
+| M9 | 两台实例抢同一会话互斥；限流可跨实例（见多机文档） |
+| M10 | 评测脚本能在 CI 跑；策略版本号进审计；能导出审计（去掉用户原文大字段） |
 
-| 里程碑 | 必须现场可演示 |
-|--------|----------------|
-| M0 | echo / demo_tools；409；cancel |
-| M1 | scaffold → 对话；指令路径 CI |
-| M2a | 两角色 tool 矩阵；**invoke deny 可测**；审计有记录 |
-| M2b | `/threads/{id}/messages` 有上一轮；`replay` 与**已提交**事件一致；append 失败不推业务事件 |
-| M3 | 权限下查库；无权限不进 list 且 invoke 拒绝 |
-| M4 | `/ready`、`/metrics`；限流错误码；**InputValidator 400**；OTel 关联 `run_id` |
-| M5 | `LLM_BACKEND=gateway` 换模型不改域；历史裁剪可测 |
-| M6 | 审批等待期间锁释放；超时 deny；resume 同 `run_id`；脱敏用例；无规则 → 无数据 |
-| M7 | ingest + citation；跨租户检索失败 |
-| M8 | 单流多 `agent_id`；SDK `allow→approve`；admin 无权限 403 |
-| M9 | 双实例同 thread 互斥（共享 Redis）；限流跨实例（见 multi-instance 文档） |
-| M10 | Eval CI；`POLICY_BUNDLE_VERSION` 进审计；审计导出 |
+## 用户旅程（给负责人排需求用）
 
-## 用户旅程
-
-| 旅程 | 里程碑 |
-|------|--------|
-| L1 | M0–M1 |
-| L2 | M2a–M3 |
-| L3 | M2（审计）+ M4（生产面） |
-| 审批 / RAG / 多 Agent·SDK | M6 / M7 / M8 |
+| 旅程 | 大致对应 |
+|------|----------|
+| 入门能聊 | M0–M1 |
+| 带权限查库 | M2a–M3 |
+| 单机可运维 | M2（审计）+ M4 |
+| 审批 / 知识库 / 多 Agent | M6 / M7 / M8 |
 | 多机 | M9 |
 
-## 对外版本（写死）
+## 版本标签（对外怎么喊）
 
 | 标签 | 含义 |
 |------|------|
@@ -72,12 +70,12 @@
 | v0.2 | +M2a +M2b |
 | v0.3 | +M3 |
 | v0.4 | +M4 |
-| **v1.0** | **= M0–M4 全部通过**（单机主承诺）；**不**要求 M5+ |
-| v1.x | 叠加已交付的 M5–M8 |
+| **v1.0** | **M0–M4 都过**（单机主承诺）；不强制要求 M5+ |
+| v1.x | 再叠已交付的 M5–M8 |
 | v1.x（多机） | +M9 |
 | v2.0 | +M10 |
 
-## 非目标
+## 明确不做
 
-官方云托管 / Studio 产品化；研究型 GroupChat；替代企业 IAM。  
-见完整方案 §1.2、附录 B。
+官方云托管 / Studio 产品化；研究型任意群聊；替代企业账号中心。  
+见完整方案「做 / 不做」一节。

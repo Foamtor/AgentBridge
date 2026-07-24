@@ -1,11 +1,11 @@
 # AgentBridge 完整方案（v4.1.1）
 
-> **定位**：自托管 Agent 能力平台（接入底座 + 可插拔增强），不是云托管 Studio  
-> **一句话**：LangGraph + FastAPI + 稳定 SSE + 多域插件；以已提交 Event 为真源，策略与模型出口统一，业务只写 graph/tools  
-> **目标**：能力上可对标「业务系统直接接入并长期演进」；质量上有硬契约、硬隔离、可回放、可验收  
+> **定位**：自己部署的 Agent 接入平台（公共能力 + 可插拔业务），不是云托管 Studio  
+> **一句话**：LangGraph + FastAPI + 稳定的流式事件 + 多个业务插件；以已经写入成功的事件为准，权限与模型出口统一，业务只写流程和工具  
+> **目标**：业务系统能直接接入并长期演进；有清晰接口、租户隔离、可回放、可验收  
 > **日期**：2026-07-24  
-> **版本**：v4.1.1（v4.1 审阅修订 + 与五份实施 Plan r2 对齐）  
-> **相对 v4**：见附录 C；不计人天；配套文档以本版为产品真源  
+> **版本**：v4.1.1（与五份实施计划对齐）  
+> **说明**：按能力划分阶段，不按工期估人天；配套文档以本版为正式产品说明  
 > **实施拆分**：`docs/superpowers/plans/README.md`（Plan1–5）
 
 ---
@@ -16,18 +16,18 @@
 
 业务系统要加对话、工具、RAG、审批、多 Agent，不想从零拼：SSE、线程锁、取消、鉴权、权限、落库、可观测、模型路由。
 
-AgentBridge 提供**统一运行面**；域作者只注册 graph + tools +（可选）检索/策略声明。
+AgentBridge 提供**统一的公共能力**；业务作者只注册流程、工具，以及（可选）检索/策略声明。
 
 ### 1.2 做 / 不做
 
 | 做 | 不做 |
 |----|------|
-| 自托管；多域注册表；稳定 SSE + 扩展事件 | 替代 LangGraph Platform 云托管 / 官方 Studio |
-| 已提交 Event 为真源；消息/审计为投影 | 无契约的「随便推 JSON」 |
+| 自托管；多个业务插件注册表；稳定 SSE + 扩展事件 | 替代 LangGraph Platform 云托管 / 官方 Studio |
+| 以已经写入成功的事件为准；消息/审计为投影 | 无契约的「随便推 JSON」 |
 | Policy 按 action 统一 tool/数据/输出/审批 | 假装通用 IAM 产品 |
 | 多租户硬隔离（键空间级） | 仅靠业务 SQL「记得写 tenant_id」 |
 | LLM Gateway Port（路由/降级/PII/成本） | 绑定单一模型厂商 |
-| 单机默认；多机有明确矩阵 | 宣称「开箱多副本无脑扩」却仍用进程内锁 |
+| 单机默认；多机有明确矩阵 | 宣称「默认安装后立刻多副本无脑扩」却仍用进程内锁 |
 | 多 Agent（supervisor/subgraph） | AutoGen 式任意 GroupChat 研究框架 |
 | SDK（TS/Python）+ 管理 API + CLI 回放 | 完整商业控制台 SaaS |
 
@@ -37,7 +37,7 @@ AgentBridge 提供**统一运行面**；域作者只注册 graph + tools +（可
 |------|------|
 | 安全 | 角色×tool 权限矩阵测试 0 漏网；跨租户读 memory/RAG/消息被 Port 拒绝 |
 | 可运维 | 任意 `run_id` 可回放**已提交**事件流；OTel span 与 SSE `run_id` 可关联 |
-| 可接入 | L1 跑通；L2 带权限查库；L3 = M2 审计能力 + M4 生产面；进阶金标域可演示 |
+| 可接入 | L1 跑通；L2 带权限查库；L3 = 已有审计 + 单机运维能力；进阶官方示例可以演示 |
 | 可演进 | Pipeline/Port 插件；未装则 noop；Gateway 有过渡期 |
 | 诚实 | README 写明单机/多机矩阵、包名与产品名差异、弱项 |
 
@@ -47,7 +47,7 @@ AgentBridge 提供**统一运行面**；域作者只注册 graph + tools +（可
 
 | 级别 | 用户做到什么 | 主要里程碑 |
 |------|----------------|------------|
-| **L1** | 起服务 → scaffold 域 → SSE 对话 | M0–M1 |
+| **L1** | 起服务 → 用模板建业务插件 → SSE 对话 | M0–M1 |
 | **L2** | JWT 角色 → tool 可见性正确 → 消息可查 →（可选）查库 | M2–M3 |
 | **L3** | **已有审计（M2）** + 限流/metrics/OTel + 单实例部署清单 | M2 + M4 |
 | **进阶 A** | 写入类 tool 审批；超时/转交可测 | M6 |
@@ -168,9 +168,9 @@ middleware 填：`user_id` / `tenant_id` / `roles` / `permissions` / 预算类�
 `checkpoint_thread_key(tenant_id, thread_id) == f"{tenant_id}::{thread_id}"`（`tenant_id` 空时用 `"default"`）。  
 多机 `ThreadLock.try_acquire` 的首参传 **storage_key**（勿对已前缀键再前缀）。
 
-### 4.2 EventLog：已提交事件才是真源
+### 4.2 EventLog：已提交事件才是权威说明
 
-**定义**：EventLog 只包含 **append 已成功提交** 的出站事件。客户端曾见但未提交的帧，不算真源。
+**定义**：EventLog 只包含 **append 已成功提交** 的出站事件。客户端曾见但未提交的帧，不算权威说明。
 
 **Emit 顺序（写死）**：
 
@@ -182,7 +182,7 @@ middleware 填：`user_id` / `tenant_id` / `roles` / `permissions` / 预算类�
 
 **与断连的关系**：
 
-- 断连 / 取消 = **run 未正常终端或提前终端**，不是「真源不可信」  
+- 断连 / 取消 = **run 未正常终端或提前终端**，不是「权威说明不可信」  
 - 已提交前缀可回放；未提交的尾部不存在于 EventLog  
 - Message 投影：在终端事件已提交后，按 run 投影一轮摘要；支持对已提交事件做补偿投影  
 
@@ -235,7 +235,7 @@ class PolicyEngine(Protocol):
   - `x.bridge.citation`
   - 多 Agent：相关事件 `data.agent_id` / `data.parent_run_id`
 
-信封样例真源：`docs/contracts.md`。
+信封样例权威说明：`docs/contracts.md`。
 
 ### 4.5 多租户硬边界
 
@@ -245,7 +245,7 @@ Port 读写的 `tenant_id` **只来自 RunContext**，调用方不可覆盖为�
 
 ### 4.6 人机审批（HIL）与线程锁
 
-**写死默认语义（M6 金标必须遵守）**：
+**写死默认语义（M6 官方示例必须遵守）**：
 
 | 项 | 约定 |
 |----|------|
@@ -254,7 +254,7 @@ Port 读写的 `tenant_id` **只来自 RunContext**，调用方不可覆盖为�
 | 事件 | 已提交 `x.bridge.approval_required`（含 `run_id`、tool、超时点） |
 | Resume | **同一 `run_id`** 经 `POST /approvals/{id}`（或等价）恢复；恢复时重新 `try_acquire` 锁，失败则 409 |
 | 超时 | 默认 **deny**（不执行副作用）+ 已提交 `x.bridge.approval_resolved` + 终端 `done` 或 `error`（实现选一种并固定；推荐 `done` + data 标明未执行） |
-| 新 run | 审批等待期间允许同 thread **新 run**（因锁已释放）；若业务要互斥，用 RunStore 策略「有 awaiting 则拒绝」——默认 **允许**，金标域演示默认行为 |
+| 新 run | 审批等待期间允许同 thread **新 run**（因锁已释放）；若业务要互斥，用 RunStore 策略「有 awaiting 则拒绝」——默认 **允许**，官方示例插件演示默认行为 |
 
 ### 4.7 管理面鉴权
 
@@ -305,8 +305,8 @@ class LLMGateway(Protocol):
 | 阶段 | 行为 |
 |------|------|
 | M5 前 | 图/Runtime 可直连厂商客户端（现状） |
-| M5 | 引入 Gateway；`LLM_BACKEND=direct\|gateway`（默认 `direct` 直至金标切换） |
-| `direct` | Gateway adapter 透传现有构造方式，域代码可暂不改 |
+| M5 | 引入 Gateway；`LLM_BACKEND=direct\|gateway`（默认 `direct` 直至官方示例切换） |
+| `direct` | Gateway adapter 透传现有构造方式，业务插件代码可暂不改 |
 | `gateway` | Runtime **只**经 Gateway；域禁止直接 `ChatOpenAI(...)` 进主路径（lint/评审） |
 | MUST | 「模型经 Gateway」在 **默认 `gateway` 且文档切换后** 生效，而非 M0 起 |
 
@@ -329,14 +329,14 @@ class EventLog(Protocol):
 
 | 能力 | 说明 |
 |------|------|
-| 多域注册表 | graphs / tools / input_builders；域健康与元数据 |
+| 多个业务插件注册表 | graphs / tools / input_builders；域健康与元数据 |
 | 域热配置 | ConfigProvider |
 | 取消 | 协作式（已有）；副作用文档化；可选硬取消 |
 | RunStore | 状态含 `awaiting_approval`；`GET /runs` |
 | 入站扩展 | 文件/图像经 `extra`；可选扫描钩子 |
 
-**金标域**：`echo`、`demo_tools` + `demo_readonly`（M3）。  
-默认安装保持瘦；进阶金标可 extra/示例目录，避免模板巨仓（实现时选定）。
+**官方示例插件**：`echo`、`demo_tools` + `demo_readonly`（M3）。  
+默认安装保持瘦；进阶官方示例可 extra/示例目录，避免模板巨仓（实现时选定）。
 
 ### 6.2 产品线 B — 知识与记忆
 
@@ -367,13 +367,13 @@ class EventLog(Protocol):
 | 能力 | 说明 |
 |------|------|
 | 多 Agent | 见 §4.8；共享 Policy 与 Gateway |
-| TS / Python SDK | stream、重连、九类、审批状态机；域作者辅助 |
+| TS / Python SDK | stream、重连、九类、审批状态机；业务作者辅助 |
 | 管理 API | 见 §4.7 |
 | PromptRegistry | 版本、变量、回滚 |
-| Eval | 金标对话；越权回归；CI 可选 |
+| Eval | 官方示例对话；越权回归；CI 可选 |
 | CLI | `replay`、`ingest`、`scaffold`（入口名随品牌重命名） |
 
-**金标域**：`demo_approval_write`、`demo_rag`、`demo_multi_agent`。
+**官方示例插件**：`demo_approval_write`、`demo_rag`、`demo_multi_agent`。
 
 ---
 
@@ -436,9 +436,9 @@ slowapi → 自研/Redis；Langfuse 不强制自托管；Guardrails 不必装。
 ### 10.1 核心规则（MUST）
 
 1. `application` 禁止 import `adapters`  
-2. 域代码不持有 `EventSink`  
-3. `core` 的 `src/` 不能出现域名称  
-4. adapter 只在组装根构造  
+2. 业务插件代码不持有 `EventSink`  
+3. `core` 的 `src/` 不能出现业务插件名称  
+4. adapter 只在服务启动时的组装代码构造  
 5. `list_tools` 为 deny 的 tool 不得进 LLM tool list  
 6. 跨租户在 Port 层失败  
 7. 默认 `LLM_BACKEND=gateway` 后，模型调用必须经 Gateway  
@@ -456,18 +456,18 @@ slowapi → 自研/Redis；Langfuse 不强制自托管；Guardrails 不必装。
 
 ---
 
-## 十一、能力里程碑（不计人天）
+## 十一、能力里程碑（按能力划分、不按工期估人天）
 
-| 里程碑 | 主题 | 验收演示 |
+| 里程碑 | 主题 | 现场怎么验收 |
 |--------|------|----------|
-| **M0** | 编排底座 | echo / demo_tools；409；cancel |
+| **M0** | 编排本平台 | echo / demo_tools；409；cancel |
 | **M1** | 包装与 AI 友好 | scaffold；指令 CI；L1 文档 |
 | **M2a** | 身份 + Tool Policy（**list + invoke 双检**）+ 审计 + Pipeline 骨架 | 两角色 tool 矩阵；invoke deny 可测；审计有记录 |
 | **M2b** | EventLog（append-before-emit，全量已提交事件）+ 消息/Run 投影（delta 合并）+ replay | messages 可查；replay 与已提交事件一致；append 失败不推业务事件 |
 | **M3** | DataSource + demo_readonly | 权限下查库 |
-| **M4** | 单机生产面 | `/ready` `/metrics` 限流 OTel；**InputValidator**；deploy 清单 |
+| **M4** | 单机运维能力 | `/ready` `/metrics` 限流 OTel；**InputValidator**；deploy 清单 |
 | **M5** | Gateway（含 direct 过渡）+ ContextManager + Prompt | `gateway` 模式换模型不改域；裁剪可测 |
-| **M6** | DataFilter、双轨脱敏、Approval（§4.6） | 审批金标；脱敏用例；无规则无数据 |
+| **M6** | DataFilter、双轨脱敏、Approval（§4.6） | 审批官方示例；脱敏用例；无规则无数据 |
 | **M7** | Memory extra、RAG、citation | 租户隔离检索 |
 | **M8** | 多 Agent（§4.8）、TS SDK、管理 API（§4.7） | 单流 agent_id；SDK 一轮；admin 鉴权 |
 | **M9** | 多机 | 双实例互斥与限流 |
@@ -482,7 +482,7 @@ slowapi → 自研/Redis；Langfuse 不强制自托管；Guardrails 不必装。
 | v1.x+M9 | 多机 |
 | v2.0 | M10 平台完备 |
 
-品牌重命名与里程碑正交；CLI/包名切换单列任务，文档在未改名前写清别名。
+品牌重命名与里程碑互不影响、可单独安排；CLI/包名切换单列任务，文档在未改名前写清别名。
 
 ---
 
@@ -502,7 +502,7 @@ slowapi → 自研/Redis；Langfuse 不强制自托管；Guardrails 不必装。
 | ConfigProvider / PromptRegistry / AgentOrchestrator | D | 协作 |
 | RateLimiter | C | 或仅 middleware |
 
-每个 Port：Protocol + noop/fake + 真实 adapter；只在组装根 `new`。
+每个 Port：Protocol + noop/fake + 真实 adapter；只在服务启动时的组装代码 `new`。
 
 ---
 
@@ -526,14 +526,14 @@ slowapi → 自研/Redis；Langfuse 不强制自托管；Guardrails 不必装。
 
 | 原则 | 说明 |
 |------|------|
-| 已提交 Event 为真源 | 投影可重建；未提交不算数 |
+| 以已经写入成功的事件为准 | 投影可重建；未提交不算数 |
 | 策略按 action | 避免 mask/deny 混用 |
 | Gateway 可过渡 | 再唯一出口 |
 | 租户硬隔离 | Port + checkpointer 键 |
 | 审批不占死锁 | 默认释放 + awaiting 状态 |
 | 不可用 tool 不暴露 | list + invoke 双检 |
 | 渐进 extras | 未装即 noop |
-| 金标驱动 | 每线可演示 |
+| 官方示例驱动 | 每线可演示 |
 | 诚实边界 | 矩阵、弱项、命名 |
 
 ---
@@ -592,7 +592,7 @@ slowapi → 自研/Redis；Langfuse 不强制自托管；Guardrails 不必装。
 
 ### 依赖摘要（v4.1.1 / Plan r3）
 
-| 消费 | 硬前置 | 说明 |
+| 消费 | 必须先完成 | 说明 |
 |------|--------|------|
 | Plan2 | Plan1 M2a | 可与 Plan1 M2b 并行 |
 | Plan3 | Plan1 | Pipeline / 建议含 EventLog |

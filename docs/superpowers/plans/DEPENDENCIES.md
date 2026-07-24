@@ -1,6 +1,6 @@
 # Plan 依赖关系（r3）
 
-> 与 [README.md](./README.md)、完整方案 **v4.1.1** 附录 D 一致。  
+> **阅读提示：** 这是历史设计/实施记录。文中若仍有偏内部的说法，请以仓库根目录 README、docs/roadmap.md、docs/add-a-domain.md 的白话为准。\n\n> 与 [README.md](./README.md)、完整方案 **v4.1.1** 附录 D 一致。  
 > **硬依赖** = 未完成不可开工验收；**软依赖** = 可 Fake/跳过，功能降级。
 
 ## 总图
@@ -41,7 +41,7 @@
 | **Plan5 M9** | **硬**（storage_key） | **硬** | — | 软 | — | — |
 | **Plan5 M10** | **硬**（Policy/Audit） | 软 | — | 软 | — | 软 |
 
-\*条件硬：仅当要做 SDK `resolveApproval` / 审批金标联调时，必须 Plan4 T4。
+\*条件硬：仅当要做 SDK `resolveApproval` / 审批官方示例联调时，必须 Plan4 T4。
 
 ## 关键产物链（防漏）
 
@@ -60,14 +60,14 @@
 
 1. **Plan4 曾只写「Plan1」未强调 M2b** → HIL 需要 RunStore，现改为硬依赖 Plan1 全量。  
 2. **锁键不一致风险** → Plan1 起 ThreadLock 即用 storage_key；Plan4/5 禁止再套 tenant 前缀。  
-3. **Plan2 可并行窗口** → 明确 M2a 后门禁即可开 Plan2，不必等 M2b。  
+3. **Plan2 可并行窗口** → 明确 M2a 后验收条件即可开 Plan2，不必等 M2b。  
 4. **Plan3→Plan4** → 技术上 M5 可偷跑，**发布纪律**要求先 Plan3 打完 v1.0 再称 v1.x。  
 5. **Plan5 审批** → 与「仅 stream SDK」拆成条件硬依赖，避免假阻塞。
 
 ## 推荐日历序（非人天）
 
 ```text
-1) Plan1 → M2a 门禁
+1) Plan1 → M2a 验收条件
 2) Plan1 M2b ∥ Plan2
 3) Plan3 → 打 v1.0
 4) Plan4（M5→M6→M7）

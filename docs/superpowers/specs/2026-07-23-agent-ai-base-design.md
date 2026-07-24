@@ -1,6 +1,6 @@
 # Agent-Base 全栈 AI 基底模板 — 设计规格
 
-> **历史规格。** 当前产品真源：[00-AgentBridge完整方案.md](../../00-AgentBridge完整方案.md) **v4.1**；冲突时以 v4.1 为准。  
+> **阅读提示：** 这是历史设计/实施记录。文中若仍有偏内部的说法，请以仓库根目录 README、docs/roadmap.md、docs/add-a-domain.md 的白话为准。\n\n> **历史规格。** 当前产品总说明：[00-AgentBridge完整方案.md](../../00-AgentBridge完整方案.md) **v4.1**；冲突时以 v4.1 为准。  
 > 状态：**审阅高优项已修复**（见 §19）；可写实施计划；P0 待填 contracts JSON 样例  
 > 日期：2026-07-23  
 > 仓库：`D:\WorkSpace\code\project\Agent-Base`（模板仓，绿场）  
@@ -14,11 +14,11 @@
 
 ## 1. 结论
 
-本仓库是**可复用的 AI 业务底座模板**：鉴权、部署、编排内核、React 调试台、域插件模型一步到位。
+本仓库是**可复用的 AI 业务本平台模板**：鉴权、部署、编排内核、React 调试台、业务插件模型一步到位。
 
 | 原则 | 含义 |
 |------|------|
-| 双仓 | 产品仓继续做业务；本仓做干净底座 |
+| 双仓 | 产品仓继续做业务；本仓做干净本平台 |
 | 绿场重写 | 对照产品仓的**能力与行为**重新设计实现，禁止大段照抄现网散乱代码 |
 | 契约对齐 | SSE / 取消 / 同会话锁 / OIDC 等对外行为可验收对照；内部结构全新 |
 | 完整目标 | 不做「先凑合最小交付」；用分阶段任务落地同一完整目标态 |
@@ -37,7 +37,7 @@
 
 同时存在：
 
-- 编排与业务域耦合（工厂写死路由、工具表绑死本仓、核心 import 业务包）
+- 编排与业务插件耦合（工厂写死路由、工具表绑死本仓、核心 import 业务包）
 - 目录与职责随历史堆叠，结构散乱，不适合直接当「下一个项目的母版」
 - 整仓当模板会拖入一张图、地图工具、入库 worker 等产品债
 
@@ -53,16 +53,16 @@
 
 | ID | 目标 | 可验证 |
 |----|------|--------|
-| G1 | 完整底座可独立启动 | compose + API + React 调试台 +（可选）Authentik |
-| G2 | 编排内核结构清晰、可测 | 分层明确；核心零业务域 import；注册表注入图与工具 |
-| G3 | 新业务只加域、不改内核 | 复制 scaffold → register → 调试台选 route 可见 SSE |
+| G1 | 完整本平台可独立启动 | compose + API + React 调试台 +（可选）Authentik |
+| G2 | 编排内核结构清晰、可测 | 分层明确；核心零业务插件 import；注册表注入图与工具 |
+| G3 | 新业务只加业务插件、不改内核 | 复制 scaffold → register → 调试台选 route 可见 SSE |
 | G4 | 鉴权可开关 | `AUTH_REQUIRED=false` 本地免登录；true 时 Bearer JWT |
 | G5 | 与产品仓行为可对照 | 契约清单上的流式生命周期、409、cancel 在本仓复现 |
-| G6 | 代码质量门禁 | lint/测试/核心 import 扫描；禁止向核心塞场景 |
+| G6 | 代码质量验收条件 | lint/测试/核心 import 扫描；禁止向核心塞场景 |
 
 ### 3.2 非目标
 
-- 不把产品仓业务域（地图、政策图谱、报告产品逻辑、一张图前端）打进默认模板
+- 不把产品仓业务插件（地图、政策图谱、报告产品逻辑、一张图前端）打进默认模板
 - 不把现网 `orchestration/`、`ai_map_chat/`、Streamlit 调试台大段粘贴过来
 - 第一期不发强制语义化版本的内部 pip SDK（可用仓内 path 包；发包后置）
 - 第一期不强制产品仓迁移到本核心（双轨；稳定后再议）
@@ -75,7 +75,7 @@
 
 ```text
 RAG_Agent（产品仓）                    Agent-Base（本仓）
-继续演进业务                            绿场底座真源
+继续演进业务                            绿场本平台权威说明
         │                                      ▲
         │  提供：能力清单、验收场景、踩坑经验     │
         └──────── 契约 / 对照用例 ──────────────┘
@@ -88,10 +88,10 @@ RAG_Agent（产品仓）                    Agent-Base（本仓）
 
 | | 产品仓 | 本仓 |
 |--|--------|------|
-| 职责 | 乡村产业 MAP 等业务 | AI 业务通用底座 |
+| 职责 | 乡村产业 MAP 等业务 | AI 业务通用本平台 |
 | 代码 | 历史实现继续维护 | 全新分层与实现 |
 | 前期同步 | 契约与验收期望 | 实现真相 |
-| 后期（可选） | 接入本仓核心包或保持分叉 | 底座稳定后可考虑内部包 |
+| 后期（可选） | 接入本仓核心包或保持分叉 | 本平台稳定后可考虑内部包 |
 
 ---
 
@@ -105,12 +105,12 @@ RAG_Agent（产品仓）                    Agent-Base（本仓）
 | ADR-2 | 部署形态 | **自建 FastAPI 宿主** | 不依赖 LangGraph Platform / LangSmith Agent Server 托管 |
 | ADR-3 | 领域词汇 | Thread / Run / Route（对齐 Platform 概念） | 第一期不实现完整 Platform Protocol v2 |
 | ADR-4 | 分层风格 | **分层 + 接口 + 构造注入**（目录名 ports/adapters = 接口/实现） | 不做每域完整 DDD；详见 [OO 架构说明](./2026-07-23-backend-oop-architecture.md) |
-| ADR-5 | 扩展模型 | **域插件 + 注册表** | 禁止核心写死 `if route == ...` |
+| ADR-5 | 扩展模型 | **业务插件 + 注册表** | 禁止核心写死 `if route == ...` |
 | ADR-6 | 持久化 | 生产 **Async Postgres** checkpointer；开发可 Memory | 不用 SQLite 当生产默认 |
-| ADR-7 | 边界门禁 | **import-linter** + 业务包名扫描 | 仅靠约定不够 |
+| ADR-7 | 边界验收条件 | **import-linter** + 业务包名扫描 | 仅靠约定不够 |
 | ADR-8 | 可观测 | Hooks 端口；可选 OTel/Langfuse 适配器后置 | 核心不绑厂商 SDK |
 | ADR-9 | 长任务 | 对话流式走请求内 Run；重 worker 后置 | 第一期不上 Celery/Taskiq 默认路径 |
-| ADR-10 | 开源用法 | 只借鉴结构与门禁 | **禁止**把参照仓库代码粘进本仓 |
+| ADR-10 | 开源用法 | 只借鉴结构与验收条件 | **禁止**把参照仓库代码粘进本仓 |
 
 ### 5.1 采用的设计模式
 
@@ -145,7 +145,7 @@ Run 简化状态：`accepted → running → succeeded | failed | cancelled`；t
 
 ```text
 packages/core/src/agent_base_core/   # application · ports · adapters · registry · protocol
-apps/api/                            # main · lifespan(组装根) · auth · routes · domains
+apps/api/                            # main · lifespan(服务启动时的组装代码) · auth · routes · domains
 apps/web/src/                        # features/auth|debug|contracts · lib/sseClient
 ```
 
@@ -295,8 +295,8 @@ PKCE 与 SSE 客户端：**重写**，只对齐 Authentik 与契约行为。
 4. **禁止**在核心用 `if route == "xxx"` 堆积场景。  
 5. **CI（当前已落地）**：import-linter + 业务包名扫描 + api 可安装/import 冒烟。  
    **后续补齐（P2/P3）**：pytest、ruff、echo SSE smoke。  
-6. **域内聚**：工具说明书、handler、子图同域目录。  
-7. **不照抄门禁**：评审拒绝整文件复制产品仓 `orchestration/` 或参照开源仓库实现。  
+6. **业务插件内聚**：工具说明书、handler、子图同域目录。  
+7. **不照抄验收条件**：评审拒绝整文件复制产品仓 `orchestration/` 或参照开源仓库实现。  
 8. **生产默认**：recursion_limit、瘦 State 指引、工具错误可流式上报。
 
 技术栈基线：Python 3.12+、FastAPI、LangGraph、Pydantic v2、Postgres、uv（推荐）、Authentik OIDC。
@@ -405,7 +405,7 @@ PKCE 与 SSE 客户端：**重写**，只对齐 Authentik 与契约行为。
 - [x] compose + API + React 调试台 + OIDC（可关）+ echo 全通  
 - [x] 同 thread 409、cancel、SSE 稳定事件子集符合 `contracts.md`  
 - [x] `packages/core` 通过 import-linter；无域/业务包泄漏  
-- [x] 新域仅通过 register + scaffold，无需改核心源码（runtime 映射不硬编码业务节点名）  
+- [x] 新业务插件仅通过 register + scaffold，无需改核心源码（runtime 映射不硬编码业务节点名）  
 - [x] 实现未大段复制产品仓或参照开源仓库代码  
 - [x] 文档：architecture、contracts、add-a-domain、deploy、parity、调研附录齐全  
 - [x] CI：architecture gates + pytest/ruff  

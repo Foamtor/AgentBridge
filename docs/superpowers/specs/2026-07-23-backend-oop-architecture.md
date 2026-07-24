@@ -1,6 +1,6 @@
 # 后端代码架构说明（面向对象视角）
 
-> 本文用人话讲清：后端代码**怎么拆类、怎么封装、谁实现接口、谁注入谁**。  
+> **阅读提示：** 这是历史设计/实施记录。文中若仍有偏内部的说法，请以仓库根目录 README、docs/roadmap.md、docs/add-a-domain.md 的白话为准。\n\n> 本文用人话讲清：后端代码**怎么拆类、怎么封装、谁实现接口、谁注入谁**。  
 > 「六边形 / ports-adapters」只是业界叫法，本质就是：**面向接口编程 + 构造注入 + 分层**。  
 > 主设计：[设计规格](./2026-07-23-agent-ai-base-design.md)
 
@@ -50,7 +50,7 @@
 
 另两块：
   ⑤ 注册表 Registry —— 保存「route → 建图函数 / 工具列表」（字典 + 注册方法）
-  ⑥ 业务域 Domains —— 你们自己的图和工具；启动时 register 进注册表
+  ⑥ 业务插件 Domains —— 你们自己的图和工具；启动时 register 进注册表
 ```
 
 **依赖规则（硬性）：**
@@ -254,7 +254,7 @@ async def lifespan(app: FastAPI):
     graphs = GraphRegistry()
     tools = ToolRegistry()
 
-    # 业务域自己注册，应用层不 import echo 内部细节以外的业务
+    # 业务插件自己注册，应用层不 import echo 内部细节以外的业务
     from apps.api.domains import bootstrap
     bootstrap.register_all(graphs, tools)
 

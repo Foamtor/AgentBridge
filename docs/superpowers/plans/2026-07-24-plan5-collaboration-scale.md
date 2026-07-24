@@ -1,23 +1,23 @@
 # Plan 5: 协作与扩展（M8 + M9 + M10）Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task.  
+> **阅读提示：** 这是历史设计/实施记录。文中若仍有偏内部的说法，请以仓库根目录 README、docs/roadmap.md、docs/add-a-domain.md 的白话为准。\n\n> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task.  
 > **Rev:** r3 — 对齐 v4.1.1；依赖矩阵：M8/M9/M10 内序；SDK 审批硬依赖 Plan4 T4。
 
 **Goal:** M8 多 Agent 单流 + TS SDK + admin；M9 Redis 锁/限流；M10 Eval + 策略版本 + 审计导出。
 
-## 依赖与门禁
+## 依赖与验收条件
 
 | 方向 | 内容 |
 |------|------|
 | **上游硬** | Plan1 全量（`checkpoint_thread_key` + storage_key 锁语义） |
-| **上游硬（条件）** | 若 SDK/金标演示审批：**Plan4 T4**；若只做 stream SDK：Plan4 可软 |
+| **上游硬（条件）** | 若 SDK/官方示例演示审批：**Plan4 T4**；若只做 stream SDK：Plan4 可软 |
 | **上游软** | Plan3（生产基线）；Plan4 M5–M7（Gateway/RAG 非 M8 必需） |
 | **本 Plan 内** | T1→T2→T3→T4（**M8**）→T5→T6（**M9**）→T7→T8（**M10**）→T9 |
 | **禁止** | M9 未完成时 README 写「多机生产」；Redis 锁对 storage_key **再**加 tenant 前缀 |
 
 ## Global Constraints
 
-- 真源：v4.1.1 §4.7–4.8、M8–M10  
+- 权威说明：v4.1.1 §4.7–4.8、M8–M10  
 - 单 SSE + `data.agent_id`  
 - `/admin/*` 无权限 → 403  
 - Redis key：`ab:lock:{storage_key}`，`storage_key` 已含 tenant  
@@ -91,7 +91,7 @@ def require_permission(ctx: RunContext, perm: str) -> None:
 - [x] `GET /admin/domains` + 403/200 测试  
 - [x] Commit `feat(api): admin domains with RBAC`
 
-**M8 门禁：** 多 agent_id；SDK 测绿；admin 403。
+**M8 验收条件：** 多 agent_id；SDK 测绿；admin 403。
 
 ---
 
@@ -117,11 +117,11 @@ async def try_acquire(self, thread_id: str, run_id: str) -> bool:
 - [x] `docs/multi-instance.md` + compose 两 api 一 redis 步骤  
 - [x] Commit `feat: redis rate limit and multi-instance doc`
 
-**M9 门禁：** 文档步骤可复现互斥与限流（自动化能写则写）。
+**M9 验收条件：** 文档步骤可复现互斥与限流（自动化能写则写）。
 
 ---
 
-### Task 7: Eval 金标 + CI
+### Task 7: Eval 官方示例 + CI
 
 - [x] `evals/golden/tool_policy_viewer.json`  
 - [x] `scripts/run_evals.py` exit 1 on fail  

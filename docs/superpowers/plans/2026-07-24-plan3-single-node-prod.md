@@ -1,11 +1,11 @@
-# Plan 3: 单机生产面（M4）Implementation Plan
+# Plan 3: 单机运维能力（M4）Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task.  
-> **Rev:** r3 — 对齐 v4.1.1；硬/软前置写死；v1.0 门禁含 Plan1+2+3。
+> **阅读提示：** 这是历史设计/实施记录。文中若仍有偏内部的说法，请以仓库根目录 README、docs/roadmap.md、docs/add-a-domain.md 的白话为准。\n\n> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task.  
+> **修订：** r3 — 与 v4.1.1 对齐；写清「必须先完成 / 建议先具备」；v1.0 验收包含 Plan1+2+3。
 
-**Goal:** 交付 M4 单机生产面；与 Plan1–2 一起构成 **v1.0（单机）**。
+**Goal:** 交付 M4 单机运维能力；与 Plan1–2 一起构成 **v1.0（单机）**。
 
-## 依赖与门禁
+## 依赖与验收条件
 
 | 方向 | 内容 |
 |------|------|
@@ -16,7 +16,7 @@
 
 ## Global Constraints
 
-- 真源：v4.1.1 §9、§11 M4；v1.0 = M0–M4
+- 权威说明：v4.1.1 §9、§11 M4；v1.0 = M0–M4
 - 限流进程内；不暗示多机
 - InputValidator **必做**
 - `/ready` 对缺失依赖 **跳过而非失败**（除非该依赖已 enable 却挂了）
@@ -26,7 +26,7 @@
 | 产物 | 供谁用 |
 |------|--------|
 | `/ready` `/metrics` 限流 OTel InputValidator | 运维、Plan4 之后基线 |
-| v1.0 门禁清单勾选结果 | 发版 |
+| v1.0 验收条件清单勾选结果 | 发版 |
 
 ## Spec ↔ Task
 
@@ -123,7 +123,7 @@ chat：校验失败 → HTTP 400 `{"detail":{"code":"invalid_input","message":".
 
 ---
 
-### Task 6: v1.0 门禁文档
+### Task 6: v1.0 验收条件文档
 
 **验收清单（全部勾上才可打 v1.0 tag）：**
 

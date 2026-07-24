@@ -1,6 +1,6 @@
 # Agent-Base 完整代码结构设计
 
-> 日期：2026-07-23  
+> **阅读提示：** 这是历史设计/实施记录。文中若仍有偏内部的说法，请以仓库根目录 README、docs/roadmap.md、docs/add-a-domain.md 的白话为准。\n\n> 日期：2026-07-23  
 > 状态：结构定稿（目录骨架已落库；业务逻辑未实现）  
 > 配套：[主设计](./2026-07-23-agent-ai-base-design.md) · [OO 分层](./2026-07-23-backend-oop-architecture.md)
 
@@ -230,7 +230,7 @@ Agent-Base/
 | 文件 | 职责 |
 |------|------|
 | `main.py` | `create_app()`：挂路由、中间件、lifespan |
-| `lifespan.py` | **唯一**组装根：new 适配器 → 注入 `RunLifecycle` → `domains.bootstrap` |
+| `lifespan.py` | **唯一**服务启动时的组装代码：new 适配器 → 注入 `RunLifecycle` → `domains.bootstrap` |
 | `deps.py` | `get_run_lifecycle(request)` |
 | `auth/*` | OIDC JWT；`AUTH_REQUIRED` |
 | `routes/health.py` | `GET /health` |
@@ -297,7 +297,7 @@ Python 包安装：
 
 ---
 
-## 6. 域插件标准形状
+## 6. 业务插件标准形状
 
 每个域目录固定四件套（scaffold 同构）：
 
@@ -326,7 +326,7 @@ def register_all(graphs, tools) -> None:
 | 成熟惯例 | 本仓落点 |
 |----------|----------|
 | `src/<feature>/router.py` | `apps/api/routes/*` + `domains/<feature>` |
-| `service.py` | `agent_base_core.application.RunLifecycle`（跨域用例）+ 域内 graph 节点 |
+| `service.py` | `agent_base_core.application.RunLifecycle`（跨域用例）+ 业务插件内 graph 节点 |
 | `core/config` | `apps/api/config` |
 | 按域分包 | `domains/echo`、未来 `domains/xxx` |
 | 可复用库抽出 | `packages/core` |
