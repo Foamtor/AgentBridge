@@ -15,6 +15,7 @@ class Settings(BaseSettings):
 
     auth_required: bool = False
     auth_dev_stub: bool = Field(default=False, validation_alias="AUTH_DEV_STUB")
+    pg_dsn: str = Field(default="", validation_alias="PG_DSN")
     pg_host: str = "localhost"
     pg_port: int = 5432
     pg_database: str = "agent_base"
@@ -26,6 +27,7 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     use_memory_checkpointer: bool = True
     fake_runtime: bool = Field(default=False, validation_alias="AGENT_BASE_FAKE_RUNTIME")
+    hooks_backend: str = Field(default="noop", validation_alias="HOOKS_BACKEND")
 
 
 def get_settings() -> Settings:

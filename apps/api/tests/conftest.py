@@ -1,4 +1,4 @@
-"""API test fixtures — fake runtime via env; register echo doubles without domains.echo."""
+"""API test fixtures — fake runtime via env; domains registered in lifespan."""
 
 from __future__ import annotations
 
@@ -18,6 +18,4 @@ def client(monkeypatch: pytest.MonkeyPatch):
 
     app = create_app()
     with TestClient(app) as c:
-        c.app.state.graphs.register("echo", lambda **kw: object())
-        c.app.state.tools.register("echo", [])
         yield c

@@ -30,8 +30,6 @@ def test_auth_off_allows_stream_without_token(monkeypatch: pytest.MonkeyPatch):
 
     app = create_app()
     with TestClient(app) as c:
-        c.app.state.graphs.register("echo", lambda **kw: object())
-        c.app.state.tools.register("echo", [])
         r = c.post(
             "/chat/stream",
             json={"query": "hi", "thread_id": "t-auth-off", "route": "echo"},
@@ -70,8 +68,6 @@ def test_auth_hs256_rejects_forged_and_accepts_valid(monkeypatch: pytest.MonkeyP
 
     app = create_app()
     with TestClient(app) as c:
-        c.app.state.graphs.register("echo", lambda **kw: object())
-        c.app.state.tools.register("echo", [])
         bad = c.post(
             "/chat/stream",
             headers={"Authorization": "Bearer not-a-jwt"},
