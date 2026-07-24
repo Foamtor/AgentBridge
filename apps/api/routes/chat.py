@@ -42,6 +42,14 @@ async def chat_stream(
     settings = request.app.state.settings
     claims = getattr(request.state, "auth_claims", None)
     ctx = claims_to_run_context(claims, auth_required=settings.auth_required)
+    ctx = ctx.model_copy(
+        update={
+            "metadata": {
+                **ctx.metadata,
+                "data_source": request.app.state.data_source,
+            }
+        }
+    )
 
     async def _run() -> None:
         try:
