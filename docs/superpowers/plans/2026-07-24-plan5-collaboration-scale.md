@@ -113,9 +113,9 @@ async def try_acquire(self, thread_id: str, run_id: str) -> bool:
 
 ### Task 6: Redis 限流 + multi-instance 文档
 
-- [ ] Redis 滑动窗口（INCR+EXPIRE 或 ZSET）  
-- [ ] `docs/multi-instance.md` + compose 两 api 一 redis 步骤  
-- [ ] Commit `feat: redis rate limit and multi-instance doc`
+- [x] Redis 滑动窗口（INCR+EXPIRE 或 ZSET）  
+- [x] `docs/multi-instance.md` + compose 两 api 一 redis 步骤  
+- [x] Commit `feat: redis rate limit and multi-instance doc`
 
 **M9 门禁：** 文档步骤可复现互斥与限流（自动化能写则写）。
 
@@ -123,25 +123,25 @@ async def try_acquire(self, thread_id: str, run_id: str) -> bool:
 
 ### Task 7: Eval 金标 + CI
 
-- [ ] `evals/golden/tool_policy_viewer.json`  
-- [ ] `scripts/run_evals.py` exit 1 on fail  
-- [ ] CI job `evals`  
-- [ ] Commit `ci: golden policy evals`
+- [x] `evals/golden/tool_policy_viewer.json`  
+- [x] `scripts/run_evals.py` exit 1 on fail  
+- [x] CI job `evals`  
+- [x] Commit `ci: golden policy evals`
 
 ---
 
 ### Task 8: policy_bundle_version + 审计导出
 
-- [ ] ConfigProvider 提供版本写入 RunContext  
-- [ ] `GET /admin/audit/export` → JSONL（无用户原文大字段）  
-- [ ] Commit `feat: policy bundle version and audit export`
+- [x] ConfigProvider 提供版本写入 RunContext  
+- [x] `GET /admin/audit/export` → JSONL（无用户原文大字段）  
+- [x] Commit `feat: policy bundle version and audit export`
 
 ---
 
 ### Task 9: 收尾
 
-- [ ] roadmap M8–M10；README 多机仅 M9 后解锁  
-- [ ] Commit `docs: Plan5 complete`
+- [x] roadmap M8–M10；README 多机仅 M9 后解锁  
+- [x] Commit `docs: Plan5 complete`
 
 ## 不在本 Plan
 
