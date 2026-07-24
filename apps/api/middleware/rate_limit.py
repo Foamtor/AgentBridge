@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import time
 from collections import defaultdict, deque
 from typing import Any
@@ -9,6 +10,16 @@ from typing import Any
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
+
+logger = logging.getLogger(__name__)
+
+_INCR_EXPIRE_LUA = """
+local c = redis.call('INCR', KEYS[1])
+if c == 1 then
+  redis.call('EXPIRE', KEYS[1], ARGV[1])
+end
+return c
+"""
 
 
 class SlidingWindowLimiter:
@@ -34,7 +45,7 @@ class SlidingWindowLimiter:
 
 
 class RedisSlidingWindowLimiter:
-    """Per-key counter with TTL window (approximate fixed window via INCR+EXPIRE)."""
+    """Per-key counter with TTL window (INCR+EXPIRE via Lua, atomic)."""
 
     def __init__(
         self, redis: Any, *, limit: int, window_seconds: int = 60
@@ -47,9 +58,9 @@ class RedisSlidingWindowLimiter:
         if self._limit <= 0:
             return True
         rkey = f"ab:rl:{key}"
-        count = await self._redis.incr(rkey)
-        if count == 1:
-            await self._redis.expire(rkey, self._window)
+        count = await self._redis.eval(
+            _INCR_EXPIRE_LUA, 1, rkey, str(self._window)
+        )
         return int(count) <= self._limit
 
 
@@ -81,10 +92,22 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         ):
             return await call_next(request)
         client = request.client.host if request.client else "unknown"
-        if self._async is not None:
-            allowed = await self._async.allow(client)
-        else:
-            allowed = self._sync.allow(client)
+        try:
+            if self._async is not None:
+                allowed = await self._async.allow(client)
+            else:
+                allowed = self._sync.allow(client)
+        except Exception:  # noqa: BLE001 — Redis/backend failure
+            logger.exception("rate limit backend error")
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "detail": {
+                        "code": "rate_limit_unavailable",
+                        "message": "rate limit backend unavailable",
+                    }
+                },
+            )
         if not allowed:
             return JSONResponse(
                 status_code=429,
