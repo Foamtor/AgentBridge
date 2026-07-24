@@ -1,9 +1,10 @@
-"""In-process sliding-window rate limiter (single-node only)."""
+"""In-process and Redis rate limiters."""
 
 from __future__ import annotations
 
 import time
 from collections import defaultdict, deque
+from typing import Any
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -11,7 +12,7 @@ from starlette.responses import JSONResponse, Response
 
 
 class SlidingWindowLimiter:
-    """Allow at most ``limit`` hits per ``window_seconds`` per key."""
+    """Allow at most ``limit`` hits per ``window_seconds`` per key (in-process)."""
 
     def __init__(self, *, limit: int, window_seconds: float = 60.0) -> None:
         self._limit = limit
@@ -32,11 +33,44 @@ class SlidingWindowLimiter:
         return True
 
 
+class RedisSlidingWindowLimiter:
+    """Per-key counter with TTL window (approximate fixed window via INCR+EXPIRE)."""
+
+    def __init__(
+        self, redis: Any, *, limit: int, window_seconds: int = 60
+    ) -> None:
+        self._redis = redis
+        self._limit = limit
+        self._window = window_seconds
+
+    async def allow(self, key: str) -> bool:
+        if self._limit <= 0:
+            return True
+        rkey = f"ab:rl:{key}"
+        count = await self._redis.incr(rkey)
+        if count == 1:
+            await self._redis.expire(rkey, self._window)
+        return int(count) <= self._limit
+
+
 class RateLimitMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app, *, limit_per_minute: int) -> None:
+    """In-process limiter by default; Redis when ``redis`` is provided."""
+
+    def __init__(
+        self,
+        app,
+        *,
+        limit_per_minute: int,
+        redis: Any | None = None,
+    ) -> None:
         super().__init__(app)
         self._limit = limit_per_minute
-        self._limiter = SlidingWindowLimiter(limit=limit_per_minute)
+        self._sync = SlidingWindowLimiter(limit=limit_per_minute)
+        self._async = (
+            RedisSlidingWindowLimiter(redis, limit=limit_per_minute)
+            if redis is not None and limit_per_minute > 0
+            else None
+        )
 
     async def dispatch(self, request: Request, call_next) -> Response:
         if self._limit <= 0:
@@ -47,7 +81,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         ):
             return await call_next(request)
         client = request.client.host if request.client else "unknown"
-        if not self._limiter.allow(client):
+        if self._async is not None:
+            allowed = await self._async.allow(client)
+        else:
+            allowed = self._sync.allow(client)
+        if not allowed:
             return JSONResponse(
                 status_code=429,
                 content={
