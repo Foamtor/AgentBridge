@@ -36,6 +36,7 @@ class Settings(BaseSettings):
         default=0, validation_alias="RATE_LIMIT_PER_MINUTE"
     )
     otel_enabled: bool = Field(default=False, validation_alias="OTEL_ENABLED")
+    llm_backend: str = Field(default="direct", validation_alias="LLM_BACKEND")
 
 
 def get_settings() -> Settings:
