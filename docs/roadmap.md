@@ -31,9 +31,9 @@
 | **M5** | Gateway（direct\|gateway 过渡）+ ContextManager + Prompt | ✅ Plan4 |
 | **M6** | DataFilter、双轨脱敏、Approval（释放锁/同 run resume） | ✅ Plan4 |
 | **M7** | Memory extra、RAG、citation | ✅ Plan4 |
-| **M8** | 多 Agent（单流 agent_id）、TS SDK、管理 API 鉴权 | 规划 |
-| **M9** | 多机（Redis 锁/限流） | 规划 |
-| **M10** | Eval、策略包版本、合规导出 | 规划 |
+| **M8** | 多 Agent（单流 agent_id）、TS SDK、管理 API 鉴权 | ✅ Plan5 |
+| **M9** | 多机（Redis 锁/限流） | ✅ Plan5 |
+| **M10** | Eval、策略包版本、合规导出 | ✅ Plan5 |
 
 ## 验收演示
 

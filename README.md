@@ -6,9 +6,9 @@
 
 把流式对话、取消、线程锁、SSE 契约、域插件一次搭好；演进方向是以 **Run/Event 为真源**，统一 **策略引擎** 与 **模型出口（Gateway）**，再按需打开记忆、RAG、审批、多 Agent 与 SDK。
 
-> **当前现状（≈ v1.0 单机）**：M0–M4 已齐（安全接入、查库、ready/metrics/限流/InputValidator/OTel noop）。默认进程内锁与限流。  
+> **当前现状**：M0–M10 已齐（含多 Agent/SDK、Redis 多机锁与限流、Eval CI、审计导出）。  
 > **能力愿景**：见 [roadmap.md](docs/roadmap.md)（M0–M10，不计人天）。  
-> **主承诺口径**：**v1.0 = 单机生产**（非多机）；多机见里程碑 M9。
+> **主承诺口径**：**v1.0 = 单机生产**（非多机）；**多机生产仅在 M9 后**（见 [multi-instance.md](docs/multi-instance.md)）。
 
 ---
 
@@ -170,8 +170,8 @@ Smoke：`.\scripts\smoke_echo.ps1` / `./scripts/smoke_echo.sh`。
 
 | | |
 |--|--|
-| ✅ 现在 | **Plan4**：M5–M7（Gateway / Approval / Filter / RAG）叠在 v1.0 单机基线上 |
-| ⏭ 建议下一切片 | **Plan5**（多 Agent / SDK / Redis / Eval） |
-| ⏳ 愿景 | M8–M10；多机仍是 **M9** |
+| ✅ 现在 | **Plan5**：M8–M10（多 Agent / SDK / Redis 多机 / Eval / 审计导出）叠在 v1.0 单机基线上 |
+| ⏭ 建议下一切片 | 按业务域扩展；多机部署见 [multi-instance.md](docs/multi-instance.md) |
+| ⏳ 非目标 | 云 Studio、研究型 GroupChat、替代企业 IAM |
 
 完整定义见 [完整方案 v4.1](docs/00-AgentBridge完整方案.md) 与 [路线图](docs/roadmap.md)。

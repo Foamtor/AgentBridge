@@ -37,4 +37,4 @@ M0 → Plan1(M2a) → Plan2 ─┐
 - Plan2–5：硬/软前置写死  
 - 新增 DEPENDENCIES.md（矩阵 + 无环说明）  
 
-**下一步：** Plan 1 Task 1。
+**下一步：** 按业务域与部署需要消费 Plan1–5 产物；多机见 [multi-instance.md](../../multi-instance.md)。
