@@ -6,6 +6,7 @@ from agent_base_core.adapters.inprocess_lock import InProcessThreadLock
 from agent_base_core.adapters.noop_hooks import NoopHooks
 from agent_base_core.application.errors import ThreadBusy
 from agent_base_core.application.run_lifecycle import RunLifecycle
+from agent_base_core.protocol.context import checkpoint_thread_key
 from agent_base_core.registry.input_builders import InputBuilderRegistry
 
 from conftest import (
@@ -48,7 +49,7 @@ async def test_start_stream_emits_start_and_done(graphs, tools, queue_and_sink, 
 async def test_thread_busy(graphs, tools, queue_and_sink):
     q, sink = queue_and_sink
     locks = InProcessThreadLock()
-    await locks.try_acquire("t1", "other")
+    await locks.try_acquire(checkpoint_thread_key("default", "t1"), "other")
     lc = _lc(FakeRuntime(), graphs, tools, locks=locks)
     with pytest.raises(ThreadBusy):
         await lc.start_stream(query="hi", thread_id="t1", route="echo", sink=sink)
@@ -142,6 +143,7 @@ async def test_hooks_failure_still_releases_lock(graphs, tools, queue_and_sink, 
     events = await drain_events(q)
     assert events[0]["type"] == "start"
     assert events[-1]["type"] == "done"
-    # Lock must be free for a second acquire.
-    assert await locks.try_acquire("t-hooks", "r-next")
-    await locks.release("t-hooks", "r-next")
+    # Lock must be free for a second acquire (same storage_key as lifecycle).
+    key = checkpoint_thread_key("default", "t-hooks")
+    assert await locks.try_acquire(key, "r-next")
+    await locks.release(key, "r-next")
