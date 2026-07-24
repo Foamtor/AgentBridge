@@ -26,14 +26,28 @@ class OrderSink:
         self.closed = True
 
 
+class FailingEventLog:
+    def __init__(self, *, fail_on: str = "text_delta") -> None:
+        self.fail_on = fail_on
+        self.appended: list[dict] = []
+
+    async def append(self, run_id: str, event: dict, *, tenant_id: str) -> None:
+        if event.get("type") == self.fail_on:
+            raise RuntimeError("append failed")
+        self.appended.append(event)
+
+    async def list(self, run_id: str, *, tenant_id: str) -> list[dict]:
+        return list(self.appended)
+
+
 class OrderEventLog(MemoryEventLog):
     def __init__(self) -> None:
         super().__init__()
         self.order: list[str] = []
 
-    async def append(self, run_id: str, event: dict) -> None:
+    async def append(self, run_id: str, event: dict, *, tenant_id: str) -> None:
         self.order.append(f"append:{event['type']}")
-        await super().append(run_id, event)
+        await super().append(run_id, event, tenant_id=tenant_id)
 
 
 class TrackingSink(OrderSink):
@@ -44,20 +58,6 @@ class TrackingSink(OrderSink):
     async def emit(self, event: dict) -> None:
         self._log.order.append(f"emit:{event['type']}")
         await super().emit(event)
-
-
-class FailingEventLog:
-    def __init__(self, *, fail_on: str = "text_delta") -> None:
-        self.fail_on = fail_on
-        self.appended: list[dict] = []
-
-    async def append(self, run_id: str, event: dict) -> None:
-        if event.get("type") == self.fail_on:
-            raise RuntimeError("append failed")
-        self.appended.append(event)
-
-    async def list(self, run_id: str) -> list[dict]:
-        return list(self.appended)
 
 
 class DeltaRuntime(FakeRuntime):
@@ -87,7 +87,7 @@ async def test_append_before_emit_order(graphs, tools) -> None:
     assert log.order.index("append:text_delta") < log.order.index("emit:text_delta")
     assert log.order[-2] == "append:done"
     assert log.order[-1] == "emit:done"
-    stored = await log.list(sink.events[0]["run_id"])
+    stored = await log.list(sink.events[0]["run_id"], tenant_id="default")
     assert [e["type"] for e in stored] == [e["type"] for e in sink.events]
 
 

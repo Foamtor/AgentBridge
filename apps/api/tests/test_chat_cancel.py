@@ -18,8 +18,12 @@ def test_cancel_404_when_idle(client):
 
 
 def test_cancel_200_when_registered(client):
+    from agent_base_core.protocol.context import checkpoint_thread_key
+
     async def _reg():
-        await client.app.state.run_lifecycle._test_register_cancel("t-cancel", "r1")
+        # Must match auth-off tenant "dev" used by cancel → storage_key.
+        key = checkpoint_thread_key("dev", "t-cancel")
+        await client.app.state.run_lifecycle._test_register_cancel(key, "r1")
 
     anyio.run(_reg)
     r = client.post("/chat/cancel", json={"thread_id": "t-cancel", "run_id": "r1"})

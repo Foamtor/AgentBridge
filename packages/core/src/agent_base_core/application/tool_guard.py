@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+import asyncio
 import copy
 import logging
+from collections.abc import Coroutine
 from typing import Any
 
-from agent_base_core.protocol.context import RunContext
-from agent_base_core.protocol.tool_meta import get_tool_meta
 from agent_base_core.ports.audit_logger import AuditLogger
 from agent_base_core.ports.policy import PolicyEngine
+from agent_base_core.protocol.context import RunContext
+from agent_base_core.protocol.tool_meta import get_tool_meta
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +29,19 @@ def _resource_for(tool: Any) -> dict[str, Any]:
         "required_roles": meta["required_roles"],
         "required_permissions": meta["required_permissions"],
     }
+
+
+def _schedule_audit(coro: Coroutine[Any, Any, None]) -> None:
+    """Best-effort audit from sync paths (ToolNode may call sync func)."""
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        try:
+            asyncio.run(coro)
+        except Exception:  # noqa: BLE001
+            logger.exception("sync invoke deny audit failed")
+        return
+    loop.create_task(coro)
 
 
 def guard_tools(
@@ -76,6 +91,7 @@ def _wrap_base_tool(
 
     def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
         if _decide() != "allow":
+            _schedule_audit(_audit_denied())
             return "forbidden"
         if callable(orig_func):
             return orig_func(*args, **kwargs)
@@ -136,6 +152,7 @@ class _GuardProxy:
 
     def invoke(self, *args: Any, **kwargs: Any) -> Any:
         if self._decide() != "allow":
+            _schedule_audit(self._audit_denied(_resource_for(self._tool)))
             return "forbidden"
         inv = getattr(self._tool, "invoke", None)
         if callable(inv):

@@ -10,16 +10,16 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 import sys
 
 
-async def _main(run_id: str) -> int:
-    # Import kept local so script can be listed without full API boot.
-    from agent_base_core.application.replay import replay_run
+async def _main(run_id: str, tenant_id: str) -> int:
     from agent_base_core.adapters.memory_event_log import MemoryEventLog
+    from agent_base_core.application.replay import replay_run
 
     log = MemoryEventLog()
-    events = await replay_run(log, run_id)
+    events = await replay_run(log, run_id, tenant_id=tenant_id)
     if not events:
         print(
             "No events in empty MemoryEventLog. "
@@ -35,8 +35,13 @@ async def _main(run_id: str) -> int:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Replay EventLog for a run_id")
     parser.add_argument("run_id")
+    parser.add_argument(
+        "--tenant-id",
+        default=os.environ.get("TENANT_ID", "dev"),
+        help="Tenant scope for EventLog (default: env TENANT_ID or 'dev')",
+    )
     args = parser.parse_args()
-    raise SystemExit(asyncio.run(_main(args.run_id)))
+    raise SystemExit(asyncio.run(_main(args.run_id, args.tenant_id)))
 
 
 if __name__ == "__main__":
