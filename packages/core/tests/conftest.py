@@ -27,10 +27,38 @@ class FakeRuntime:
         yield build_event(
             "text_delta",
             run_id="r-test",
-            sequence=2,
+            sequence=99,
             trace_id="tr",
             data={"content": "ok"},
         )
+
+
+class SlowCancelRuntime:
+    """Blocks until cancel_token is set, then exits."""
+
+    async def astream(self, builder, **kwargs):
+        token = kwargs.get("cancel_token")
+        yield build_event(
+            "text_delta",
+            run_id="r-slow",
+            sequence=1,
+            trace_id="tr",
+            data={"content": "partial"},
+        )
+        if isinstance(token, asyncio.Event):
+            await token.wait()
+
+
+class BoomRuntime:
+    async def astream(self, builder, **kwargs):
+        yield build_event(
+            "text_delta",
+            run_id="r-boom",
+            sequence=1,
+            trace_id="tr",
+            data={"content": "before-fail"},
+        )
+        raise RuntimeError("boom")
 
 
 @pytest.fixture

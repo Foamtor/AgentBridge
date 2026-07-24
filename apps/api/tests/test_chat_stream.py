@@ -46,24 +46,50 @@ def test_unknown_route_400(client):
 
 
 def test_thread_busy_409(client):
-    # Hold the lock so the next stream maps to thread_busy.
-    import anyio
+    class BlockingRuntime:
+        async def astream(self, builder, **kwargs):
+            import asyncio
 
-    async def _hold():
-        await client.app.state.locks.try_acquire("t-busy", "holder")
+            from agent_base_core.protocol.events import build_event
 
-    anyio.run(_hold)
+            extra = kwargs.get("extra") or {}
+            run_id = str(extra.get("run_id") or "r")
+            yield build_event(
+                "text_delta",
+                run_id=run_id,
+                sequence=1,
+                trace_id=run_id,
+                data={"content": "hold"},
+            )
+            await asyncio.sleep(2)
+
+    client.app.state.run_lifecycle.replace_runtime(BlockingRuntime())
+    tid = "t-busy"
+    import threading
+
+    def _hold():
+        client.post(
+            "/chat/stream",
+            json={"query": "hi", "thread_id": tid, "route": "echo"},
+        )
+
+    th = threading.Thread(target=_hold)
+    th.start()
+    import time
+
+    time.sleep(0.1)
     r = client.post(
         "/chat/stream",
-        json={"query": "hi", "thread_id": "t-busy", "route": "echo"},
+        json={"query": "hi", "thread_id": tid, "route": "echo"},
     )
     assert r.status_code == 409
     assert r.json()["detail"]["code"] == "thread_busy"
+    client.post("/chat/cancel", json={"thread_id": tid})
+    th.join(timeout=5)
 
 
 def test_real_echo_stream_has_text_and_done(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("AGENT_BASE_FAKE_RUNTIME", "0")
-    # Settings reads bool from env; ensure create_app sees real runtime.
     os.environ["AGENT_BASE_FAKE_RUNTIME"] = "0"
     from main import create_app
 

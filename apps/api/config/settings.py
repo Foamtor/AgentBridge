@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     )
 
     auth_required: bool = False
+    auth_dev_stub: bool = Field(default=False, validation_alias="AUTH_DEV_STUB")
     pg_host: str = "localhost"
     pg_port: int = 5432
     pg_database: str = "agent_base"
@@ -21,6 +22,7 @@ class Settings(BaseSettings):
     pg_password: str = "postgres"
     oidc_issuer: str = ""
     oidc_audience: str = ""
+    oidc_jwt_secret: str = Field(default="", validation_alias="OIDC_JWT_SECRET")
     llm_api_key: str = ""
     use_memory_checkpointer: bool = True
     fake_runtime: bool = Field(default=False, validation_alias="AGENT_BASE_FAKE_RUNTIME")

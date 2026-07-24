@@ -10,7 +10,7 @@ export type StableEventType =
   | "cancelled";
 
 export type StableEvent = {
-  type: StableEventType | string;
+  type: StableEventType;
   run_id?: string;
   event_id?: string;
   sequence?: number;
@@ -26,6 +26,14 @@ export type SseHandlers = {
   onError?: (err: unknown) => void;
   onDone?: () => void;
 };
+
+function parseDataLine(line: string): StableEvent | null {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith("data:")) return null;
+  const json = trimmed.slice(trimmed.startsWith("data: ") ? 6 : 5).trim();
+  if (!json || json === "[DONE]") return null;
+  return JSON.parse(json) as StableEvent;
+}
 
 /** Parse SSE `data: JSON` lines from a fetch body stream. */
 export async function streamChatSse(
@@ -56,17 +64,25 @@ export async function streamChatSse(
       const { done, value } = await reader.read();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
-      const parts = buffer.split("\n\n");
-      buffer = parts.pop() ?? "";
-      for (const part of parts) {
-        const line = part.trim();
-        if (!line.startsWith("data: ")) continue;
-        const json = line.slice("data: ".length);
+      let idx: number;
+      while ((idx = buffer.indexOf("\n")) >= 0) {
+        const line = buffer.slice(0, idx);
+        buffer = buffer.slice(idx + 1);
+        if (!line.trim()) continue;
         try {
-          handlers.onEvent(JSON.parse(json) as StableEvent);
+          const evt = parseDataLine(line);
+          if (evt) handlers.onEvent(evt);
         } catch (err) {
           handlers.onError?.(err);
         }
+      }
+    }
+    if (buffer.trim()) {
+      try {
+        const evt = parseDataLine(buffer);
+        if (evt) handlers.onEvent(evt);
+      } catch (err) {
+        handlers.onError?.(err);
       }
     }
   } finally {

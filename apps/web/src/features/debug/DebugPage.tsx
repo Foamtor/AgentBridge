@@ -72,35 +72,39 @@ export function DebugPage() {
   }
 
   async function onCancel() {
-    abortRef.current?.abort();
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
     if (token.trim()) headers.Authorization = `Bearer ${token.trim()}`;
-    await fetch(cancelUrl, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ thread_id: threadId }),
-    });
+    try {
+      const res = await fetch(cancelUrl, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ thread_id: threadId }),
+      });
+      if (!res.ok && res.status !== 404) {
+        setError(`cancel failed HTTP ${res.status}`);
+      }
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      abortRef.current?.abort();
+    }
   }
 
   async function onDoubleFire() {
     setError(null);
-    setEvents([]);
     const tid = threadId;
-    // Fire two overlapping streams to surface 409 on the second.
-    void sendOnce(tid);
-    await new Promise((r) => setTimeout(r, 20));
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (token.trim()) headers.Authorization = `Bearer ${token.trim()}`;
+    const body = JSON.stringify({ query, thread_id: tid, route });
+    // First request holds the lock; second should 409. Independent of timeline state.
+    const first = fetch(streamUrl, { method: "POST", headers, body });
+    await new Promise((r) => setTimeout(r, 40));
     try {
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-      };
-      if (token.trim()) headers.Authorization = `Bearer ${token.trim()}`;
-      const res = await fetch(streamUrl, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ query, thread_id: tid, route }),
-      });
+      const res = await fetch(streamUrl, { method: "POST", headers, body });
       if (res.status === 409) {
         setError("409 thread_busy（连点成功）");
       } else {
@@ -108,6 +112,17 @@ export function DebugPage() {
       }
     } catch (err) {
       setError(String(err));
+    } finally {
+      try {
+        await fetch(cancelUrl, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ thread_id: tid }),
+        });
+      } catch {
+        /* ignore */
+      }
+      void first;
     }
   }
 

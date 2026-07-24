@@ -4,6 +4,8 @@
 
 产品参照仓：`RAG_Agent`（继续演进业务）。本仓**对照能力重写**，不整包拷贝现网实现。
 
+**状态：** P0–P6 主路径已落地。鉴权支持 HS256 / JWKS；本地 stub 仅 `AUTH_DEV_STUB=1`。PKCE↔Authentik 为增强项。
+
 ## 从零到绿
 
 ```bash

@@ -12,6 +12,7 @@ from fastapi.responses import StreamingResponse
 from agent_base_core.adapters.sse_event_sink import SseEventSink
 from agent_base_core.application.errors import RunNotFound, ThreadBusy, UnknownRoute
 from agent_base_core.application.run_lifecycle import RunLifecycle
+from agent_base_core.protocol.events import build_event
 from agent_base_core.protocol.sse import format_sse_line
 from agent_base_core.public import cancel_run, orchestration_stream
 from deps import get_run_lifecycle
@@ -46,6 +47,7 @@ async def chat_stream(
 
     queue: asyncio.Queue[dict[str, Any] | None | tuple[str, BaseException]] = asyncio.Queue()
     sink = SseEventSink(queue)  # type: ignore[arg-type]
+    cancelled_on_disconnect = False
 
     async def _run() -> None:
         try:
@@ -64,7 +66,7 @@ async def chat_stream(
         except UnknownRoute as exc:
             await queue.put(("__error__", exc))
             await queue.put(None)
-        except Exception as exc:  # noqa: BLE001 — surface as stream error frame path
+        except Exception as exc:  # noqa: BLE001
             await queue.put(("__error__", exc))
             await queue.put(None)
 
@@ -90,17 +92,46 @@ async def chat_stream(
         raise err
 
     async def event_gen() -> AsyncIterator[str]:
+        nonlocal cancelled_on_disconnect
         try:
-            if first is not None and not (isinstance(first, tuple) and first[0] == "__error__"):
+            if first is not None and not (
+                isinstance(first, tuple) and first[0] == "__error__"
+            ):
                 yield format_sse_line(first)  # type: ignore[arg-type]
             while True:
-                item = await queue.get()
+                if await request.is_disconnected():
+                    if not cancelled_on_disconnect:
+                        cancelled_on_disconnect = True
+                        try:
+                            await cancel_run(lifecycle, thread_id=body.thread_id)
+                        except RunNotFound:
+                            pass
+                    break
+                try:
+                    item = await asyncio.wait_for(queue.get(), timeout=0.25)
+                except asyncio.TimeoutError:
+                    continue
                 if item is None:
                     break
                 if isinstance(item, tuple) and item[0] == "__error__":
+                    err = item[1]
+                    yield format_sse_line(
+                        build_event(
+                            "error",
+                            run_id="r-host",
+                            sequence=0,
+                            trace_id="r-host",
+                            data={"message": str(err), "code": "stream_failed"},
+                        )
+                    )
                     break
                 yield format_sse_line(item)  # type: ignore[arg-type]
         finally:
+            if not task.done() and not cancelled_on_disconnect:
+                try:
+                    await cancel_run(lifecycle, thread_id=body.thread_id)
+                except RunNotFound:
+                    pass
             await task
 
     return StreamingResponse(event_gen(), media_type="text/event-stream")

@@ -1,3 +1,7 @@
+"""In-process lock / cancel adapter tests."""
+
+import asyncio
+
 import pytest
 from agent_base_core.adapters.inprocess_cancel import InProcessCancelRegistry
 from agent_base_core.adapters.inprocess_lock import InProcessThreadLock
@@ -15,8 +19,16 @@ async def test_lock_busy():
 @pytest.mark.asyncio
 async def test_cancel_registry():
     reg = InProcessCancelRegistry()
-    token = object()
+    token = asyncio.Event()
     await reg.register("t1", "r1", token)
     assert await reg.request_cancel("t1", "r1") is True
+    assert token.is_set()
     await reg.unregister("t1", "r1")
     assert await reg.request_cancel("t1", "r1") is False
+
+
+@pytest.mark.asyncio
+async def test_cancel_rejects_non_event_token():
+    reg = InProcessCancelRegistry()
+    with pytest.raises(TypeError):
+        await reg.register("t1", "r1", object())  # type: ignore[arg-type]
