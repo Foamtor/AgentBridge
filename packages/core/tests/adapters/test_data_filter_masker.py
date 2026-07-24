@@ -27,3 +27,11 @@ def test_regex_masker_phone_roundtrip() -> None:
     assert "[PHONE_1]" in masked
     assert token_map["[PHONE_1]"] == "13812345678"
     assert m.unmask(masked, token_map) == "call 13812345678 now"
+
+
+def test_token_map_is_run_scoped_dict_contract() -> None:
+    """Hosts keep token_map on RunContext.metadata for DataMasker roundtrips."""
+    ctx = RunContext(metadata={"token_map": {}})
+    m = RegexDataMasker()
+    m.mask("13900001111", ctx.metadata["token_map"])
+    assert ctx.metadata["token_map"]
