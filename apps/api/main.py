@@ -8,6 +8,7 @@ from auth.middleware import OptionalOidcMiddleware
 from auth.oidc import validate_auth_settings
 from config.settings import get_settings
 from lifespan import lifespan
+from middleware.rate_limit import RateLimitMiddleware
 from routes.chat import router as chat_router
 from routes.health import router as health_router
 from routes.runs import router as runs_router
@@ -23,6 +24,7 @@ def create_app() -> FastAPI:
         oidc_jwt_secret=settings.oidc_jwt_secret,
     )
     app = FastAPI(title="agent-base-api", lifespan=lifespan)
+    # Last added = outermost. Rate limit wraps auth so 429 can fire before JWT work.
     app.add_middleware(
         OptionalOidcMiddleware,
         auth_required=settings.auth_required,
@@ -30,6 +32,10 @@ def create_app() -> FastAPI:
         audience=settings.oidc_audience,
         jwt_secret=settings.oidc_jwt_secret,
         auth_dev_stub=settings.auth_dev_stub,
+    )
+    app.add_middleware(
+        RateLimitMiddleware,
+        limit_per_minute=settings.rate_limit_per_minute,
     )
     app.include_router(health_router)
     app.include_router(chat_router)

@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     data_source_dsn: str = Field(default="", validation_alias="DATA_SOURCE_DSN")
     fake_runtime: bool = Field(default=False, validation_alias="AGENT_BASE_FAKE_RUNTIME")
     hooks_backend: str = Field(default="noop", validation_alias="HOOKS_BACKEND")
+    rate_limit_per_minute: int = Field(
+        default=0, validation_alias="RATE_LIMIT_PER_MINUTE"
+    )
 
 
 def get_settings() -> Settings:
