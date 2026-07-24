@@ -9,8 +9,8 @@ export type StableEventType =
   | "cancel_requested"
   | "cancelled";
 
-export type StableEvent = {
-  type: StableEventType;
+export type StreamEvent = {
+  type: string;
   run_id?: string;
   event_id?: string;
   sequence?: number;
@@ -21,18 +21,25 @@ export type StableEvent = {
   data?: Record<string, unknown>;
 };
 
+/** @deprecated Prefer StreamEvent; kept for stable-type call sites. */
+export type StableEvent = StreamEvent & { type: StableEventType | string };
+
 export type SseHandlers = {
-  onEvent: (event: StableEvent) => void;
+  onEvent: (event: StreamEvent) => void;
   onError?: (err: unknown) => void;
   onDone?: () => void;
 };
 
-function parseDataLine(line: string): StableEvent | null {
+function parseDataLine(line: string): StreamEvent | null {
   const trimmed = line.trim();
   if (!trimmed.startsWith("data:")) return null;
   const json = trimmed.slice(trimmed.startsWith("data: ") ? 6 : 5).trim();
   if (!json || json === "[DONE]") return null;
-  return JSON.parse(json) as StableEvent;
+  return JSON.parse(json) as StreamEvent;
+}
+
+export function isExtensionEvent(type: string): boolean {
+  return type.startsWith("x.");
 }
 
 /** Parse SSE `data: JSON` lines from a fetch body stream. */

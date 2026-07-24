@@ -68,7 +68,42 @@ def _summary_from_tool_output(output: Any) -> str:
     return str(output)
 
 
-def _tool_call_id(event: dict[str, Any], data: dict[str, Any]) -> str:
+def _tool_call_ids_from_chain_output(output: Any) -> list[str]:
+    """Collect AIMessage.tool_calls[].id from a node output (FIFO for ToolNode)."""
+    messages: list[Any] = []
+    if isinstance(output, dict) and isinstance(output.get("messages"), list):
+        messages = output["messages"]
+    elif hasattr(output, "tool_calls"):
+        messages = [output]
+    ids: list[str] = []
+    for msg in messages:
+        tool_calls = getattr(msg, "tool_calls", None)
+        if tool_calls is None and isinstance(msg, dict):
+            tool_calls = msg.get("tool_calls")
+        if not isinstance(tool_calls, list):
+            continue
+        for tc in tool_calls:
+            if isinstance(tc, dict):
+                tid = tc.get("id")
+            else:
+                tid = getattr(tc, "id", None)
+            if isinstance(tid, str) and tid:
+                ids.append(tid)
+    return ids
+
+
+def _tool_call_id_from_output(output: Any) -> str | None:
+    tid = getattr(output, "tool_call_id", None)
+    if isinstance(tid, str) and tid:
+        return tid
+    if isinstance(output, dict):
+        tid = output.get("tool_call_id")
+        if isinstance(tid, str) and tid:
+            return tid
+    return None
+
+
+def _tool_call_id_fallback(event: dict[str, Any], data: dict[str, Any]) -> str:
     for key in ("tool_call_id", "id"):
         val = data.get(key)
         if isinstance(val, str) and val:
@@ -107,6 +142,8 @@ class LangGraphRuntime:
         stream = compiled.astream_events(graph_input, config=config, version="v2")
         aiter = stream.__aiter__()
         streamed_model_text = False
+        pending_tool_call_ids: list[str] = []
+        run_id_to_tool_call_id: dict[str, str] = {}
         try:
             while True:
                 if isinstance(cancel_token, asyncio.Event) and cancel_token.is_set():
@@ -126,6 +163,7 @@ class LangGraphRuntime:
                 kind = event.get("event")
                 data = event.get("data") or {}
                 name = event.get("name") or ""
+                run_id = str(event.get("run_id") or "")
 
                 if kind == "on_chain_start" and name and name not in {
                     "LangGraph",
@@ -140,28 +178,46 @@ class LangGraphRuntime:
                         streamed_model_text = True
                         yield map_text_delta(text)
                 elif kind == "on_tool_start":
+                    if pending_tool_call_ids:
+                        tool_call_id = pending_tool_call_ids.pop(0)
+                    else:
+                        tool_call_id = _tool_call_id_fallback(event, data)
+                    if run_id:
+                        run_id_to_tool_call_id[run_id] = tool_call_id
                     yield map_tool_call(
                         event.get("name") or "tool",
                         data.get("input") if isinstance(data.get("input"), dict) else {},
-                        _tool_call_id(event, data),
+                        tool_call_id,
                     )
                 elif kind == "on_tool_end":
                     output = data.get("output")
+                    tool_call_id = (
+                        _tool_call_id_from_output(output)
+                        or run_id_to_tool_call_id.get(run_id)
+                        or _tool_call_id_fallback(event, data)
+                    )
                     yield map_tool_result(
                         event.get("name") or "tool",
                         ok=True,
-                        tool_call_id=_tool_call_id(event, data),
+                        tool_call_id=tool_call_id,
                         summary=_summary_from_tool_output(output),
                     )
                 elif kind == "on_tool_error":
                     err = data.get("error")
+                    tool_call_id = (
+                        run_id_to_tool_call_id.get(run_id)
+                        or _tool_call_id_fallback(event, data)
+                    )
                     yield map_tool_result(
                         event.get("name") or "tool",
                         ok=False,
-                        tool_call_id=_tool_call_id(event, data),
+                        tool_call_id=tool_call_id,
                         summary=str(err) if err is not None else "tool error",
                     )
                 elif kind == "on_chain_end":
+                    pending_tool_call_ids.extend(
+                        _tool_call_ids_from_chain_output(data.get("output"))
+                    )
                     if name and name not in {"LangGraph", "RunnableSequence"}:
                         yield map_step_update(name, "done")
                     # Prefer token stream; only fallback to full node output when

@@ -44,3 +44,8 @@ def test_demo_tools_stream_tool_and_extension(monkeypatch: pytest.MonkeyPatch):
     assert types[-1] == "done"
     finished = next(e for e in events if e["type"] == "x.demo_tools.finished")
     assert finished["data"]["ok"] is True
+    call = next(e for e in events if e["type"] == "tool_call")
+    result = next(e for e in events if e["type"] == "tool_result")
+    assert call["data"]["tool_call_id"] == "tc-demo-add-1"
+    assert result["data"]["tool_call_id"] == "tc-demo-add-1"
+    assert result["data"]["ok"] is True

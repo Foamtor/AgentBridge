@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import { apiBase } from "../../lib/apiBase";
-import { streamChatSse, type StableEvent } from "../../lib/sseClient";
+import { streamChatSse, type StreamEvent } from "../../lib/sseClient";
 import { getToken, setToken } from "../auth/token";
 import { EventTimeline } from "./EventTimeline";
 import { SendPanel } from "./SendPanel";
@@ -15,7 +15,7 @@ export function DebugPage() {
   const [route, setRoute] = useState("echo");
   const [token, setTokenState] = useState(getToken);
   const [query, setQuery] = useState("hello");
-  const [events, setEvents] = useState<StableEvent[]>([]);
+  const [events, setEvents] = useState<StreamEvent[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -130,7 +130,9 @@ export function DebugPage() {
     <main className="page">
       <header>
         <h1>Agent-Base 调试台</h1>
-        <p className="lede">发送到 /chat/stream，观察稳定 SSE 事件时间线。</p>
+        <p className="lede">
+          发送到 /chat/stream。route 可选 echo / demo_tools；扩展事件 x.* 在时间线中默认折叠。
+        </p>
       </header>
       <SessionBar
         threadId={threadId}
