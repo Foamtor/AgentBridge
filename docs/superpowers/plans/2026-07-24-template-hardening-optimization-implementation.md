@@ -13,34 +13,38 @@
 ## Global Constraints
 
 - 一期**会改** `packages/core`；硬化后新域零改 core；core 禁止出现 `demo_tools` / 业务节点名硬编码
-- `OutboundFragment` 属于 **`protocol/`**，禁止放在 `adapters/` 或 `application/`
+- `OutboundFragment` 与 **`OUTBOUND_EXTENSIONS_KEY`** 属于 **`protocol/`**，禁止放在 `adapters/` 或 `application/`
+- 扩展读取默认：**`compiled.aget_state(config)`**，禁止用 `on_chain_end` 猜节点 output；`event_hook` 为一期**不实现**的同级高级选项（规格允许，计划默认不做）
 - `GraphRuntime.astream` 的 Protocol 返回类型为 `AsyncIterator[OutboundFragment]`（与实现一致）
 - Builder **Option B**：`build_event` 仅稳定九类；`build_extension_event` 仅合法 `x.*`
+- lifecycle 终端保证与 **chat.py 删除 r-host / 禁止双发 error** 必须在 **同一 Task** 完成
 - `demo_tools` **无 LLM**；CI 零外部 API key
 - 生产 `app.state` 仅 `run_lifecycle` + `settings`；禁止暴露 locks/cancels/graphs/tools/input_builders
-- 允许 `adapters.* → adapters.*`；实施时补 code-structure 一句
+- 允许 `adapters.* → adapters.*`，且 **import-linter 白名单**约束边；补 code-structure
 - 路径写仓库相对全路径；每 Task 测绿再 commit
-- 二期（Redis 锁等）不阻塞一期宣布
+- 二期（Redis 锁等）不阻塞一期宣布；对外叙事：模板可用 ≠ 多副本生产
 
 ## File map（一期）
 
 | 路径 | 职责 |
 |------|------|
-| `packages/core/src/agent_base_core/protocol/fragments.py` | **新建** `OutboundFragment` Pydantic 模型 |
+| `packages/core/src/agent_base_core/protocol/fragments.py` | **新建** `OutboundFragment` + `OUTBOUND_EXTENSIONS_KEY` |
 | `packages/core/src/agent_base_core/protocol/events.py` | `build_event` 收紧；新增 `build_extension_event` + `EXTENSION_TYPE_RE` |
 | `packages/core/src/agent_base_core/protocol/__init__.py` | 按需导出 |
 | `packages/core/src/agent_base_core/adapters/event_mapper.py` | 返回 Fragment；加 `map_tool_result` |
-| `packages/core/src/agent_base_core/adapters/langgraph_runtime.py` | `on_tool_end` / step / `outbound_extensions` |
+| `packages/core/src/agent_base_core/adapters/langgraph_runtime.py` | `on_tool_end` / step / **`aget_state` 读扩展** |
 | `packages/core/src/agent_base_core/ports/graph_runtime.py` | Protocol 返回类型改为 `AsyncIterator[OutboundFragment]` |
 | `packages/core/src/agent_base_core/application/run_lifecycle.py` | Fragment→信封；cancel data；terminal_sent |
 | `packages/core/src/agent_base_core/ports/event_sink.py` | 仍 emit `dict`（完整信封） |
+| `apps/api/routes/chat.py` | **与 Task 6 同改**：删 r-host、禁双发 error |
 | `docs/contracts.md` | 对齐稳定九类 + `x.*`；cancel data |
 | `docs/superpowers/specs/2026-07-23-code-structure.md` | adapters 同层允许 |
+| `.importlinter` | adapters 内部边白名单 |
 | `apps/api/domains/demo_tools/*` | 无 LLM 样板域 |
 | `apps/api/domains/bootstrap.py` | 注册 echo + demo_tools |
-| `apps/api/lifespan.py` / `config/settings.py` / `routes/chat.py` | Fake 迁出；DSN；app.state；禁 r-host |
+| `apps/api/lifespan.py` / `config/settings.py` | Fake 迁出；DSN；app.state；hooks |
 | `apps/api/testing/fake_runtime.py` | Fake 迁出落点 |
-| `scripts/import_scan_core.py`（或新测） | 禁 core 含 `demo_tools` |
+| `scripts/import_scan_core.py`（或新测） | 禁 core 含 `demo_tools` / `echo_node` |
 
 ---
 
@@ -91,6 +95,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+OUTBOUND_EXTENSIONS_KEY = "outbound_extensions"
+
 
 class OutboundFragment(BaseModel):
     """Protocol-layer fragment: type + data only (no run_id/sequence/event_id).
@@ -112,7 +118,14 @@ class OutboundFragment(BaseModel):
 
 ```python
 # packages/core/tests/protocol/test_fragments.py
-from agent_base_core.protocol.fragments import OutboundFragment
+from agent_base_core.protocol.fragments import (
+    OUTBOUND_EXTENSIONS_KEY,
+    OutboundFragment,
+)
+
+
+def test_outbound_extensions_key_constant():
+    assert OUTBOUND_EXTENSIONS_KEY == "outbound_extensions"
 
 
 def test_outbound_fragment_defaults():
@@ -262,12 +275,14 @@ git commit -m "feat(core): mappers return OutboundFragment; add map_tool_result"
 1. `async for` yield **`OutboundFragment`**（不是完整 event dict）
 2. `on_tool_end` → `map_tool_result`
 3. 最小 `on_chain_start` → `map_step_update(step=name, status="running")`；对应 end 可发 `status="done"`（保持简单）
-4. **`outbound_extensions` 读取策略（写死）：**  
-   - 维护 `extensions_acc: list[dict] = []`  
-   - 每次 `on_chain_end`：若 `data["output"]` 为 `dict` 且含键 `outbound_extensions`（list），则 **替换** `extensions_acc` 为该 list 的浅拷贝（以节点最新写入为准）  
-   - `astream_events` 循环结束后：对 `extensions_acc` 每一项 yield `OutboundFragment(type=item["type"], data=item.get("data") or {})`  
-   - **此处不跑 `EXTENSION_TYPE_RE`**（交给 lifecycle / `build_extension_event`）  
-   - **禁止**增加 `event_hook` callback
+4. **`outbound_extensions` 读取策略（写死，用 `aget_state`）：**  
+   - 主循环跑完 `astream_events` 后：  
+     `snapshot = await compiled.aget_state(config)`（`config` 与跑图相同，含 `thread_id`）  
+     `raw = (snapshot.values or {}).get(OUTBOUND_EXTENSIONS_KEY) or []`  
+   - 对 `raw` 每一项 yield `OutboundFragment(type=item["type"], data=item.get("data") or {})`  
+   - **禁止**从 `on_chain_end` 解析节点 output 猜扩展列表  
+   - **此处不跑 `EXTENSION_TYPE_RE`**（交给 lifecycle）  
+   - 一期**不实现** `event_hook`（规格中的同级高级选项留到需要复杂域时再开 Task）
 5. 去掉业务节点名硬编码；通用 `_text_from_chain_output` 可保留
 
 - [ ] **Step 1: 单测扩展累积逻辑（纯函数或假 event 序列即可）**
@@ -280,32 +295,39 @@ git commit -m "feat(core): runtime emits fragments including tool_result and ext
 
 ---
 
-### Task 6: RunLifecycle — Fragment 信封、cancel data、terminal_sent
+### Task 6: RunLifecycle 终端保证 + chat 删除 r-host（同一切片）
 
 **Files:**
 - Modify: `packages/core/src/agent_base_core/application/run_lifecycle.py`
 - Modify: `packages/core/tests/application/test_run_lifecycle.py`
 - Modify: `packages/core/tests/conftest.py`（FakeRuntime yield `OutboundFragment`）
+- Modify: `apps/api/routes/chat.py`（**本 Task 必须改完**，勿留到 Task 8）
+- Modify: `apps/api/tests/test_chat_stream.py`（若依赖旁路行为则更新）
 
-**行为:**
-1. `async for frag in runtime.astream(...)`，按 Fragment.type 分支（写死）：  
-   - `frag.type in EVENT_TYPES` → `build_event(...)`  
-   - `EXTENSION_TYPE_RE.fullmatch(frag.type)` → `build_extension_event(...)`  
-   - 否则 → 记为运行失败：发 `error`（稳定事件）并置 `terminal_sent`（**不要**把非法 type 静默丢掉）  
-2. 统一递增 `sequence`，再 `sink.emit(dict)`  
-3. `cancel_requested`/`cancelled`：`data={"thread_id": thread_id, "run_id": run_id}`  
-4. `terminal_sent`：`try_acquire` 成功后，`sink.close()` 前必须已发 `done` **或** cancel 对 **或** `error` 之一；`ThreadBusy` 仍只抛异常、不发 SSE  
-5. Fake/Slow/Boom runtime 改为 yield `OutboundFragment`  
-6. 既有 echo 路径相关 core 测（start/done、busy、cancel、error）保持绿
+**行为（lifecycle）:**
+1. `async for frag in runtime.astream(...)`：  
+   - `frag.type in EVENT_TYPES` → `build_event`  
+   - `EXTENSION_TYPE_RE.fullmatch(frag.type)` → `build_extension_event`  
+   - 否则 → 发稳定 `error` 并 `terminal_sent`  
+2. 统一递增 `sequence`，`sink.emit(dict)`  
+3. cancel 事件 `data={"thread_id", "run_id"}`  
+4. `terminal_sent`：acquire 成功后 close 前必有 `done` / cancel 对 / `error` 之一  
 
-- [ ] **Step 1: 测试钉死：** cancel `data` 字段；非法扩展 type（如 `x.`）最终出现 `error`（或你们选定的终端）；sequence 单调
+**行为（chat.py，与上同步）:**
+1. **删除** `run_id="r-host"` / `sequence=0` 的假 error 帧  
+2. `_run` 的 `except Exception`：**不得**在 lifecycle 已通过 sink 发出 `error` 后再往 queue 塞第二帧 error；ThreadBusy/UnknownRoute 开流前映射保持；其余异常若 sink 已关闭则只结束生成器  
+3. 集成/单测确认：**一条失败流最多一帧 `type=error`**
 
-- [ ] **Step 2: 实现 → `python -m pytest packages/core/tests -v` 全绿**
+- [ ] **Step 1: core 测** — cancel data；非法 `x.*` → error；terminal  
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 2: 改 chat.py + api 测** — 无 r-host；无双 error  
+
+- [ ] **Step 3: `python -m pytest packages/core/tests -v` 且 `cd apps/api && python -m pytest tests -v`**
+
+- [ ] **Step 4: Commit**
 
 ```bash
-git commit -m "feat(core): lifecycle envelopes fragments; cancel data; terminal guarantee"
+git commit -m "feat(core,api): lifecycle envelopes + remove chat r-host duplicate errors"
 ```
 
 ---
@@ -319,8 +341,9 @@ git commit -m "feat(core): lifecycle envelopes fragments; cancel data; terminal 
 
 **行为:**
 - Tool（如 `add`）真绑定；图无 ChatModel
-- State 含 `outbound_extensions`；结束前 append `x.demo_tools.finished`
+- State 用 `OUTBOUND_EXTENSIONS_KEY` 写入 list；结束前 append `{"type": "x.demo_tools.finished", "data": {...}}`
 - 集成测：SSE 含 `tool_call`、`tool_result`、`x.demo_tools.finished`、`done`
+- 图可用 ToolNode + 预置 tool_calls 的 Fake AIMessage（无真实 LLM）；细节见域 README
 
 - [ ] **Step 1: 实现域 + bootstrap 注册**
 
@@ -336,24 +359,25 @@ git commit -m "feat(api): add demo_tools domain with tool SSE and x.* extension"
 
 ---
 
-### Task 8: 宿主瘦身 + chat 禁旁路 + DSN
+### Task 8: 宿主瘦身 + DSN + hooks（r-host 已在 Task 6 完成）
 
 **Files:**
 - Create: `apps/api/testing/fake_runtime.py`
-- Modify: `apps/api/lifespan.py`、`config/settings.py`、`routes/chat.py`、`main.py`（如需）
-- Modify: `apps/api/tests/*`（去掉 `app.state.locks` 主路径；fixture 注册方式调整）
-- Modify: `docs/superpowers/specs/2026-07-23-code-structure.md`（adapters→adapters 允许）
-- Modify: `.env.example`、`docs/deploy.md`（`PG_DSN` / `HOOKS_BACKEND`）
+- Modify: `apps/api/lifespan.py`、`config/settings.py`、`main.py`（如需）
+- Modify: `apps/api/tests/*`（去掉 `app.state.locks` 主路径；fixture 调整）
+- Modify: `docs/superpowers/specs/2026-07-23-code-structure.md`
+- Modify: `.importlinter`（adapters 白名单边）
+- Modify: `.env.example`、`docs/deploy.md`
 
 **行为:**
-- Fake 迁出；`app.state` 仅 `run_lifecycle`+`settings`（测试钩子另议，不得恢复 locks 暴露为正式 API）
-- chat 删除 `r-host` 旁路；未知 route 靠 lifecycle `UnknownRoute`
-- `settings.postgres_dsn` 优先，否则五字段拼接
-- `hooks_backend=noop|logging`
+- Fake 迁出；`app.state` 仅 `run_lifecycle`+`settings`
+- `postgres_dsn` 优先 + 五字段 fallback；`hooks_backend=noop|logging`
+- **确认** chat.py 已无 r-host（Task 6）；本 Task 不重开旁路
+- import-linter：例如仅允许 `langgraph_runtime` → `event_mapper`
 
-- [ ] **Step 1: 改测试与实现 → `cd apps/api && python -m pytest tests -v`**
+- [ ] **Step 1: 实现 → `cd apps/api && python -m pytest tests -v`**
 
-- [ ] **Step 2: 根目录 `lint-imports` + `python scripts/import_scan_core.py`**
+- [ ] **Step 2: 根目录 `lint-imports` + import/域名扫描**
 
 - [ ] **Step 3: Commit**
 
@@ -371,15 +395,17 @@ git commit -m "refactor(api): slim lifespan app.state; DSN and hooks settings"
 - Modify: `.github/workflows/ci.yml`（如需跑新扫描）
 - Optional: `apps/web/src/features/contracts/ContractsPage.tsx`、`DebugPage.tsx`（软要求）
 
-- [ ] **Step 1: 文档写清 Fragment / Option B / demo_tools / 多副本未就绪警告**
+- [ ] **Step 1: 文档** — Fragment / Option B / `OUTBOUND_EXTENSIONS_KEY`+`aget_state` / demo_tools / **「模板可用 ≠ 多副本」** 叙事
 
-- [ ] **Step 2: 门禁扫描** — `packages/core` 全文禁止：`demo_tools`、`echo_node`（防业务节点名硬编码回潮）；CI 挂上
+- [ ] **Step 2: 门禁** — core 禁 `demo_tools`、`echo_node`；import-linter adapters 白名单已挂
 
-- [ ] **Step 3（可选·软）: Web** — Contracts 页注明 `demo_tools` 与 `x.*` 规则；调试台可对未知 `x.*` 折叠（不进硬验收红线）
+- [ ] **Step 3（可选·软）: Web** — Contracts 注明 `demo_tools`/`x.*`；未知 `x.*` 可折叠
 
-- [ ] **Step 4: CI 绿（core + api 分目录 pytest + lint-imports + 扫描）**
+- [ ] **Step 4（可选·后续文档）: `add-a-domain.md`「何时改 core」决策树** — 可本 Task 做薄版，不挡硬验收
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: CI 绿**
+
+- [ ] **Step 6: Commit**
 
 ```bash
 git commit -m "docs: harden runbooks; ci: ban domain names in core"
@@ -394,6 +420,7 @@ git commit -m "docs: harden runbooks; ci: ban domain names in core"
 | P2-1 | Redis `ThreadLock` + `RunCancelRegistry`；`lock_backend` 切换 |
 | P2-2 | `/ready`；deploy 多副本前提 |
 | P2-3 | JWKS TTL；入站 `trace_id` |
+| P2-4（体验） | 可选 `demo_llm` 域（需 key）；不挡一期 |
 
 ---
 
@@ -402,21 +429,20 @@ git commit -m "docs: harden runbooks; ci: ban domain names in core"
 | Spec 要求 | Task |
 |-----------|------|
 | contracts 对齐 | 1 |
-| OutboundFragment **在 protocol/** | **2（显式 Pydantic）** |
+| OutboundFragment + **OUTBOUND_EXTENSIONS_KEY** ∈ protocol/ | **2** |
 | Option B builders | 3 |
 | tool_result / mapper | 4 |
-| Port=`AsyncIterator[OutboundFragment]` + runtime 扩展累积策略 | **5** |
-| lifecycle 分支（EVENT_TYPES / EXTENSION_TYPE_RE）+ cancel data + terminal | **6** |
+| Port + runtime **`aget_state`** 读扩展 | **5** |
+| lifecycle + **chat 删 r-host / 禁双发** | **6（合并切片）** |
 | demo_tools 无 LLM | 7 |
-| lifespan / app.state / DSN | 8 |
-| 门禁（含 `echo_node`）+ 文档 + Web 软项 | 9 |
-| 二期 | 文末 |
+| lifespan / app.state / DSN / **import-linter 白名单** | 8 |
+| 叙事 + 门禁 + Web 软 + 决策树软 | 9 |
+| 二期 / demo_llm | 文末 |
 
-**相对规格的关键钉死：**
+**三方评审写入 plan 的钉死项：**
 
-1. `OutboundFragment`：Pydantic、`extra="forbid"`、`protocol/fragments.py`  
-2. 扩展读取：仅 `on_chain_end.output.outbound_extensions` **替换累积**；无 callback  
-3. Lifecycle type 分支：稳定集 / `EXTENSION_TYPE_RE` / 否则 `error`  
-4. 扫描：core 禁 `demo_tools` **与** `echo_node`
-
-**相对上一版 plan 的修订（审阅对齐）：** Port 签名、扩展读取写死、Task 6 分支写死、mapper 签名去歧义、门禁含 `echo_node`、Web 软 Step。
+1. 扩展读取 = `aget_state` + `OUTBOUND_EXTENSIONS_KEY`（不用 on_chain_end 猜）  
+2. Task 6 = lifecycle **和** chat r-host 同一切片  
+3. callback = 规格同级高级选项；**本 plan 一期不实现**  
+4. adapters→adapters = code-structure + import-linter 白名单  
+5. 对外说清：一期模板可用 ≠ 多副本生产
