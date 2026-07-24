@@ -15,7 +15,11 @@ def _label_key(labels: dict[str, str] | None) -> tuple[tuple[str, str], ...]:
 def _format_labels(labels: tuple[tuple[str, str], ...]) -> str:
     if not labels:
         return ""
-    inner = ",".join(f'{k}="{v}"' for k, v in labels)
+
+    def _esc(v: str) -> str:
+        return v.replace("\\", "\\\\").replace("\n", "\\n").replace('"', '\\"')
+
+    inner = ",".join(f'{k}="{_esc(v)}"' for k, v in labels)
     return "{" + inner + "}"
 
 

@@ -18,6 +18,9 @@ class PostgresCheckpointerFactory:
         self._checkpointer = await self._cm.__aenter__()
         await self._checkpointer.setup()
 
+    def is_setup(self) -> bool:
+        return self._checkpointer is not None
+
     async def get(self) -> Any:
         if self._checkpointer is None:
             await self.setup()

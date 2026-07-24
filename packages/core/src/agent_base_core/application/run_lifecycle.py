@@ -195,23 +195,32 @@ class RunLifecycle:
                     "span_factory failed thread_id=%s run_id=%s", thread_id, run_id
                 )
                 span_cm = nullcontext()
-        with span_cm:
-            await self._run_stream_body(
-                query=query,
-                thread_id=thread_id,
-                route=route,
-                sink=sink,
-                model=model,
-                extra=extra,
-                run_ctx=run_ctx,
-                tools_override=tools_override,
-                run_id=run_id,
-                trace_id=trace_id,
-                tenant_id=tenant_id,
-                storage_key=storage_key,
-                graph_cfg=graph_cfg,
-                cancel_token=cancel_token,
-            )
+        body_entered = False
+        try:
+            with span_cm:
+                body_entered = True
+                await self._run_stream_body(
+                    query=query,
+                    thread_id=thread_id,
+                    route=route,
+                    sink=sink,
+                    model=model,
+                    extra=extra,
+                    run_ctx=run_ctx,
+                    tools_override=tools_override,
+                    run_id=run_id,
+                    trace_id=trace_id,
+                    tenant_id=tenant_id,
+                    storage_key=storage_key,
+                    graph_cfg=graph_cfg,
+                    cancel_token=cancel_token,
+                )
+        except BaseException:
+            # span __enter__ failed before body → lock would otherwise stick forever.
+            if not body_entered:
+                await self._locks.release(storage_key, run_id)
+                await self._cancels.unregister(storage_key, run_id)
+            raise
 
     async def _run_stream_body(
         self,

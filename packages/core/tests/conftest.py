@@ -15,6 +15,9 @@ class FakeCheckpointerFactory:
     async def setup(self) -> None:
         return None
 
+    def is_setup(self) -> bool:
+        return True
+
     async def get(self):
         return None
 

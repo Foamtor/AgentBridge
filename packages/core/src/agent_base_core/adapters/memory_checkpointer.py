@@ -14,6 +14,9 @@ class MemoryCheckpointerFactory:
     async def setup(self) -> None:
         self._saver = MemorySaver()
 
+    def is_setup(self) -> bool:
+        return self._saver is not None
+
     async def get(self) -> Any:
         if self._saver is None:
             await self.setup()
