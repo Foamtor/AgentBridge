@@ -257,7 +257,19 @@
 }
 ```
 
-域扩展：`type` 可为自定义字符串；核心原样透传 `data`，不校验业务字段。
+### 2.2 事件类型规则
+
+**稳定九类**（仅这些可由核心 `build_event` 构造）：
+
+`start` · `step_update` · `text_delta` · `tool_call` · `tool_result` · `done` · `error` · `cancel_requested` · `cancelled`
+
+**扩展集**（域自定义，经 `build_extension_event` 出站）：
+
+- `type` 必须匹配：`^x\.[a-z][a-z0-9_]*\.[a-z0-9_.]+$`
+- 示例：`x.demo_tools.finished`
+- 非法扩展 type（如 `X.UPPER.x`、`x.`、`custom`）**不得出站**；应用层拒绝，禁止静默透传
+
+域扩展的 `data` 业务字段由域约定；核心只校验 `type` 形态，不校验 `data` 内部 schema。
 
 ---
 
