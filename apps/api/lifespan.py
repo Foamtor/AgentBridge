@@ -14,6 +14,8 @@ from agent_base_core.adapters.logging_hooks import LoggingHooks
 from agent_base_core.adapters.memory_audit_logger import MemoryAuditLogger
 from agent_base_core.adapters.memory_checkpointer import MemoryCheckpointerFactory
 from agent_base_core.adapters.memory_event_log import MemoryEventLog
+from agent_base_core.adapters.memory_message_store import MemoryMessageStore
+from agent_base_core.adapters.memory_run_store import MemoryRunStore
 from agent_base_core.adapters.noop_hooks import NoopHooks
 from agent_base_core.adapters.role_policy import RolePolicyEngine
 from agent_base_core.application.pipeline import RequestPipeline, ToolPolicyPlugin
@@ -74,6 +76,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     policy = RolePolicyEngine()
     audit = MemoryAuditLogger()
     event_log = MemoryEventLog()
+    message_store = MemoryMessageStore()
+    run_store = MemoryRunStore()
 
     lifecycle = RunLifecycle(
         locks=locks,
@@ -87,6 +91,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         policy=policy,
         audit=audit,
         event_log=event_log,
+        message_store=message_store,
+        run_store=run_store,
     )
     pipeline = RequestPipeline(
         lifecycle=lifecycle,
@@ -105,6 +111,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.pipeline = pipeline
     app.state.audit = audit
     app.state.event_log = event_log
+    app.state.message_store = message_store
+    app.state.run_store = run_store
     app.state.tools = tools
     try:
         yield

@@ -8,6 +8,7 @@ import uuid
 from typing import Any
 
 from agent_base_core.application.graph_config import build_graph_config
+from agent_base_core.application.project_turn import project_turn
 from agent_base_core.application.tool_guard import guard_tools
 from agent_base_core.errors import RunNotFound, ThreadBusy, UnknownRoute
 from agent_base_core.ports.checkpointer import CheckpointerFactory
@@ -49,6 +50,8 @@ class RunLifecycle:
         policy: Any | None = None,
         audit: Any | None = None,
         event_log: Any | None = None,
+        message_store: Any | None = None,
+        run_store: Any | None = None,
     ) -> None:
         self._locks = locks
         self._checkpointers = checkpointers
@@ -61,6 +64,8 @@ class RunLifecycle:
         self._policy = policy
         self._audit = audit
         self._event_log = event_log
+        self._message_store = message_store
+        self._run_store = run_store
         self._api_to_storage: dict[str, str] = {}
 
     def replace_runtime(self, runtime: GraphRuntime) -> None:
@@ -160,6 +165,7 @@ class RunLifecycle:
         trace_id = run_id
         sequence = 0
         terminal_sent = False
+        terminal_status: str | None = None
         pre_start_failure = False
         run_ctx = ctx or RunContext()
         run_ctx = run_ctx.model_copy(
@@ -258,6 +264,7 @@ class RunLifecycle:
                             ),
                         )
                         terminal_sent = True
+                        terminal_status = "error"
                         return
                     sequence += 1
                     await self._emit(sink, evt)
@@ -271,6 +278,7 @@ class RunLifecycle:
                     message=str(exc),
                 )
                 terminal_sent = True
+                terminal_status = "error"
                 return
             except Exception as exc:  # noqa: BLE001
                 logger.exception("run failed thread_id=%s run_id=%s", thread_id, run_id)
@@ -286,6 +294,7 @@ class RunLifecycle:
                     ),
                 )
                 terminal_sent = True
+                terminal_status = "error"
                 return
 
             if cancel_token.is_set():
@@ -315,6 +324,7 @@ class RunLifecycle:
                     ),
                 )
                 terminal_sent = True
+                terminal_status = "cancelled"
             else:
                 sequence += 1
                 await self._emit(
@@ -327,6 +337,7 @@ class RunLifecycle:
                     ),
                 )
                 terminal_sent = True
+                terminal_status = "done"
         except UnknownRoute:
             pre_start_failure = True
             raise
@@ -341,6 +352,7 @@ class RunLifecycle:
                     message=str(exc),
                 )
                 terminal_sent = True
+                terminal_status = "error"
             else:
                 pre_start_failure = sequence == 0
                 raise
@@ -361,10 +373,33 @@ class RunLifecycle:
                     ),
                 )
                 terminal_sent = True
+                terminal_status = "error"
             else:
                 pre_start_failure = sequence == 0
                 raise
         finally:
+            if (
+                terminal_sent
+                and terminal_status
+                and self._event_log is not None
+                and self._message_store is not None
+                and self._run_store is not None
+            ):
+                try:
+                    await project_turn(
+                        event_log=self._event_log,
+                        message_store=self._message_store,
+                        run_store=self._run_store,
+                        tenant_id=run_ctx.tenant_id or "default",
+                        thread_id=thread_id,
+                        run_id=run_id,
+                        query=query,
+                        terminal=terminal_status,
+                    )
+                except Exception:  # noqa: BLE001 — never block cleanup
+                    logger.exception(
+                        "project_turn failed thread_id=%s run_id=%s", thread_id, run_id
+                    )
             try:
                 await self._hooks.on_run_end(
                     {"thread_id": thread_id, "run_id": run_id, "route": route}
