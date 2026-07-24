@@ -15,3 +15,11 @@ class UnknownRoute(Exception):
 
 class RunNotFound(Exception):
     """Raised when cancel targets a missing run."""
+
+
+class InvalidInput(Exception):
+    """Raised when InputValidator rejects the query."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+        self.message = message
