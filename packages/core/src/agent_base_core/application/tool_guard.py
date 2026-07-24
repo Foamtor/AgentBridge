@@ -15,7 +15,7 @@ from agent_base_core.protocol.tool_meta import get_tool_meta
 
 logger = logging.getLogger(__name__)
 
-# Placeholder until Plan4/5 versioned policy bundles land.
+# Placeholder default when RunContext.policy_bundle_version is empty.
 _POLICY_VERSION = "role_policy/v1"
 
 try:
@@ -44,11 +44,15 @@ def _deny_reason_code(resource: dict[str, Any]) -> str:
     return "policy_deny"
 
 
-def _deny_audit_detail(resource: dict[str, Any]) -> dict[str, Any]:
+def _policy_version(ctx: RunContext) -> str:
+    return (ctx.policy_bundle_version or "").strip() or _POLICY_VERSION
+
+
+def _deny_audit_detail(resource: dict[str, Any], ctx: RunContext) -> dict[str, Any]:
     return {
         "decision": "deny",
         "reason_code": _deny_reason_code(resource),
-        "policy_version": _POLICY_VERSION,
+        "policy_version": _policy_version(ctx),
     }
 
 
@@ -112,7 +116,7 @@ def _wrap_base_tool(
             tenant_id=ctx.tenant_id,
             action="invoke_tool",
             resource=str(resource.get("name")),
-            detail=_deny_audit_detail(resource),
+            detail=_deny_audit_detail(resource, ctx),
             result="denied",
         )
 
@@ -162,7 +166,7 @@ class _GuardProxy:
             tenant_id=self._ctx.tenant_id,
             action="invoke_tool",
             resource=str(resource.get("name")),
-            detail=_deny_audit_detail(resource),
+            detail=_deny_audit_detail(resource, self._ctx),
             result="denied",
         )
 

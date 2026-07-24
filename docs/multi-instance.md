@@ -1,7 +1,8 @@
 # 多机部署（M9）
 
 > 仅在 **Plan5 / M9** 完成后，才可称「多机生产」。  
-> 锁键为 `ab:lock:{storage_key}`，其中 `storage_key = {tenant_id}::{thread_id}`（**不要**再套一层 tenant 前缀）。
+> 锁键为 `ab:lock:{storage_key}`，其中 `storage_key = {tenant_id}::{thread_id}`（**不要**再套一层 tenant 前缀）。  
+> 默认锁 TTL 300s；长跑需加大或续租，否则锁过期后另一实例可能抢入。
 
 ## Compose：两 API + 一 Redis
 

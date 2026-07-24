@@ -74,7 +74,9 @@ class ToolPolicyPlugin:
                 "before": before,
                 "after": after,
                 "reason_code": "list_filtered" if after < before else "list_ok",
-                "policy_version": "role_policy/v1",
+                "policy_version": (
+                    (req.ctx.policy_bundle_version or "").strip() or "role_policy/v1"
+                ),
             },
             result="ok",
         )

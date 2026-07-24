@@ -25,11 +25,21 @@ class FakeRedis:
         return True
 
     async def eval(self, script: str, numkeys: int, *args: str) -> int:
-        _ = (script, numkeys)
-        key, run_id = args[0], args[1]
-        if self._kv.get(key) == run_id:
-            del self._kv[key]
-            return 1
+        _ = script
+        if numkeys < 1 or len(args) < numkeys:
+            return 0
+        key = args[0]
+        # Lock release: get+del if value matches
+        if "get" in script and "del" in script and len(args) >= 2:
+            run_id = args[1]
+            if self._kv.get(key) == run_id:
+                del self._kv[key]
+                return 1
+            return 0
+        # Rate limit: INCR + EXPIRE on first hit
+        if "INCR" in script.upper():
+            self._kv[key] = int(self._kv.get(key, 0)) + 1
+            return int(self._kv[key])
         return 0
 
     async def aclose(self) -> None:

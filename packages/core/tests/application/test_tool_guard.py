@@ -55,6 +55,22 @@ async def test_guard_denies_invoke_for_viewer() -> None:
 
 
 @pytest.mark.asyncio
+async def test_guard_deny_uses_ctx_policy_bundle_version() -> None:
+    raw = attach_tool_meta(_T(), required_roles=["admin"])
+    ctx = RunContext(
+        roles=["viewer"],
+        tenant_id="t",
+        user_id="u1",
+        policy_bundle_version="bundle/v9",
+    )
+    audit = MemoryAuditLogger()
+    guarded = guard_tools([raw], policy=RolePolicyEngine(), ctx=ctx, audit=audit)
+    await guarded[0].ainvoke({})
+    denied = [r for r in audit.records if r["result"] == "denied"]
+    assert denied[0]["detail"]["policy_version"] == "bundle/v9"
+
+
+@pytest.mark.asyncio
 async def test_guard_allows_invoke_for_admin() -> None:
     raw = attach_tool_meta(_T(), required_roles=["admin"])
     ctx = RunContext(roles=["admin"], tenant_id="t")
