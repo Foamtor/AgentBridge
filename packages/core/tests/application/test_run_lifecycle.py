@@ -9,7 +9,7 @@ from agent_base_core.application.run_lifecycle import RunLifecycle
 from agent_base_core.protocol.context import checkpoint_thread_key
 from agent_base_core.registry.input_builders import InputBuilderRegistry
 
-from conftest import (
+from fakes import (
     BadExtensionRuntime,
     BoomRuntime,
     FakeCheckpointerFactory,

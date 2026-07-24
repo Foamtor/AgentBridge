@@ -29,7 +29,7 @@ def test_rate_limit_middleware_returns_429(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setenv("AGENT_BASE_FAKE_RUNTIME", "1")
     os.environ["RATE_LIMIT_PER_MINUTE"] = "2"
     os.environ["AGENT_BASE_FAKE_RUNTIME"] = "1"
-    from main import create_app
+    from testing.app_factory import create_test_app as create_app
 
     app = create_app()
     with TestClient(app) as c:

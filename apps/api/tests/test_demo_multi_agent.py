@@ -23,7 +23,7 @@ def test_demo_multi_agent_two_agent_ids(monkeypatch: pytest.MonkeyPatch) -> None
     import os
 
     os.environ["AGENT_BASE_FAKE_RUNTIME"] = "0"
-    from main import create_app
+    from testing.app_factory import create_test_app as create_app
 
     app = create_app()
     with TestClient(app) as c:

@@ -13,7 +13,7 @@ from agent_base_core.protocol.context import RunContext, checkpoint_thread_key
 from agent_base_core.protocol.fragments import OutboundFragment
 from agent_base_core.registry.input_builders import InputBuilderRegistry
 
-from conftest import FakeCheckpointerFactory, FakeRuntime
+from fakes import FakeCheckpointerFactory, FakeRuntime
 
 
 class RecordingLock(InProcessThreadLock):

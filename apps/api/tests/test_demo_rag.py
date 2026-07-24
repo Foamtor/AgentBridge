@@ -25,7 +25,7 @@ async def test_demo_rag_emits_citation(monkeypatch: pytest.MonkeyPatch) -> None:
     import os
 
     os.environ["AGENT_BASE_FAKE_RUNTIME"] = "0"
-    from main import create_app
+    from testing.app_factory import create_test_app as create_app
 
     app = create_app()
     fake = FakeRetriever()

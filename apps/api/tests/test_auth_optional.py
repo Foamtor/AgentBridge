@@ -26,7 +26,7 @@ def test_auth_off_allows_stream_without_token(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("AUTH_DEV_STUB", "false")
     monkeypatch.setenv("AGENT_BASE_FAKE_RUNTIME", "1")
     os.environ["AUTH_REQUIRED"] = "false"
-    from main import create_app
+    from testing.app_factory import create_test_app as create_app
 
     app = create_app()
     with TestClient(app) as c:
@@ -43,7 +43,7 @@ def test_auth_on_rejects_missing_token(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("AGENT_BASE_FAKE_RUNTIME", "1")
     os.environ["AUTH_REQUIRED"] = "true"
     os.environ["AUTH_DEV_STUB"] = "true"
-    from main import create_app
+    from testing.app_factory import create_test_app as create_app
 
     app = create_app()
     with TestClient(app) as c:
@@ -64,7 +64,7 @@ def test_auth_hs256_rejects_forged_and_accepts_valid(monkeypatch: pytest.MonkeyP
     os.environ["AUTH_REQUIRED"] = "true"
     os.environ["AUTH_DEV_STUB"] = "false"
     os.environ["OIDC_JWT_SECRET"] = secret
-    from main import create_app
+    from testing.app_factory import create_test_app as create_app
 
     app = create_app()
     with TestClient(app) as c:

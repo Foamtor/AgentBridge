@@ -2,7 +2,7 @@
 
 from fastapi.testclient import TestClient
 
-from main import create_app
+from testing.app_factory import create_test_app as create_app
 
 
 def test_health():

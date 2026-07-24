@@ -24,7 +24,7 @@ def test_demo_readonly_stream_queries_with_tenant(
 ) -> None:
     """Real LangGraph + RolePolicy + InjectedToolArg must still reach DataSource."""
     monkeypatch.setenv("AGENT_BASE_FAKE_RUNTIME", "0")
-    from main import create_app
+    from testing.app_factory import create_test_app as create_app
 
     app = create_app()
     fake = FakeDataSource()

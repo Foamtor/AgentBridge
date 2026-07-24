@@ -12,7 +12,7 @@ from agent_base_core.protocol.context import RunContext
 from agent_base_core.registry.input_builders import InputBuilderRegistry
 from agent_base_core.registry.tool_meta import attach_tool_meta
 
-from conftest import FakeCheckpointerFactory, FakeRuntime
+from fakes import FakeCheckpointerFactory, FakeRuntime
 
 
 class CapturingRuntime(FakeRuntime):

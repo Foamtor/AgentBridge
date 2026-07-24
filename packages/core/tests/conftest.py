@@ -6,49 +6,17 @@ import asyncio
 
 import pytest
 from agent_base_core.adapters.sse_event_sink import SseEventSink
-from agent_base_core.protocol.fragments import OutboundFragment
 from agent_base_core.registry.graphs import GraphRegistry
 from agent_base_core.registry.tools import ToolRegistry
 
-
-class FakeCheckpointerFactory:
-    async def setup(self) -> None:
-        return None
-
-    def is_setup(self) -> bool:
-        return True
-
-    async def get(self):
-        return None
-
-    async def teardown(self) -> None:
-        return None
-
-
-class FakeRuntime:
-    async def astream(self, builder, **kwargs):
-        yield OutboundFragment(type="text_delta", data={"content": "ok"})
-
-
-class SlowCancelRuntime:
-    """Blocks until cancel_token is set, then exits."""
-
-    async def astream(self, builder, **kwargs):
-        token = kwargs.get("cancel_token")
-        yield OutboundFragment(type="text_delta", data={"content": "partial"})
-        if isinstance(token, asyncio.Event):
-            await token.wait()
-
-
-class BoomRuntime:
-    async def astream(self, builder, **kwargs):
-        yield OutboundFragment(type="text_delta", data={"content": "before-fail"})
-        raise RuntimeError("boom")
-
-
-class BadExtensionRuntime:
-    async def astream(self, builder, **kwargs):
-        yield OutboundFragment(type="x.", data={})
+# Re-export for fixtures only; tests should ``from fakes import …``.
+from fakes import (  # noqa: F401
+    BadExtensionRuntime,
+    BoomRuntime,
+    FakeCheckpointerFactory,
+    FakeRuntime,
+    SlowCancelRuntime,
+)
 
 
 @pytest.fixture

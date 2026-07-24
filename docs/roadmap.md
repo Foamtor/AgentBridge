@@ -37,6 +37,8 @@
 
 ## 验收演示
 
+> 状态列「✅ PlanN」表示**功能分支上**的实现与单测门禁；合入默认分支前以对应 `feat/plan*` 为准。
+
 | 里程碑 | 必须现场可演示 |
 |--------|----------------|
 | M0 | echo / demo_tools；409；cancel |
@@ -48,9 +50,9 @@
 | M5 | `LLM_BACKEND=gateway` 换模型不改域；历史裁剪可测 |
 | M6 | 审批等待期间锁释放；超时 deny；resume 同 `run_id`；脱敏用例；无规则 → 无数据 |
 | M7 | ingest + citation；跨租户检索失败 |
-| M8 | 单流多 `agent_id`；SDK 一轮含审批；admin 无权限 403 |
-| M9 | 双实例同 thread 互斥；限流跨实例 |
-| M10 | Eval CI；策略回滚；审计导出 |
+| M8 | 单流多 `agent_id`；SDK `allow→approve`；admin 无权限 403 |
+| M9 | 双实例同 thread 互斥（共享 Redis）；限流跨实例（见 multi-instance 文档） |
+| M10 | Eval CI；`POLICY_BUNDLE_VERSION` 进审计；审计导出 |
 
 ## 用户旅程
 

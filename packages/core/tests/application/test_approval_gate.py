@@ -17,7 +17,7 @@ from agent_base_core.application.run_lifecycle import RunLifecycle
 from agent_base_core.protocol.context import RunContext, checkpoint_thread_key
 from agent_base_core.registry.input_builders import InputBuilderRegistry
 
-from conftest import FakeCheckpointerFactory
+from fakes import FakeCheckpointerFactory
 
 
 def _lc(**kwargs):
