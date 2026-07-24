@@ -45,3 +45,10 @@ def test_auth_on_missing_claims_is_empty_not_admin() -> None:
     assert ctx.tenant_id == ""
     assert ctx.roles == []
     assert ctx.permissions == []
+
+
+def test_policy_bundle_version_from_config() -> None:
+    ctx = claims_to_run_context(
+        None, auth_required=False, policy_bundle_version="bundle/v2"
+    )
+    assert ctx.policy_bundle_version == "bundle/v2"

@@ -46,7 +46,11 @@ async def chat_stream(
     cancelled_on_disconnect = False
     settings = request.app.state.settings
     claims = getattr(request.state, "auth_claims", None)
-    ctx = claims_to_run_context(claims, auth_required=settings.auth_required)
+    ctx = claims_to_run_context(
+        claims,
+        auth_required=settings.auth_required,
+        policy_bundle_version=settings.policy_bundle_version,
+    )
     # Process-local handles (not JSON-serializable); keep in metadata only.
     ctx = ctx.model_copy(
         update={
@@ -178,7 +182,11 @@ async def chat_cancel(
 ) -> dict[str, bool]:
     settings = request.app.state.settings
     claims = getattr(request.state, "auth_claims", None)
-    ctx = claims_to_run_context(claims, auth_required=settings.auth_required)
+    ctx = claims_to_run_context(
+        claims,
+        auth_required=settings.auth_required,
+        policy_bundle_version=settings.policy_bundle_version,
+    )
     try:
         await cancel_run(
             lifecycle,

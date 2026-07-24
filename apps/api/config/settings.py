@@ -42,6 +42,9 @@ class Settings(BaseSettings):
         default="memory", validation_alias="RATE_LIMIT_BACKEND"
     )
     redis_url: str = Field(default="redis://localhost:6379/0", validation_alias="REDIS_URL")
+    policy_bundle_version: str = Field(
+        default="role_policy/v1", validation_alias="POLICY_BUNDLE_VERSION"
+    )
 
 
 def get_settings() -> Settings:
