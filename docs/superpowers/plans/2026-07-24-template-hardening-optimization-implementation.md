@@ -1,8 +1,10 @@
 # Template Hardening + Production Readiness Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** 按修订规格完成一期模板硬化（契约单源、OutboundFragment、Option B builders、tool_result、demo_tools、组装根瘦身），二期能力在文末单列不阻塞一期。
+
+**Status:** 一期 Task 1–9 **已完成**（分支 `feat/template-hardening`）。
 
 **Architecture:** Runtime/mapper 只产出 `protocol.OutboundFragment`；`RunLifecycle` 用 `build_event`（稳定九类）或 `build_extension_event`（合法 `x.*`）套信封并唯一编号。扩展事件默认经图 State 的 `OUTBOUND_EXTENSIONS_KEY`，由 runtime 在 `astream_events` 结束后用 `compiled.aget_state(config)` 读取并 yield；域不得持有 `EventSink`。`event_hook` 为规格中的同级高级选项，一期不实现。
 
@@ -72,7 +74,7 @@
 **Files:**
 - Modify: `docs/contracts.md`
 
-- [ ] **Step 1: 改 §2 域扩展表述**
+- [x] **Step 1: 改 §2 域扩展表述**
 
 删除「type 可为自定义字符串；核心原样透传」。改为：
 
@@ -82,7 +84,7 @@
 
 确认 `cancel_requested` / `cancelled` 样例 `data` 含 `thread_id`、`run_id`（已有则保留）。确认 `tool_result.data` 字段为 `name` / `ok` / `tool_call_id` / `summary`。
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add docs/contracts.md
@@ -133,7 +135,7 @@ class OutboundFragment(BaseModel):
     status: str | None = None
 ```
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```python
 # packages/core/tests/protocol/test_fragments.py
@@ -165,19 +167,19 @@ def test_outbound_fragment_forbids_envelope_keys_via_extra():
         )
 ```
 
-- [ ] **Step 2: 跑测确认失败**
+- [x] **Step 2: 跑测确认失败**
 
 Run: `python -m pytest packages/core/tests/protocol/test_fragments.py -v`  
 Expected: FAIL（模块不存在）
 
-- [ ] **Step 3: 实现 `fragments.py`（上文模型原文落地）**
+- [x] **Step 3: 实现 `fragments.py`（上文模型原文落地）**
 
-- [ ] **Step 4: 跑测通过**
+- [x] **Step 4: 跑测通过**
 
 Run: `python -m pytest packages/core/tests/protocol/test_fragments.py -v`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/core/src/agent_base_core/protocol packages/core/tests/protocol/test_fragments.py
@@ -199,7 +201,7 @@ git commit -m "feat(core): add OutboundFragment and OUTBOUND_EXTENSIONS_KEY"
 - `build_extension_event(type, *, run_id, sequence, trace_id, data=None, step=None, status=None) -> dict` — 仅当 `EXTENSION_TYPE_RE.fullmatch(type)`，否则 `ValueError`（禁止 silent drop）
 - 两者返回完整信封 dict（含 timestamp / event_id）
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```python
 import pytest
@@ -245,9 +247,9 @@ def test_build_extension_event_rejects_bad(bad):
 
 （保留既有 `test_build_start_event_shape` 等。）
 
-- [ ] **Step 2: 实现 → pytest `packages/core/tests/protocol/` 全绿**
+- [x] **Step 2: 实现 → pytest `packages/core/tests/protocol/` 全绿**
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git commit -m "feat(core): Option B build_event vs build_extension_event"
@@ -283,9 +285,9 @@ def map_tool_result(
     )
 ```
 
-- [ ] **Step 1: 更新/新增测试断言返回 `OutboundFragment` 且无 sequence 字段；`map_tool_result` 字段对齐 contracts**
+- [x] **Step 1: 更新/新增测试断言返回 `OutboundFragment` 且无 sequence 字段；`map_tool_result` 字段对齐 contracts**
 
-- [ ] **Step 2: 实现 → 测绿 → Commit**
+- [x] **Step 2: 实现 → 测绿 → Commit**
 
 ```bash
 git commit -m "feat(core): mappers return OutboundFragment; add map_tool_result"
@@ -318,9 +320,9 @@ git commit -m "feat(core): mappers return OutboundFragment; add map_tool_result"
    - 一期**不实现** `event_hook`
 5. 去掉业务节点名硬编码；通用 `_text_from_chain_output` 可保留
 
-- [ ] **Step 1: 单测 `aget_state` 扩展读取**（mock `compiled.aget_state` 返回含 `OUTBOUND_EXTENSIONS_KEY` 的 values；断言 yield 对应 Fragment；断言**未**依赖 `on_chain_end` 猜扩展）
+- [x] **Step 1: 单测 `aget_state` 扩展读取**（mock `compiled.aget_state` 返回含 `OUTBOUND_EXTENSIONS_KEY` 的 values；断言 yield 对应 Fragment；断言**未**依赖 `on_chain_end` 猜扩展）
 
-- [ ] **Step 2: 更新 Port + 实现 → 测绿 → Commit**
+- [x] **Step 2: 更新 Port + 实现 → 测绿 → Commit**
 
 ```bash
 git commit -m "feat(core): runtime emits fragments via aget_state extensions"
@@ -353,13 +355,13 @@ git commit -m "feat(core): runtime emits fragments via aget_state extensions"
 3. **不新增** `ensure_route`  
 4. 集成/单测确认：**一条失败流最多一帧 `type=error`**；全文无 `r-host`
 
-- [ ] **Step 1: core 测** — cancel `data` 含 `thread_id`+`run_id`；非法扩展 type（如 `x.`）→ 稳定 `error`；`terminal_sent` 路径；既有 echo/busy/cancel 绿  
+- [x] **Step 1: core 测** — cancel `data` 含 `thread_id`+`run_id`；非法扩展 type（如 `x.`）→ 稳定 `error`；`terminal_sent` 路径；既有 echo/busy/cancel 绿  
 
-- [ ] **Step 2: 改 chat.py + api 测** — 无 r-host；无双 error  
+- [x] **Step 2: 改 chat.py + api 测** — 无 r-host；无双 error  
 
-- [ ] **Step 3: `python -m pytest packages/core/tests -v` 且 `cd apps/api && python -m pytest tests -v`**
+- [x] **Step 3: `python -m pytest packages/core/tests -v` 且 `cd apps/api && python -m pytest tests -v`**
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git commit -m "feat(core,api): lifecycle envelopes + remove chat r-host duplicate errors"
@@ -382,13 +384,13 @@ git commit -m "feat(core,api): lifecycle envelopes + remove chat r-host duplicat
 - 图可用 ToolNode + 预置 `tool_calls` 的 Fake AIMessage（无真实 LLM）；细节见域 README
 - `register_all` 注册 echo + demo_tools
 
-- [ ] **Step 1: 实现域 + bootstrap 注册**
+- [x] **Step 1: 实现域 + bootstrap 注册**
 
-- [ ] **Step 2: 集成测绿（`AGENT_BASE_FAKE_RUNTIME=0`）**
+- [x] **Step 2: 集成测绿（`AGENT_BASE_FAKE_RUNTIME=0`）**
 
-- [ ] **Step 3: 确认 `rg demo_tools packages/core` 无匹配**
+- [x] **Step 3: 确认 `rg demo_tools packages/core` 无匹配**
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git commit -m "feat(api): add demo_tools domain with tool SSE and x.* extension"
@@ -457,13 +459,13 @@ def test_cancel_200_when_registered(client):
 
 3. **locks** — 勿把 `locks` 挂回 `app.state`；409 busy 用双开流测公开行为。流内 cancel（`test_cancel_during_stream_emits_cancelled`）已用 `replace_runtime`，一般无需改注册路径。
 
-- [ ] **Step 1: 加 `_test_register_cancel` + 改 `test_chat_cancel.py` + lifespan/`app.state` 收敛 + Fake/DSN/hooks**
+- [x] **Step 1: 加 `_test_register_cancel` + 改 `test_chat_cancel.py` + lifespan/`app.state` 收敛 + Fake/DSN/hooks**
 
-- [ ] **Step 2: `cd apps/api && python -m pytest tests -v` 全绿（含 cancel / 409 / echo / auth）**
+- [x] **Step 2: `cd apps/api && python -m pytest tests -v` 全绿（含 cancel / 409 / echo / auth）**
 
-- [ ] **Step 3: 根目录 `lint-imports` + import/域名扫描**
+- [x] **Step 3: 根目录 `lint-imports` + import/域名扫描**
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git commit -m "refactor(api): slim lifespan app.state; DSN and hooks settings"
@@ -479,17 +481,17 @@ git commit -m "refactor(api): slim lifespan app.state; DSN and hooks settings"
 - Modify: `.github/workflows/ci.yml`（如需跑新扫描）
 - Optional: `apps/web/src/features/contracts/ContractsPage.tsx`、`DebugPage.tsx`（软要求）
 
-- [ ] **Step 1: 文档（硬）** — Fragment / Option B / `OUTBOUND_EXTENSIONS_KEY`+`aget_state` / demo_tools 无 LLM / **「模板可用 ≠ 多副本」**（单机默认、无分布式锁、无完整 OTel/interrupt）/ **域不得持 EventSink** / **state 与 event_hook 同级**（hook 一期未实现，复杂域可选）/ §1.1「零改 core」措辞
+- [x] **Step 1: 文档（硬）** — Fragment / Option B / `OUTBOUND_EXTENSIONS_KEY`+`aget_state` / demo_tools 无 LLM / **「模板可用 ≠ 多副本」**（单机默认、无分布式锁、无完整 OTel/interrupt）/ **域不得持 EventSink** / **state 与 event_hook 同级**（hook 一期未实现，复杂域可选）/ §1.1「零改 core」措辞
 
-- [ ] **Step 2: 门禁（硬）** — core 禁 `demo_tools`、`echo_node`；确认 Task 8 的 import-linter adapters 白名单已挂且 CI 跑
+- [x] **Step 2: 门禁（硬）** — core 禁 `demo_tools`、`echo_node`；确认 Task 8 的 import-linter adapters 白名单已挂且 CI 跑
 
-- [ ] **Step 3（可选·软）: Web** — Contracts 注明 `demo_tools`/`x.*`；未知 `x.*` 可折叠（不进硬验收红线）
+- [x] **Step 3（可选·软）: Web** — Contracts 注明 `demo_tools`/`x.*`；未知 `x.*` 可折叠（不进硬验收红线）
 
-- [ ] **Step 4（可选·软）: `add-a-domain.md`「何时必须改 core」决策树** — 薄版即可，不挡硬验收
+- [x] **Step 4（可选·软）: `add-a-domain.md`「何时必须改 core」决策树** — 薄版即可，不挡硬验收
 
-- [ ] **Step 5: CI 绿** — core / api **分目录** pytest + lint-imports + 扫描
+- [x] **Step 5: CI 绿** — core / api **分目录** pytest + lint-imports + 扫描
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git commit -m "docs: harden runbooks; ci: ban domain names in core"
