@@ -89,6 +89,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     message_store = MemoryMessageStore()
     run_store = MemoryRunStore()
     data_source = _build_data_source(settings)
+    from adapters.prometheus_metrics import PrometheusMetrics
+
+    metrics = PrometheusMetrics()
 
     lifecycle = RunLifecycle(
         locks=locks,
@@ -104,6 +107,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         event_log=event_log,
         message_store=message_store,
         run_store=run_store,
+        metrics=metrics,
     )
     pipeline = RequestPipeline(
         lifecycle=lifecycle,
@@ -125,7 +129,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.message_store = message_store
     app.state.run_store = run_store
     app.state.data_source = data_source
+    app.state.metrics = metrics
     app.state.tools = tools
+    # Expose checkpointer factory for /ready (memory always "ready" after setup).
+    app.state.checkpointers = checkpointers
     try:
         yield
     finally:

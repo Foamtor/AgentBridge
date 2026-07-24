@@ -52,6 +52,7 @@ class RunLifecycle:
         event_log: Any | None = None,
         message_store: Any | None = None,
         run_store: Any | None = None,
+        metrics: Any | None = None,
     ) -> None:
         self._locks = locks
         self._checkpointers = checkpointers
@@ -66,6 +67,7 @@ class RunLifecycle:
         self._event_log = event_log
         self._message_store = message_store
         self._run_store = run_store
+        self._metrics = metrics
 
     def replace_runtime(self, runtime: GraphRuntime) -> None:
         """Test/host hook to swap GraphRuntime without private attribute access."""
@@ -419,6 +421,15 @@ class RunLifecycle:
                 logger.exception(
                     "on_run_end failed thread_id=%s run_id=%s", thread_id, run_id
                 )
+            if self._metrics is not None:
+                try:
+                    self._metrics.inc(
+                        "agentbridge_runs_total", labels={"route": route}
+                    )
+                except Exception:  # noqa: BLE001
+                    logger.exception(
+                        "metrics.inc failed thread_id=%s run_id=%s", thread_id, run_id
+                    )
             await self._locks.release(storage_key, run_id)
             await self._cancels.unregister(storage_key, run_id)
             if not pre_start_failure:
