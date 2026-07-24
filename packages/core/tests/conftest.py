@@ -6,7 +6,7 @@ import asyncio
 
 import pytest
 from agent_base_core.adapters.sse_event_sink import SseEventSink
-from agent_base_core.protocol.events import build_event
+from agent_base_core.protocol.fragments import OutboundFragment
 from agent_base_core.registry.graphs import GraphRegistry
 from agent_base_core.registry.tools import ToolRegistry
 
@@ -24,13 +24,7 @@ class FakeCheckpointerFactory:
 
 class FakeRuntime:
     async def astream(self, builder, **kwargs):
-        yield build_event(
-            "text_delta",
-            run_id="r-test",
-            sequence=99,
-            trace_id="tr",
-            data={"content": "ok"},
-        )
+        yield OutboundFragment(type="text_delta", data={"content": "ok"})
 
 
 class SlowCancelRuntime:
@@ -38,27 +32,20 @@ class SlowCancelRuntime:
 
     async def astream(self, builder, **kwargs):
         token = kwargs.get("cancel_token")
-        yield build_event(
-            "text_delta",
-            run_id="r-slow",
-            sequence=1,
-            trace_id="tr",
-            data={"content": "partial"},
-        )
+        yield OutboundFragment(type="text_delta", data={"content": "partial"})
         if isinstance(token, asyncio.Event):
             await token.wait()
 
 
 class BoomRuntime:
     async def astream(self, builder, **kwargs):
-        yield build_event(
-            "text_delta",
-            run_id="r-boom",
-            sequence=1,
-            trace_id="tr",
-            data={"content": "before-fail"},
-        )
+        yield OutboundFragment(type="text_delta", data={"content": "before-fail"})
         raise RuntimeError("boom")
+
+
+class BadExtensionRuntime:
+    async def astream(self, builder, **kwargs):
+        yield OutboundFragment(type="x.", data={})
 
 
 @pytest.fixture

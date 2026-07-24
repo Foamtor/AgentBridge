@@ -9,6 +9,7 @@ from agent_base_core.application.run_lifecycle import RunLifecycle
 from agent_base_core.registry.input_builders import InputBuilderRegistry
 
 from conftest import (
+    BadExtensionRuntime,
     BoomRuntime,
     FakeCheckpointerFactory,
     FakeRuntime,
@@ -80,3 +81,40 @@ async def test_runtime_error_emits_error_event(graphs, tools, queue_and_sink, dr
     assert types[0] == "start"
     assert "error" in types
     assert "done" not in types
+
+
+@pytest.mark.asyncio
+async def test_cancel_events_include_thread_and_run_id(
+    graphs, tools, queue_and_sink, drain_events
+):
+    q, sink = queue_and_sink
+    lc = _lc(SlowCancelRuntime(), graphs, tools)
+
+    async def _run():
+        await lc.start_stream(query="hi", thread_id="t-cancel-data", route="echo", sink=sink)
+
+    task = asyncio.create_task(_run())
+    await asyncio.sleep(0.05)
+    await lc.cancel(thread_id="t-cancel-data")
+    await task
+    events = await drain_events(q)
+    cancel_evts = [e for e in events if e["type"] in {"cancel_requested", "cancelled"}]
+    assert len(cancel_evts) == 2
+    for e in cancel_evts:
+        assert e["data"]["thread_id"] == "t-cancel-data"
+        assert e["data"]["run_id"] == e["run_id"]
+
+
+@pytest.mark.asyncio
+async def test_invalid_extension_type_emits_error(
+    graphs, tools, queue_and_sink, drain_events
+):
+    q, sink = queue_and_sink
+    lc = _lc(BadExtensionRuntime(), graphs, tools)
+    await lc.start_stream(query="hi", thread_id="t-bad-x", route="echo", sink=sink)
+    events = await drain_events(q)
+    types = [e["type"] for e in events]
+    assert types[0] == "start"
+    assert "error" in types
+    assert "done" not in types
+    assert types[-1] == "error"
