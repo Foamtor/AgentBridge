@@ -12,6 +12,7 @@ from agent_base_core.adapters.inprocess_cancel import InProcessCancelRegistry
 from agent_base_core.adapters.inprocess_lock import InProcessThreadLock
 from agent_base_core.adapters.langgraph_runtime import LangGraphRuntime
 from agent_base_core.adapters.logging_hooks import LoggingHooks
+from agent_base_core.adapters.fake_retriever import FakeRetriever
 from agent_base_core.adapters.memory_approval_store import MemoryApprovalStore
 from agent_base_core.adapters.memory_audit_logger import MemoryAuditLogger
 from agent_base_core.adapters.memory_checkpointer import MemoryCheckpointerFactory
@@ -21,6 +22,7 @@ from agent_base_core.adapters.memory_run_store import MemoryRunStore
 from agent_base_core.adapters.noop_data_source import NoopDataSource
 from agent_base_core.adapters.noop_hooks import NoopHooks
 from agent_base_core.adapters.role_policy import RolePolicyEngine
+from agent_base_core.adapters.safety_hooks import SafetyHooks
 from agent_base_core.application.pipeline import (
     InputValidatorPlugin,
     RequestPipeline,
@@ -114,6 +116,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     message_store = MemoryMessageStore()
     run_store = MemoryRunStore()
     approval_store = MemoryApprovalStore()
+    retriever = FakeRetriever()
     data_source = _build_data_source(settings)
     llm_gateway = _build_llm_gateway(settings)
     from adapters.prometheus_metrics import PrometheusMetrics
@@ -139,6 +142,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         metrics=metrics,
         span_factory=span_factory,
         approval_store=approval_store,
+        safety_hooks=SafetyHooks(redact=True),
     )
     pipeline = RequestPipeline(
         lifecycle=lifecycle,
@@ -161,6 +165,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.message_store = message_store
     app.state.run_store = run_store
     app.state.approval_store = approval_store
+    app.state.retriever = retriever
     app.state.data_source = data_source
     app.state.llm_gateway = llm_gateway
     app.state.metrics = metrics

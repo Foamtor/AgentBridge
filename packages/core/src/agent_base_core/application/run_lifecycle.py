@@ -56,6 +56,7 @@ class RunLifecycle:
         metrics: Any | None = None,
         span_factory: Any | None = None,
         approval_store: Any | None = None,
+        safety_hooks: Any | None = None,
     ) -> None:
         self._locks = locks
         self._checkpointers = checkpointers
@@ -73,6 +74,7 @@ class RunLifecycle:
         self._metrics = metrics
         self._span_factory = span_factory
         self._approval_store = approval_store
+        self._safety_hooks = safety_hooks
 
     def replace_runtime(self, runtime: GraphRuntime) -> None:
         """Test/host hook to swap GraphRuntime without private attribute access."""
@@ -122,6 +124,23 @@ class RunLifecycle:
     async def _emit(
         self, sink: EventSink, evt: dict[str, Any], *, tenant_id: str
     ) -> None:
+        if (
+            self._safety_hooks is not None
+            and evt.get("type") == "text_delta"
+            and isinstance(evt.get("data"), dict)
+        ):
+            data = dict(evt["data"])
+            content = data.get("content")
+            if content is None:
+                content = data.get("text")
+            if isinstance(content, str):
+                redacted = self._safety_hooks.on_emit_text(content)
+                if "content" in data or "text" not in data:
+                    data["content"] = redacted
+                if "text" in data:
+                    data["text"] = redacted
+                evt = dict(evt)
+                evt["data"] = data
         if self._event_log is not None:
             try:
                 await self._event_log.append(
