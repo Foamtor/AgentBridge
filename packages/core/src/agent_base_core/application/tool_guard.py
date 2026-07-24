@@ -6,10 +6,10 @@ import copy
 import logging
 from typing import Any
 
+from agent_base_core.protocol.context import RunContext
+from agent_base_core.protocol.tool_meta import get_tool_meta
 from agent_base_core.ports.audit_logger import AuditLogger
 from agent_base_core.ports.policy import PolicyEngine
-from agent_base_core.protocol.context import RunContext
-from agent_base_core.registry.tool_meta import get_tool_meta
 
 logger = logging.getLogger(__name__)
 

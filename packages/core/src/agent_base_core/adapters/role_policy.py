@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from agent_base_core.protocol.context import RunContext
-from agent_base_core.registry.tool_meta import get_tool_meta
+from agent_base_core.protocol.tool_meta import get_tool_meta
 
 
 def _allowed(
