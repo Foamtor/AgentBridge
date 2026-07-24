@@ -61,3 +61,44 @@ def test_cancel_during_stream_emits_cancelled(client):
     assert types[0] == "start"
     assert "cancel_requested" in types
     assert types[-1] == "cancelled"
+
+
+def test_abort_during_stream_releases_thread_lock(client):
+    """After cancel ends a held stream, the same thread_id must not stay busy."""
+
+    class SlowRuntime:
+        async def astream(self, builder, **kwargs):
+            yield OutboundFragment(type="text_delta", data={"content": "partial"})
+            await kwargs["cancel_token"].wait()
+
+    from testing.fake_runtime import ApiFakeRuntime
+
+    client.app.state.run_lifecycle.replace_runtime(SlowRuntime())
+    tid = "t-abort-lock"
+    out: dict = {}
+
+    def _stream():
+        with client.stream(
+            "POST",
+            "/chat/stream",
+            json={"query": "hi", "thread_id": tid, "route": "echo"},
+        ) as resp:
+            out["status"] = resp.status_code
+            out["body"] = resp.read().decode("utf-8", errors="replace")
+
+    th = threading.Thread(target=_stream)
+    th.start()
+    time.sleep(0.15)
+    cr = client.post("/chat/cancel", json={"thread_id": tid})
+    assert cr.status_code == 200
+    th.join(timeout=5)
+    assert th.is_alive() is False
+    assert out.get("status") == 200
+
+    # Restore fast fake runtime; assertion is that the lock itself was released.
+    client.app.state.run_lifecycle.replace_runtime(ApiFakeRuntime())
+    r = client.post(
+        "/chat/stream",
+        json={"query": "again", "thread_id": tid, "route": "echo"},
+    )
+    assert r.status_code == 200, f"expected free lock, got {r.status_code}: {r.text[:200]}"

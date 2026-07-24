@@ -1,6 +1,6 @@
 # Agent-Base 全面优化设计 — 模板硬化 + 生产能力（两期）
 
-> 状态：**三方评审已写入规格与实施计划**  
+> 状态：**一期验收项已完成（见 §8）；实施在 `feat/template-hardening`**  
 > 日期：2026-07-24  
 > 仓库：`Agent-Base`  
 > 前置：主设计 [2026-07-23-agent-ai-base-design.md](./2026-07-23-agent-ai-base-design.md)、[code-structure](./2026-07-23-code-structure.md)  
@@ -247,20 +247,20 @@ Redis 锁/cancel、`/ready`、JWKS TTL、可配置 hooks/`trace_id`；文档：�
 
 ### 一期
 
-- [ ] `contracts.md`：稳定九类 + `x.*`；无「任意自定义透传」  
-- [ ] `build_event` 仅稳定九类；`build_extension_event` 校验 `x.*`；非法前缀失败测例  
-- [ ] OutboundFragment；lifecycle 唯一编号  
-- [ ] `map_tool_result` + `on_tool_end`  
-- [ ] 最小 `step_update` 映射存在（demo 验收不强制看到）  
-- [ ] cancel 事件 `data` 含 `thread_id`+`run_id`（测例钉死）  
-- [ ] 终端事件保证（`terminal_sent` / 等价）  
-- [ ] `OUTBOUND_EXTENSIONS_KEY` 常量；runtime 用 `aget_state` 读取  
-- [ ] `outbound_extensions` 通道；core 无域名  
-- [ ] `demo_tools` 无 LLM；流验收通过  
-- [ ] chat **无** `r-host` 旁路、无与 lifecycle 重复的 error 帧  
-- [ ] lifespan 无 Fake 类；`app.state` 不暴露 locks/cancels/graphs/tools/input_builders  
-- [ ] echo/409/cancel/auth 回归；门禁绿（含 `echo_node`）  
-- [ ] import-linter：adapters 同层白名单  
+- [x] `contracts.md`：稳定九类 + `x.*`；无「任意自定义透传」  
+- [x] `build_event` 仅稳定九类；`build_extension_event` 校验 `x.*`；非法前缀失败测例  
+- [x] OutboundFragment；lifecycle 唯一编号  
+- [x] `map_tool_result` + `on_tool_end`  
+- [x] 最小 `step_update` 映射存在（demo 验收不强制看到）  
+- [x] cancel 事件 `data` 含 `thread_id`+`run_id`（测例钉死）  
+- [x] 终端事件保证（`terminal_sent` / 等价）  
+- [x] `OUTBOUND_EXTENSIONS_KEY` 常量；runtime 用 `aget_state` 读取  
+- [x] `outbound_extensions` 通道；core 无域名  
+- [x] `demo_tools` 无 LLM；流验收通过  
+- [x] chat **无** `r-host` 旁路、无与 lifecycle 重复的 error 帧  
+- [x] lifespan 无 Fake 类；`app.state` 不暴露 locks/cancels/graphs/tools/input_builders  
+- [x] echo/409/cancel/auth 回归；门禁绿（含 `echo_node`）  
+- [x] import-linter：adapters 同层白名单  
 
 ### 二期
 
