@@ -37,6 +37,11 @@ class Settings(BaseSettings):
     )
     otel_enabled: bool = Field(default=False, validation_alias="OTEL_ENABLED")
     llm_backend: str = Field(default="direct", validation_alias="LLM_BACKEND")
+    lock_backend: str = Field(default="memory", validation_alias="LOCK_BACKEND")
+    rate_limit_backend: str = Field(
+        default="memory", validation_alias="RATE_LIMIT_BACKEND"
+    )
+    redis_url: str = Field(default="redis://localhost:6379/0", validation_alias="REDIS_URL")
 
 
 def get_settings() -> Settings:

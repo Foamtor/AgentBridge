@@ -20,6 +20,9 @@ dev = [
 datasource = [
   "asyncpg>=0.29,<1",
 ]
+redis = [
+  "redis>=5.0,<6",
+]
 
 [build-system]
 requires = ["hatchling"]

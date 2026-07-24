@@ -74,12 +74,29 @@ def _build_llm_gateway(settings: Settings) -> Any:
     return DirectLLMGateway(default_model)
 
 
+def _build_redis(settings: Settings) -> Any | None:
+    if settings.lock_backend != "redis" and settings.rate_limit_backend != "redis":
+        return None
+    import redis.asyncio as redis
+
+    return redis.from_url(settings.redis_url)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     configure_logging()
     settings = get_settings()
 
-    locks = InProcessThreadLock()
+    redis_client = getattr(app.state, "bootstrap_redis", None)
+    locks: Any
+    if settings.lock_backend == "redis":
+        if redis_client is None:
+            redis_client = _build_redis(settings)
+        from adapters.redis_thread_lock import RedisThreadLock
+
+        locks = RedisThreadLock(redis_client)
+    else:
+        locks = InProcessThreadLock()
     cancels = InProcessCancelRegistry()
     graphs = GraphRegistry()
     tools = ToolRegistry()
@@ -172,8 +189,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.tools = tools
     # Expose checkpointer factory for /ready (memory always "ready" after setup).
     app.state.checkpointers = checkpointers
+    app.state.redis = redis_client
     try:
         yield
     finally:
         await data_source.close()
         await checkpointers.teardown()
+        if redis_client is not None:
+            close = getattr(redis_client, "aclose", None) or getattr(
+                redis_client, "close", None
+            )
+            if close is not None:
+                result = close()
+                if hasattr(result, "__await__"):
+                    await result

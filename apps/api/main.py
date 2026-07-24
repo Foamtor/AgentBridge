@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from auth.middleware import OptionalOidcMiddleware
 from auth.oidc import validate_auth_settings
 from config.settings import get_settings
-from lifespan import lifespan
+from lifespan import _build_redis, lifespan
 from middleware.rate_limit import RateLimitMiddleware
 from routes.admin import router as admin_router
 from routes.approvals import router as approvals_router
@@ -27,7 +27,11 @@ def create_app() -> FastAPI:
         oidc_issuer=settings.oidc_issuer,
         oidc_jwt_secret=settings.oidc_jwt_secret,
     )
+    redis_client = None
+    if settings.lock_backend == "redis" or settings.rate_limit_backend == "redis":
+        redis_client = _build_redis(settings)
     app = FastAPI(title="agent-base-api", lifespan=lifespan)
+    app.state.bootstrap_redis = redis_client
     # Last added = outermost. Rate limit wraps auth so 429 can fire before JWT work.
     app.add_middleware(
         OptionalOidcMiddleware,
@@ -40,6 +44,7 @@ def create_app() -> FastAPI:
     app.add_middleware(
         RateLimitMiddleware,
         limit_per_minute=settings.rate_limit_per_minute,
+        redis=redis_client if settings.rate_limit_backend == "redis" else None,
     )
     app.include_router(health_router)
     app.include_router(ready_router)
