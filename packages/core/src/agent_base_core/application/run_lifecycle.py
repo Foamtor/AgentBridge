@@ -20,6 +20,7 @@ from agent_base_core.protocol.events import (
     build_event,
     build_extension_event,
 )
+from agent_base_core.protocol.context import RunContext
 from agent_base_core.protocol.fragments import OutboundFragment
 from agent_base_core.registry.graphs import GraphRegistry
 from agent_base_core.registry.input_builders import InputBuilderRegistry
@@ -103,12 +104,18 @@ class RunLifecycle:
         sink: EventSink,
         model: str | None = None,
         extra: dict[str, Any] | None = None,
+        ctx: RunContext | None = None,
+        tools_override: list[Any] | None = None,
     ) -> None:
         run_id = f"r-{uuid.uuid4().hex[:12]}"
         trace_id = run_id
         sequence = 0
         terminal_sent = False
         pre_start_failure = False
+        run_ctx = ctx or RunContext()
+        run_ctx = run_ctx.model_copy(
+            update={"run_id": run_id, "trace_id": run_ctx.trace_id or run_id}
+        )
 
         if not await self._locks.try_acquire(thread_id, run_id):
             raise ThreadBusy(thread_id)
@@ -119,10 +126,13 @@ class RunLifecycle:
         await self._cancels.register(thread_id, run_id, cancel_token)
         try:
             builder = self._graphs.get(route)
-            try:
-                tools = self._tools.get(route)
-            except UnknownRoute:
-                tools = []
+            if tools_override is not None:
+                tools = tools_override
+            else:
+                try:
+                    tools = self._tools.get(route)
+                except UnknownRoute:
+                    tools = []
             try:
                 input_builder = self._input_builders.get(route)
                 graph_input = input_builder(query, model=model, extra=extra or {})
@@ -156,6 +166,7 @@ class RunLifecycle:
                         "trace_id": trace_id,
                         "graph_input": graph_input,
                         "model": model,
+                        "run_context": run_ctx,
                     },
                 ):
                     if cancel_token.is_set():
