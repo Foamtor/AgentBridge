@@ -12,6 +12,7 @@ from agent_base_core.adapters.inprocess_cancel import InProcessCancelRegistry
 from agent_base_core.adapters.inprocess_lock import InProcessThreadLock
 from agent_base_core.adapters.langgraph_runtime import LangGraphRuntime
 from agent_base_core.adapters.logging_hooks import LoggingHooks
+from agent_base_core.adapters.memory_approval_store import MemoryApprovalStore
 from agent_base_core.adapters.memory_audit_logger import MemoryAuditLogger
 from agent_base_core.adapters.memory_checkpointer import MemoryCheckpointerFactory
 from agent_base_core.adapters.memory_event_log import MemoryEventLog
@@ -112,6 +113,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     event_log = MemoryEventLog()
     message_store = MemoryMessageStore()
     run_store = MemoryRunStore()
+    approval_store = MemoryApprovalStore()
     data_source = _build_data_source(settings)
     llm_gateway = _build_llm_gateway(settings)
     from adapters.prometheus_metrics import PrometheusMetrics
@@ -136,6 +138,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         run_store=run_store,
         metrics=metrics,
         span_factory=span_factory,
+        approval_store=approval_store,
     )
     pipeline = RequestPipeline(
         lifecycle=lifecycle,
@@ -157,6 +160,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.event_log = event_log
     app.state.message_store = message_store
     app.state.run_store = run_store
+    app.state.approval_store = approval_store
     app.state.data_source = data_source
     app.state.llm_gateway = llm_gateway
     app.state.metrics = metrics

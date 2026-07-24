@@ -9,6 +9,7 @@ from auth.oidc import validate_auth_settings
 from config.settings import get_settings
 from lifespan import lifespan
 from middleware.rate_limit import RateLimitMiddleware
+from routes.approvals import router as approvals_router
 from routes.chat import router as chat_router
 from routes.health import router as health_router
 from routes.metrics import router as metrics_router
@@ -43,6 +44,7 @@ def create_app() -> FastAPI:
     app.include_router(ready_router)
     app.include_router(metrics_router)
     app.include_router(chat_router)
+    app.include_router(approvals_router)
     app.include_router(threads_router)
     app.include_router(runs_router)
     return app

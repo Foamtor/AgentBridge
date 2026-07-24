@@ -55,6 +55,7 @@ class RunLifecycle:
         run_store: Any | None = None,
         metrics: Any | None = None,
         span_factory: Any | None = None,
+        approval_store: Any | None = None,
     ) -> None:
         self._locks = locks
         self._checkpointers = checkpointers
@@ -71,6 +72,7 @@ class RunLifecycle:
         self._run_store = run_store
         self._metrics = metrics
         self._span_factory = span_factory
+        self._approval_store = approval_store
 
     def replace_runtime(self, runtime: GraphRuntime) -> None:
         """Test/host hook to swap GraphRuntime without private attribute access."""
@@ -245,6 +247,8 @@ class RunLifecycle:
         terminal_status: str | None = None
         pre_start_failure = False
         cancelled = False
+        awaiting_approval = False
+        lock_held = True
         try:
             builder = self._graphs.get(route)
             if tools_override is not None:
@@ -332,6 +336,26 @@ class RunLifecycle:
                         terminal_status = "error"
                         return
                     sequence += 1
+                    if (
+                        frag.type == "x.bridge.approval_required"
+                        and self._approval_store is not None
+                    ):
+                        await self._pause_for_approval(
+                            frag=frag,
+                            evt=evt,
+                            sink=sink,
+                            run_id=run_id,
+                            trace_id=trace_id,
+                            tenant_id=tenant_id,
+                            thread_id=thread_id,
+                            storage_key=storage_key,
+                            route=route,
+                            query=query,
+                            sequence=sequence,
+                        )
+                        awaiting_approval = True
+                        lock_held = False
+                        break
                     await self._emit(sink, evt, tenant_id=tenant_id)
             except EventLogAppendError as exc:
                 sequence += 1
@@ -367,7 +391,9 @@ class RunLifecycle:
             if cancel_token.is_set():
                 cancelled = True
 
-            if cancelled:
+            if awaiting_approval:
+                pass
+            elif cancelled:
                 sequence += 1
                 await self._emit(
                     sink,
@@ -489,10 +515,199 @@ class RunLifecycle:
                     logger.exception(
                         "metrics.inc failed thread_id=%s run_id=%s", thread_id, run_id
                     )
-            await self._locks.release(storage_key, run_id)
+            if lock_held:
+                await self._locks.release(storage_key, run_id)
             await self._cancels.unregister(storage_key, run_id)
             if not pre_start_failure:
                 await sink.close()
+
+    async def _pause_for_approval(
+        self,
+        *,
+        frag: OutboundFragment,
+        evt: dict[str, Any],
+        sink: EventSink,
+        run_id: str,
+        trace_id: str,
+        tenant_id: str,
+        thread_id: str,
+        storage_key: str,
+        route: str,
+        query: str,
+        sequence: int,
+    ) -> str:
+        assert self._approval_store is not None
+        data = dict(frag.data or {})
+        timeout_seconds = float(data.get("timeout_seconds") or 30.0)
+        approval_id = await self._approval_store.create(
+            {
+                "tenant_id": tenant_id,
+                "thread_id": thread_id,
+                "storage_key": storage_key,
+                "run_id": run_id,
+                "trace_id": trace_id,
+                "sequence": sequence,
+                "route": route,
+                "query": query,
+                "tool": data.get("tool"),
+                "timeout_seconds": timeout_seconds,
+                "status": "pending",
+            }
+        )
+        evt_data = dict(evt.get("data") or {})
+        evt_data.update(
+            {
+                "approval_id": approval_id,
+                "run_id": run_id,
+                "tool": data.get("tool"),
+                "timeout_seconds": timeout_seconds,
+            }
+        )
+        evt = dict(evt)
+        evt["data"] = evt_data
+        await self._emit(sink, evt, tenant_id=tenant_id)
+        if self._run_store is not None:
+            await self._run_store.upsert(
+                {
+                    "run_id": run_id,
+                    "tenant_id": tenant_id,
+                    "thread_id": thread_id,
+                    "status": "awaiting_approval",
+                    "approval_id": approval_id,
+                    "storage_key": storage_key,
+                }
+            )
+        await self._locks.release(storage_key, run_id)
+        asyncio.create_task(
+            self._approval_timeout(approval_id, tenant_id, timeout_seconds)
+        )
+        return approval_id
+
+    async def _approval_timeout(
+        self, approval_id: str, tenant_id: str, delay: float
+    ) -> None:
+        try:
+            await asyncio.sleep(delay)
+            await self.finalize_approval(
+                approval_id=approval_id,
+                tenant_id=tenant_id,
+                decision="deny",
+                sink=None,
+                reason="timeout",
+            )
+        except Exception:  # noqa: BLE001
+            logger.exception("approval timeout handler failed id=%s", approval_id)
+
+    async def finalize_approval(
+        self,
+        *,
+        approval_id: str,
+        tenant_id: str,
+        decision: str,
+        sink: EventSink | None,
+        reason: str | None = None,
+    ) -> dict[str, Any]:
+        """Resolve pending approval (approve/deny/timeout); re-acquire storage_key."""
+        if self._approval_store is None:
+            raise RuntimeError("approval_store not configured")
+        rec = await self._approval_store.get(approval_id, tenant_id=tenant_id)
+        if rec is None:
+            raise RunNotFound(approval_id)
+        if rec.get("status") != "pending":
+            return rec
+        storage_key = str(rec["storage_key"])
+        run_id = str(rec["run_id"])
+        thread_id = str(rec["thread_id"])
+        trace_id = str(rec.get("trace_id") or run_id)
+        sequence = int(rec.get("sequence") or 0)
+        query = str(rec.get("query") or "")
+
+        if not await self._locks.try_acquire(storage_key, run_id):
+            existing = await self._approval_store.get(approval_id, tenant_id=tenant_id)
+            if existing is not None and existing.get("status") != "pending":
+                return existing
+            raise ThreadBusy(thread_id)
+
+        class _NullSink:
+            async def emit(self, evt: dict[str, Any]) -> None:
+                return None
+
+            async def close(self) -> None:
+                return None
+
+        out_sink: EventSink = sink if sink is not None else _NullSink()  # type: ignore[assignment]
+        try:
+            updated = await self._approval_store.resolve(
+                approval_id, tenant_id=tenant_id, decision=decision
+            )
+            if updated is None:
+                existing = await self._approval_store.get(
+                    approval_id, tenant_id=tenant_id
+                )
+                return existing or rec
+            sequence += 1
+            resolved = build_extension_event(
+                "x.bridge.approval_resolved",
+                run_id=run_id,
+                sequence=sequence,
+                trace_id=trace_id,
+                data={
+                    "approval_id": approval_id,
+                    "decision": decision,
+                    "reason": reason or decision,
+                    "skipped": decision != "approve",
+                },
+            )
+            await self._emit(out_sink, resolved, tenant_id=tenant_id)
+            if decision == "approve":
+                sequence += 1
+                await self._emit(
+                    out_sink,
+                    build_event(
+                        "tool_result",
+                        run_id=run_id,
+                        sequence=sequence,
+                        trace_id=trace_id,
+                        data={
+                            "ok": True,
+                            "summary": f"approved:{rec.get('tool')}",
+                        },
+                    ),
+                    tenant_id=tenant_id,
+                )
+            sequence += 1
+            await self._emit(
+                out_sink,
+                build_event(
+                    "done",
+                    run_id=run_id,
+                    sequence=sequence,
+                    trace_id=trace_id,
+                    data={
+                        "skipped": decision != "approve",
+                        "approval_decision": decision,
+                    },
+                ),
+                tenant_id=tenant_id,
+            )
+            if (
+                self._event_log is not None
+                and self._message_store is not None
+                and self._run_store is not None
+            ):
+                await project_turn(
+                    event_log=self._event_log,
+                    message_store=self._message_store,
+                    run_store=self._run_store,
+                    tenant_id=tenant_id,
+                    thread_id=thread_id,
+                    run_id=run_id,
+                    query=query,
+                    terminal="done",
+                )
+            return updated
+        finally:
+            await self._locks.release(storage_key, run_id)
 
     async def cancel(
         self,
