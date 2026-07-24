@@ -72,7 +72,7 @@ def test_chat_stream_with_viewer_jwt_audits_list_tools(monkeypatch: pytest.Monke
     os.environ["AUTH_REQUIRED"] = "true"
     os.environ["AUTH_DEV_STUB"] = "false"
     os.environ["OIDC_JWT_SECRET"] = secret
-    from main import create_app
+    from testing.app_factory import create_test_app as create_app
 
     app = create_app()
     token = jwt.encode(

@@ -31,7 +31,9 @@ uvicorn main:app --port 8002
 
 ## 验证互斥
 
-对同一 `thread_id` 同时向 8001 / 8002 发 `/chat/stream`：一侧应 `409 thread_busy`。
+自动化：`apps/api/tests/test_redis_lock.py` 用共享 FakeRedis 模拟双进程抢同一 `storage_key`。
+
+手工：对同一 `thread_id` 同时向 8001 / 8002 发 `/chat/stream`：一侧应 `409 thread_busy`。
 
 ## 验证限流
 

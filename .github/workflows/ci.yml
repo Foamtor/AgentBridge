@@ -57,6 +57,9 @@ jobs:
         run: python -m pytest tests -v
         working-directory: apps/api
 
+      - name: pytest core+api joint (conftest / main path hygiene)
+        run: python -m pytest packages/core/tests apps/api/tests -q
+
   evals:
     name: golden evals
     runs-on: ubuntu-latest
@@ -74,3 +77,23 @@ jobs:
 
       - name: Run golden policy evals
         run: python scripts/run_evals.py
+
+  sdk-tests:
+    name: typescript sdk
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/sdk
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: packages/sdk/package-lock.json
+
+      - name: Install and test
+        run: |
+          npm ci
+          npm test

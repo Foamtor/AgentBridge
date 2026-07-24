@@ -28,7 +28,7 @@ def test_gateway_backend_alias_swap_without_domain_change(
     monkeypatch.setenv("AGENT_BASE_FAKE_RUNTIME", "0")
     os.environ["LLM_BACKEND"] = "gateway"
     os.environ["AGENT_BASE_FAKE_RUNTIME"] = "0"
-    from main import create_app
+    from testing.app_factory import create_test_app as create_app
 
     app = create_app()
     with TestClient(app) as c:

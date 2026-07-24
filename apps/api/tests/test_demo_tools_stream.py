@@ -20,7 +20,7 @@ def _parse_sse(body: str) -> list[dict]:
 
 def test_demo_tools_stream_tool_and_extension(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("AGENT_BASE_FAKE_RUNTIME", "0")
-    from main import create_app
+    from testing.app_factory import create_test_app as create_app
 
     app = create_app()
     with TestClient(app) as c:
