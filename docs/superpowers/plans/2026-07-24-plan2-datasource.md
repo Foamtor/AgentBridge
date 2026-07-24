@@ -37,15 +37,20 @@
 | `demo_readonly` + `order:read` | 验收、Eval 可复用 |
 | `ctx.metadata["data_source"]` | 域 tool 约定 |
 
+## Already done
+
+- [x] 硬前置 Plan1 M2a（及本仓库已含 M2b）
+- [x] **T1–T5 已实现**（分支 `feat/plan2-datasource`）
+
 ## Spec ↔ Task
 
 | 要求 | Task |
 |------|------|
-| DataSource Port | T1 |
-| Postgres adapter | T2 |
-| metadata 注入 | T3 |
-| demo_readonly + order:read | T4 |
-| 文档/路线图 | T5 |
+| DataSource Port | T1 ✅ |
+| Postgres adapter | T2 ✅ |
+| metadata 注入 | T3 ✅ |
+| demo_readonly + order:read | T4 ✅ |
+| 文档/路线图 | T5 ✅ |
 
 ---
 
