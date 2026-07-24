@@ -104,3 +104,79 @@ async def test_runtime_extensions_not_from_on_chain_end_output():
 
     assert all(f.type != "x.should.not_emit" for f in frags)
     assert any(f.type == "text_delta" for f in frags)
+
+
+@pytest.mark.asyncio
+async def test_runtime_no_duplicate_text_when_model_streamed():
+    compiled = _FakeCompiled(
+        events=[
+            {
+                "event": "on_chat_model_stream",
+                "data": {"chunk": SimpleNamespace(content="Hi")},
+            },
+            {
+                "event": "on_chain_end",
+                "name": "agent",
+                "data": {"output": {"result": "Hi full"}},
+            },
+        ],
+        state_values={},
+    )
+    runtime = LangGraphRuntime()
+    frags: list[OutboundFragment] = []
+    async for frag in runtime.astream(
+        lambda **_kw: compiled,
+        tools=[],
+        checkpointer=None,
+        thread_id="t1",
+        query="hi",
+        cancel_token=None,
+    ):
+        frags.append(frag)
+    texts = [f.data.get("content") for f in frags if f.type == "text_delta"]
+    assert texts == ["Hi"]
+
+
+@pytest.mark.asyncio
+async def test_runtime_tool_error_sets_ok_false():
+    compiled = _FakeCompiled(
+        events=[
+            {
+                "event": "on_tool_error",
+                "name": "add",
+                "run_id": "run-x",
+                "data": {"error": "boom", "tool_call_id": "tc-demo-1"},
+            }
+        ],
+        state_values={},
+    )
+    runtime = LangGraphRuntime()
+    frags: list[OutboundFragment] = []
+    async for frag in runtime.astream(
+        lambda **_kw: compiled,
+        tools=[],
+        checkpointer=None,
+        thread_id="t1",
+        query="hi",
+        cancel_token=None,
+    ):
+        frags.append(frag)
+    assert len(frags) == 1
+    assert frags[0].type == "tool_result"
+    assert frags[0].data["ok"] is False
+    assert frags[0].data["tool_call_id"] == "tc-demo-1"
+
+
+@pytest.mark.asyncio
+async def test_runtime_rejects_non_compiled_builder():
+    runtime = LangGraphRuntime()
+    with pytest.raises(RuntimeError, match="astream_events"):
+        async for _ in runtime.astream(
+            lambda **_kw: object(),
+            tools=[],
+            checkpointer=None,
+            thread_id="t1",
+            query="hi",
+            cancel_token=None,
+        ):
+            pass

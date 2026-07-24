@@ -118,3 +118,30 @@ async def test_invalid_extension_type_emits_error(
     assert "error" in types
     assert "done" not in types
     assert types[-1] == "error"
+
+
+@pytest.mark.asyncio
+async def test_hooks_failure_still_releases_lock(graphs, tools, queue_and_sink, drain_events):
+    class BoomHooks:
+        async def on_run_end(self, payload):
+            raise RuntimeError("hooks boom")
+
+    q, sink = queue_and_sink
+    locks = InProcessThreadLock()
+    lc = RunLifecycle(
+        locks=locks,
+        checkpointers=FakeCheckpointerFactory(),
+        graphs=graphs,
+        tools=tools,
+        input_builders=InputBuilderRegistry(),
+        runtime=FakeRuntime(),
+        cancels=InProcessCancelRegistry(),
+        hooks=BoomHooks(),
+    )
+    await lc.start_stream(query="hi", thread_id="t-hooks", route="echo", sink=sink)
+    events = await drain_events(q)
+    assert events[0]["type"] == "start"
+    assert events[-1]["type"] == "done"
+    # Lock must be free for a second acquire.
+    assert await locks.try_acquire("t-hooks", "r-next")
+    await locks.release("t-hooks", "r-next")
