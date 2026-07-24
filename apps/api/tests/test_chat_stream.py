@@ -50,17 +50,9 @@ def test_thread_busy_409(client):
         async def astream(self, builder, **kwargs):
             import asyncio
 
-            from agent_base_core.protocol.events import build_event
+            from agent_base_core.protocol.fragments import OutboundFragment
 
-            extra = kwargs.get("extra") or {}
-            run_id = str(extra.get("run_id") or "r")
-            yield build_event(
-                "text_delta",
-                run_id=run_id,
-                sequence=1,
-                trace_id=run_id,
-                data={"content": "hold"},
-            )
+            yield OutboundFragment(type="text_delta", data={"content": "hold"})
             await asyncio.sleep(2)
 
     client.app.state.run_lifecycle.replace_runtime(BlockingRuntime())

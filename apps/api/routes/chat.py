@@ -12,7 +12,6 @@ from fastapi.responses import StreamingResponse
 from agent_base_core.adapters.sse_event_sink import SseEventSink
 from agent_base_core.application.errors import RunNotFound, ThreadBusy, UnknownRoute
 from agent_base_core.application.run_lifecycle import RunLifecycle
-from agent_base_core.protocol.events import build_event
 from agent_base_core.protocol.sse import format_sse_line
 from agent_base_core.public import cancel_run, orchestration_stream
 from deps import get_run_lifecycle
@@ -66,8 +65,8 @@ async def chat_stream(
         except UnknownRoute as exc:
             await queue.put(("__error__", exc))
             await queue.put(None)
-        except Exception as exc:  # noqa: BLE001
-            await queue.put(("__error__", exc))
+        except Exception:  # noqa: BLE001 — lifecycle already emitted error or closed sink
+            # Do not enqueue a second error frame (no r-host / double error).
             await queue.put(None)
 
     task = asyncio.create_task(_run())
@@ -114,16 +113,8 @@ async def chat_stream(
                 if item is None:
                     break
                 if isinstance(item, tuple) and item[0] == "__error__":
-                    err = item[1]
-                    yield format_sse_line(
-                        build_event(
-                            "error",
-                            run_id="r-host",
-                            sequence=0,
-                            trace_id="r-host",
-                            data={"message": str(err), "code": "stream_failed"},
-                        )
-                    )
+                    # Mid-stream host errors must not synthesize r-host frames;
+                    # lifecycle owns terminal error events.
                     break
                 yield format_sse_line(item)  # type: ignore[arg-type]
         finally:

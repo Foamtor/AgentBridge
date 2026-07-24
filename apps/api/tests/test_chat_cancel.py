@@ -8,7 +8,7 @@ import threading
 import time
 
 import anyio
-from agent_base_core.protocol.events import build_event
+from agent_base_core.protocol.fragments import OutboundFragment
 
 
 def test_cancel_404_when_idle(client):
@@ -31,15 +31,7 @@ def test_cancel_200_when_registered(client):
 def test_cancel_during_stream_emits_cancelled(client):
     class SlowRuntime:
         async def astream(self, builder, **kwargs):
-            extra = kwargs.get("extra") or {}
-            run_id = str(extra.get("run_id") or "r-x")
-            yield build_event(
-                "text_delta",
-                run_id=run_id,
-                sequence=1,
-                trace_id=run_id,
-                data={"content": "partial"},
-            )
+            yield OutboundFragment(type="text_delta", data={"content": "partial"})
             await kwargs["cancel_token"].wait()
 
     client.app.state.run_lifecycle.replace_runtime(SlowRuntime())

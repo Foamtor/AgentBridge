@@ -13,7 +13,7 @@ from agent_base_core.adapters.langgraph_runtime import LangGraphRuntime
 from agent_base_core.adapters.memory_checkpointer import MemoryCheckpointerFactory
 from agent_base_core.adapters.noop_hooks import NoopHooks
 from agent_base_core.application.run_lifecycle import RunLifecycle
-from agent_base_core.protocol.events import build_event
+from agent_base_core.protocol.fragments import OutboundFragment
 from agent_base_core.registry.graphs import GraphRegistry
 from agent_base_core.registry.input_builders import InputBuilderRegistry
 from agent_base_core.registry.tools import ToolRegistry
@@ -26,16 +26,7 @@ class ApiFakeRuntime:
     """Deterministic runtime for API tests (AGENT_BASE_FAKE_RUNTIME=1)."""
 
     async def astream(self, builder: Any, **kwargs: Any):
-        extra = kwargs.get("extra") or {}
-        run_id = str(extra.get("run_id") or "r-x")
-        trace_id = str(extra.get("trace_id") or run_id)
-        yield build_event(
-            "text_delta",
-            run_id=run_id,
-            sequence=2,
-            trace_id=trace_id,
-            data={"content": "ok"},
-        )
+        yield OutboundFragment(type="text_delta", data={"content": "ok"})
 
 
 @asynccontextmanager

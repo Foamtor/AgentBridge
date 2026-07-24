@@ -14,7 +14,13 @@ from agent_base_core.ports.graph_runtime import GraphRuntime
 from agent_base_core.ports.hooks import RunHooks
 from agent_base_core.ports.run_control import RunCancelRegistry
 from agent_base_core.ports.thread_lock import ThreadLock
-from agent_base_core.protocol.events import build_event
+from agent_base_core.protocol.events import (
+    EVENT_TYPES,
+    EXTENSION_TYPE_RE,
+    build_event,
+    build_extension_event,
+)
+from agent_base_core.protocol.fragments import OutboundFragment
 from agent_base_core.registry.graphs import GraphRegistry
 from agent_base_core.registry.input_builders import InputBuilderRegistry
 from agent_base_core.registry.tools import ToolRegistry
@@ -47,13 +53,35 @@ class RunLifecycle:
         """Test/host hook to swap GraphRuntime without private attribute access."""
         self._runtime = runtime
 
-    def _renumber(self, evt: dict[str, Any], *, run_id: str, trace_id: str, sequence: int) -> dict[str, Any]:
-        out = dict(evt)
-        out["run_id"] = run_id
-        out["trace_id"] = trace_id
-        out["sequence"] = sequence
-        out["event_id"] = f"{run_id}-{sequence}"
-        return out
+    def _envelope_from_fragment(
+        self,
+        frag: OutboundFragment,
+        *,
+        run_id: str,
+        sequence: int,
+        trace_id: str,
+    ) -> dict[str, Any]:
+        if frag.type in EVENT_TYPES:
+            return build_event(
+                frag.type,
+                run_id=run_id,
+                sequence=sequence,
+                trace_id=trace_id,
+                data=frag.data,
+                step=frag.step,
+                status=frag.status,
+            )
+        if EXTENSION_TYPE_RE.fullmatch(frag.type):
+            return build_extension_event(
+                frag.type,
+                run_id=run_id,
+                sequence=sequence,
+                trace_id=trace_id,
+                data=frag.data,
+                step=frag.step,
+                status=frag.status,
+            )
+        raise ValueError(f"invalid outbound fragment type: {frag.type}")
 
     async def start_stream(
         self,
@@ -68,6 +96,7 @@ class RunLifecycle:
         run_id = f"r-{uuid.uuid4().hex[:12]}"
         trace_id = run_id
         sequence = 0
+        terminal_sent = False
 
         if not await self._locks.try_acquire(thread_id, run_id):
             raise ThreadBusy(thread_id)
@@ -102,7 +131,7 @@ class RunLifecycle:
             checkpointer = await self._checkpointers.get()
 
             try:
-                async for evt in self._runtime.astream(
+                async for frag in self._runtime.astream(
                     builder,
                     tools=tools,
                     checkpointer=checkpointer,
@@ -120,10 +149,32 @@ class RunLifecycle:
                     if cancel_token.is_set():
                         cancelled = True
                         break
+                    if not isinstance(frag, OutboundFragment):
+                        raise TypeError(
+                            f"runtime must yield OutboundFragment, got {type(frag)!r}"
+                        )
+                    try:
+                        evt = self._envelope_from_fragment(
+                            frag, run_id=run_id, sequence=sequence + 1, trace_id=trace_id
+                        )
+                    except ValueError:
+                        sequence += 1
+                        await sink.emit(
+                            build_event(
+                                "error",
+                                run_id=run_id,
+                                sequence=sequence,
+                                trace_id=trace_id,
+                                data={
+                                    "message": f"invalid event type: {frag.type}",
+                                    "code": "invalid_event_type",
+                                },
+                            )
+                        )
+                        terminal_sent = True
+                        return
                     sequence += 1
-                    await sink.emit(
-                        self._renumber(evt, run_id=run_id, trace_id=trace_id, sequence=sequence)
-                    )
+                    await sink.emit(evt)
             except Exception as exc:  # noqa: BLE001 — map to SSE error then close
                 logger.exception("run failed thread_id=%s run_id=%s", thread_id, run_id)
                 sequence += 1
@@ -136,6 +187,7 @@ class RunLifecycle:
                         data={"message": str(exc), "code": "run_failed"},
                     )
                 )
+                terminal_sent = True
                 return
 
             if cancel_token.is_set():
@@ -149,6 +201,7 @@ class RunLifecycle:
                         run_id=run_id,
                         sequence=sequence,
                         trace_id=trace_id,
+                        data={"thread_id": thread_id, "run_id": run_id},
                     )
                 )
                 sequence += 1
@@ -158,8 +211,10 @@ class RunLifecycle:
                         run_id=run_id,
                         sequence=sequence,
                         trace_id=trace_id,
+                        data={"thread_id": thread_id, "run_id": run_id},
                     )
                 )
+                terminal_sent = True
             else:
                 sequence += 1
                 await sink.emit(
@@ -170,6 +225,25 @@ class RunLifecycle:
                         trace_id=trace_id,
                     )
                 )
+                terminal_sent = True
+        except Exception as exc:  # noqa: BLE001
+            if not terminal_sent and sequence > 0:
+                logger.exception(
+                    "run failed after start thread_id=%s run_id=%s", thread_id, run_id
+                )
+                sequence += 1
+                await sink.emit(
+                    build_event(
+                        "error",
+                        run_id=run_id,
+                        sequence=sequence,
+                        trace_id=trace_id,
+                        data={"message": str(exc), "code": "run_failed"},
+                    )
+                )
+                terminal_sent = True
+            else:
+                raise
         finally:
             await self._hooks.on_run_end(
                 {"thread_id": thread_id, "run_id": run_id, "route": route}
