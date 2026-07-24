@@ -31,7 +31,7 @@
 | `text_delta.data` | `content` | **对齐** `content` |
 | 忙冲突 | HTTP 409 | **对齐**；body 用 `thread_busy` |
 | cancel 事件 | `cancel_requested` → `cancelled` | **对齐** |
-| 业务扩展事件 | 地图等自定义 | 透传；本仓默认树不实现地图事件 |
+| 业务扩展事件 | 地图等自定义 | 稳定九类 + `x.<domain>.*`（见 contracts）；样板 `demo_tools` |
 
 允许命名微调时：必须在本表追加一行「产品字段 → 本仓字段」。
 
