@@ -68,11 +68,17 @@ def _wrap_base_tool(
     ctx: RunContext,
     audit: AuditLogger | None,
 ) -> Any:
-    """Shallow-copy a LangChain BaseTool and wrap func/coroutine in place."""
+    """Copy BaseTool and wrap ainvoke/invoke — keep coroutine signature intact.
+
+    Replacing ``coroutine`` with a bare ``*args, **kwargs`` wrapper breaks
+    LangChain ``InjectedToolArg`` (e.g. RunnableConfig), because injection
+    inspects the coroutine signature. Wrapping ainvoke/invoke lets
+    StructuredTool inject config first, then our policy check runs.
+    """
     guarded = copy.copy(tool)
     resource = _resource_for(tool)
-    orig_func = getattr(tool, "func", None)
-    orig_coro = getattr(tool, "coroutine", None)
+    orig_ainvoke = tool.ainvoke
+    orig_invoke = tool.invoke
 
     def _decide() -> str:
         return policy.decide(ctx=ctx, action="invoke_tool", resource=resource)
@@ -89,28 +95,22 @@ def _wrap_base_tool(
             result="denied",
         )
 
-    def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
-        if _decide() != "allow":
-            _schedule_audit(_audit_denied())
-            return "forbidden"
-        if callable(orig_func):
-            return orig_func(*args, **kwargs)
-        raise TypeError("tool has no func")
-
-    async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+    async def guarded_ainvoke(
+        input: Any, config: Any | None = None, **kwargs: Any
+    ) -> Any:
         if _decide() != "allow":
             await _audit_denied()
             return "forbidden"
-        if callable(orig_coro):
-            return await orig_coro(*args, **kwargs)
-        if callable(orig_func):
-            return orig_func(*args, **kwargs)
-        raise TypeError("tool has no coroutine/func")
+        return await orig_ainvoke(input, config=config, **kwargs)
 
-    if callable(orig_func):
-        object.__setattr__(guarded, "func", sync_wrapper)
-    if callable(orig_coro) or callable(orig_func):
-        object.__setattr__(guarded, "coroutine", async_wrapper)
+    def guarded_invoke(input: Any, config: Any | None = None, **kwargs: Any) -> Any:
+        if _decide() != "allow":
+            _schedule_audit(_audit_denied())
+            return "forbidden"
+        return orig_invoke(input, config=config, **kwargs)
+
+    object.__setattr__(guarded, "ainvoke", guarded_ainvoke)
+    object.__setattr__(guarded, "invoke", guarded_invoke)
     return guarded
 
 
