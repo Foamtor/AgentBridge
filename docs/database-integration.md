@@ -9,8 +9,8 @@
 | 能力 | 用途 | 状态 |
 |------|------|------|
 | Checkpointer（`PG_DSN`） | LangGraph 会话状态 | 已有 |
-| DataSource | 业务 tool 查业务表 | 规划 M3 |
-| EventLog / Message 投影 | run 事件与对话查询 | 规划 M2b（可与 checkpointer 同实例分表） |
+| DataSource | 业务 tool 查业务表 | ✅ M3（Plan2） |
+| EventLog / Message 投影 | run 事件与对话查询 | ✅ M2b（可与 checkpointer 同实例分表） |
 
 ## 目标 API（M3）
 
@@ -32,4 +32,9 @@ class DataSource(Protocol):
 
 ## 现在
 
-域内可先用自有 DB 客户端；Port 落地后再迁，便于 fake 测试。
+- 默认：`ENABLE_DATA_SOURCE=false` → `NoopDataSource`
+- 开启：`ENABLE_DATA_SOURCE=true`，DSN 用 `DATA_SOURCE_DSN` 或回退 `PG_DSN` / 分量配置
+- 金标域：`demo_readonly`（`list_orders`，需 `order:read`）；迁移见 `apps/api/migrations/002_demo_readonly.sql`
+- optional extra：`pip install -e "apps/api[datasource]"`（asyncpg）
+
+域内仍可先用自有 DB 客户端；新域优先走 `ctx.metadata["data_source"]` + `get_run_context(config)`。
