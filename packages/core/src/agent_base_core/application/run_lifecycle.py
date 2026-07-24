@@ -122,8 +122,18 @@ class RunLifecycle:
         raise ValueError(f"invalid outbound fragment type: {frag.type}")
 
     async def _emit(
-        self, sink: EventSink, evt: dict[str, Any], *, tenant_id: str
+        self,
+        sink: EventSink,
+        evt: dict[str, Any],
+        *,
+        tenant_id: str,
+        agent_id: str = "",
     ) -> None:
+        if agent_id:
+            data = dict(evt.get("data") or {})
+            data.setdefault("agent_id", agent_id)
+            evt = dict(evt)
+            evt["data"] = data
         if (
             self._safety_hooks is not None
             and evt.get("type") == "text_delta"
@@ -268,6 +278,7 @@ class RunLifecycle:
         cancelled = False
         awaiting_approval = False
         lock_held = True
+        agent_id = run_ctx.agent_id or ""
         try:
             builder = self._graphs.get(route)
             if tools_override is not None:
@@ -300,6 +311,7 @@ class RunLifecycle:
                     data={"thread_id": thread_id, "route": route},
                 ),
                 tenant_id=tenant_id,
+                agent_id=agent_id,
             )
 
             checkpointer = await self._checkpointers.get()
@@ -355,6 +367,10 @@ class RunLifecycle:
                         terminal_status = "error"
                         return
                     sequence += 1
+                    frag_agent = ""
+                    if isinstance(frag.data, dict) and frag.data.get("agent_id"):
+                        frag_agent = str(frag.data["agent_id"])
+                        agent_id = frag_agent
                     if (
                         frag.type == "x.bridge.approval_required"
                         and self._approval_store is not None
@@ -375,7 +391,9 @@ class RunLifecycle:
                         awaiting_approval = True
                         lock_held = False
                         break
-                    await self._emit(sink, evt, tenant_id=tenant_id)
+                    await self._emit(
+                        sink, evt, tenant_id=tenant_id, agent_id=agent_id
+                    )
             except EventLogAppendError as exc:
                 sequence += 1
                 await self._emit_append_failed_error(
