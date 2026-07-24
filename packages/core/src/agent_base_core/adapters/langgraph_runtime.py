@@ -15,6 +15,25 @@ from agent_base_core.adapters.event_mapper import (
 from agent_base_core.protocol.fragments import OUTBOUND_EXTENSIONS_KEY, OutboundFragment
 
 
+def _content_to_text(content: Any) -> str | None:
+    if isinstance(content, str) and content:
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for block in content:
+            if isinstance(block, str):
+                parts.append(block)
+            elif isinstance(block, dict) and block.get("type") == "text":
+                parts.append(str(block.get("text") or ""))
+            else:
+                text = getattr(block, "text", None)
+                if isinstance(text, str) and text:
+                    parts.append(text)
+        joined = "".join(parts)
+        return joined or None
+    return None
+
+
 def _text_from_chain_output(output: Any) -> str | None:
     """Generic domain-agnostic extraction (no hard-coded node names)."""
     if isinstance(output, dict):
@@ -23,16 +42,18 @@ def _text_from_chain_output(output: Any) -> str | None:
         messages = output.get("messages")
         if isinstance(messages, list) and messages:
             last = messages[-1]
-            content = getattr(last, "content", None)
-            if isinstance(content, str) and content:
-                return content
-            if isinstance(last, dict) and isinstance(last.get("content"), str):
-                return last["content"]
+            text = _content_to_text(getattr(last, "content", None))
+            if text:
+                return text
+            if isinstance(last, dict):
+                text = _content_to_text(last.get("content"))
+                if text:
+                    return text
             if isinstance(last, str):
                 return last
-    content = getattr(output, "content", None)
-    if isinstance(content, str) and content:
-        return content
+    text = _content_to_text(getattr(output, "content", None))
+    if text:
+        return text
     return None
 
 
@@ -41,10 +62,24 @@ def _summary_from_tool_output(output: Any) -> str:
         return ""
     if isinstance(output, str):
         return output
-    content = getattr(output, "content", None)
-    if isinstance(content, str):
-        return content
+    text = _content_to_text(getattr(output, "content", None))
+    if text is not None:
+        return text
     return str(output)
+
+
+def _tool_call_id(event: dict[str, Any], data: dict[str, Any]) -> str:
+    for key in ("tool_call_id", "id"):
+        val = data.get(key)
+        if isinstance(val, str) and val:
+            return val
+    inp = data.get("input")
+    if isinstance(inp, dict):
+        for key in ("tool_call_id", "id"):
+            val = inp.get(key)
+            if isinstance(val, str) and val:
+                return val
+    return str(event.get("run_id") or "tc-unknown")
 
 
 class LangGraphRuntime:
@@ -64,14 +99,14 @@ class LangGraphRuntime:
 
         compiled = builder(checkpointer=checkpointer, tools=tools) if callable(builder) else builder
         if compiled is None or not hasattr(compiled, "astream_events"):
-            if isinstance(cancel_token, asyncio.Event) and cancel_token.is_set():
-                return
-            yield map_text_delta(query)
-            return
+            raise RuntimeError(
+                "graph builder did not return a compiled graph with astream_events"
+            )
 
         config = {"configurable": {"thread_id": thread_id}}
         stream = compiled.astream_events(graph_input, config=config, version="v2")
         aiter = stream.__aiter__()
+        streamed_model_text = False
         try:
             while True:
                 if isinstance(cancel_token, asyncio.Event) and cancel_token.is_set():
@@ -83,7 +118,7 @@ class LangGraphRuntime:
                 except asyncio.TimeoutError:
                     continue
                 except asyncio.CancelledError:
-                    break
+                    raise
 
                 if isinstance(cancel_token, asyncio.Event) and cancel_token.is_set():
                     break
@@ -100,28 +135,44 @@ class LangGraphRuntime:
                 elif kind == "on_chat_model_stream":
                     chunk = data.get("chunk")
                     content = getattr(chunk, "content", None) if chunk is not None else None
-                    if isinstance(content, str) and content:
-                        yield map_text_delta(content)
+                    text = _content_to_text(content)
+                    if text:
+                        streamed_model_text = True
+                        yield map_text_delta(text)
                 elif kind == "on_tool_start":
                     yield map_tool_call(
                         event.get("name") or "tool",
                         data.get("input") if isinstance(data.get("input"), dict) else {},
-                        str(event.get("run_id") or "tc-unknown"),
+                        _tool_call_id(event, data),
                     )
                 elif kind == "on_tool_end":
                     output = data.get("output")
                     yield map_tool_result(
                         event.get("name") or "tool",
                         ok=True,
-                        tool_call_id=str(event.get("run_id") or "tc-unknown"),
+                        tool_call_id=_tool_call_id(event, data),
                         summary=_summary_from_tool_output(output),
+                    )
+                elif kind == "on_tool_error":
+                    err = data.get("error")
+                    yield map_tool_result(
+                        event.get("name") or "tool",
+                        ok=False,
+                        tool_call_id=_tool_call_id(event, data),
+                        summary=str(err) if err is not None else "tool error",
                     )
                 elif kind == "on_chain_end":
                     if name and name not in {"LangGraph", "RunnableSequence"}:
                         yield map_step_update(name, "done")
-                    text = _text_from_chain_output(data.get("output"))
-                    if text and name and name not in {"LangGraph", "RunnableSequence"}:
-                        yield map_text_delta(text)
+                    # Prefer token stream; only fallback to full node output when
+                    # no chat model stream was seen (e.g. echo-style nodes).
+                    if not streamed_model_text:
+                        text = _text_from_chain_output(data.get("output"))
+                        if text and name and name not in {
+                            "LangGraph",
+                            "RunnableSequence",
+                        }:
+                            yield map_text_delta(text)
         finally:
             aclose = getattr(aiter, "aclose", None)
             if callable(aclose):

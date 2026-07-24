@@ -97,3 +97,39 @@ def test_real_echo_stream_has_text_and_done(monkeypatch: pytest.MonkeyPatch):
     assert "text_delta" in types
     assert types[-1] == "done"
     assert "hello-echo" in r.text
+
+
+def test_runtime_error_single_error_no_rhost(client):
+    class BoomRuntime:
+        async def astream(self, builder, **kwargs):
+            from agent_base_core.protocol.fragments import OutboundFragment
+
+            yield OutboundFragment(type="text_delta", data={"content": "partial"})
+            raise RuntimeError("boom")
+
+    client.app.state.run_lifecycle.replace_runtime(BoomRuntime())
+    r = client.post(
+        "/chat/stream",
+        json={"query": "hi", "thread_id": "t-boom", "route": "echo"},
+    )
+    assert r.status_code == 200
+    assert "r-host" not in r.text
+    types = _parse_sse_types(r.text)
+    assert types.count("error") == 1
+    assert types[0] == "start"
+    assert types[-1] == "error"
+    assert "done" not in types
+
+
+def test_pre_start_input_failure_is_500_not_empty_200(client):
+    def boom_input(query: str, **kwargs):
+        raise ValueError("bad input")
+
+    client.app.state.run_lifecycle._input_builders.register("echo", boom_input)
+    r = client.post(
+        "/chat/stream",
+        json={"query": "hi", "thread_id": "t-pre-fail", "route": "echo"},
+    )
+    assert r.status_code == 500
+    assert r.json()["detail"]["code"] == "stream_failed"
+    assert "bad input" in r.json()["detail"]["message"]

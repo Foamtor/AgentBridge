@@ -263,9 +263,14 @@ class RunLifecycle:
                 pre_start_failure = sequence == 0
                 raise
         finally:
-            await self._hooks.on_run_end(
-                {"thread_id": thread_id, "run_id": run_id, "route": route}
-            )
+            try:
+                await self._hooks.on_run_end(
+                    {"thread_id": thread_id, "run_id": run_id, "route": route}
+                )
+            except Exception:  # noqa: BLE001 — never block lock/cancel cleanup
+                logger.exception(
+                    "on_run_end failed thread_id=%s run_id=%s", thread_id, run_id
+                )
             await self._locks.release(thread_id, run_id)
             await self._cancels.unregister(thread_id, run_id)
             if not pre_start_failure:

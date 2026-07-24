@@ -54,12 +54,22 @@ async def chat_stream(
         except UnknownRoute as exc:
             await queue.put(("__error__", exc))
             await queue.put(None)
-        except Exception:  # noqa: BLE001 — lifecycle already emitted error or closed sink
-            # Do not enqueue a second error frame (no r-host / double error).
+        except Exception as exc:  # noqa: BLE001
+            # Pre-start failures re-raise from lifecycle (no SSE yet). Mid-stream
+            # failures are emitted as error by lifecycle and do not re-raise.
+            await queue.put(("__error__", exc))
             await queue.put(None)
 
     task = asyncio.create_task(_run())
     first = await queue.get()
+    if first is None:
+        await task
+        raise _http_error(
+            500,
+            "stream_failed",
+            "stream ended before any event",
+            thread_id=body.thread_id,
+        )
     if isinstance(first, tuple) and first[0] == "__error__":
         err = first[1]
         await task
@@ -77,7 +87,12 @@ async def chat_stream(
                 f"unknown route: {body.route}",
                 route=body.route,
             )
-        raise err
+        raise _http_error(
+            500,
+            "stream_failed",
+            str(err),
+            thread_id=body.thread_id,
+        )
 
     async def event_gen() -> AsyncIterator[str]:
         nonlocal cancelled_on_disconnect
