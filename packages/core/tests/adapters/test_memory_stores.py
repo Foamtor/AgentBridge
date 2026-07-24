@@ -21,6 +21,7 @@ async def test_run_store_upsert_and_list() -> None:
     await store.upsert(
         {"run_id": "r1", "tenant_id": "t1", "thread_id": "th", "status": "done"}
     )
-    assert (await store.get("r1"))["status"] == "done"
+    assert (await store.get("r1", tenant_id="t1"))["status"] == "done"
+    assert await store.get("r1", tenant_id="other") is None
     assert len(await store.list_by_tenant("t1")) == 1
     assert await store.list_by_tenant("other") == []

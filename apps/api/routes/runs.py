@@ -22,8 +22,8 @@ def _ctx(request: Request):
 async def get_run(run_id: str, request: Request) -> dict[str, Any]:
     ctx = _ctx(request)
     tenant_id = ctx.tenant_id or "default"
-    run = await request.app.state.run_store.get(run_id)
-    if run is None or run.get("tenant_id") != tenant_id:
+    run = await request.app.state.run_store.get(run_id, tenant_id=tenant_id)
+    if run is None:
         raise HTTPException(
             status_code=404,
             detail={"code": "run_not_found", "message": "run not found"},
@@ -35,8 +35,8 @@ async def get_run(run_id: str, request: Request) -> dict[str, Any]:
 async def get_run_events(run_id: str, request: Request) -> list[dict[str, Any]]:
     ctx = _ctx(request)
     tenant_id = ctx.tenant_id or "default"
-    run = await request.app.state.run_store.get(run_id)
-    if run is None or run.get("tenant_id") != tenant_id:
+    run = await request.app.state.run_store.get(run_id, tenant_id=tenant_id)
+    if run is None:
         raise HTTPException(
             status_code=404,
             detail={"code": "run_not_found", "message": "run not found"},

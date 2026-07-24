@@ -48,7 +48,10 @@ async def test_guard_denies_invoke_for_viewer() -> None:
     result = await guarded[0].ainvoke({})
     assert result == "forbidden"
     assert raw.called is False
-    assert any(r["result"] == "denied" for r in audit.records)
+    denied = [r for r in audit.records if r["result"] == "denied"]
+    assert denied
+    assert denied[0]["detail"]["reason_code"] == "role_mismatch"
+    assert denied[0]["detail"]["policy_version"] == "role_policy/v1"
 
 
 @pytest.mark.asyncio
@@ -69,7 +72,10 @@ def test_guard_sync_invoke_denies_and_audits() -> None:
     result = guarded[0].invoke({})
     assert result == "forbidden"
     assert raw.called is False
-    assert any(r["result"] == "denied" for r in audit.records)
+    denied = [r for r in audit.records if r["result"] == "denied"]
+    assert denied
+    assert denied[0]["detail"]["reason_code"] == "role_mismatch"
+    assert denied[0]["detail"]["policy_version"] == "role_policy/v1"
 
 
 @pytest.mark.asyncio
