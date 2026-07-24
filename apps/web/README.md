@@ -1,7 +1,6 @@
 # apps/web
 
-React debug console (Vite + TS). Implement per design; structure only for now.
+React 调试台（Vite + TypeScript）。
 
-- features/auth — OIDC PKCE
-- features/debug — SSE workbench
-- features/contracts — event contract page
+产品真源：[docs/00-AgentBridge完整方案.md](../../docs/00-AgentBridge完整方案.md) **v4.1**。  
+SSE 契约：[docs/contracts.md](../../docs/contracts.md)。

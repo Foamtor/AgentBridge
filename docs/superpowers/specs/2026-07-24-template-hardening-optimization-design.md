@@ -1,5 +1,6 @@
 # Agent-Base 全面优化设计 — 模板硬化 + 生产能力（两期）
 
+> **历史规格。** 当前产品真源：[00-AgentBridge完整方案.md](../../00-AgentBridge完整方案.md) **v4.1** 与 [roadmap.md](../../roadmap.md)；冲突时以 v4.1 为准。  
 > 状态：**一期验收项已完成（见 §8）；实施在 `feat/template-hardening`**  
 > 日期：2026-07-24  
 > 仓库：`Agent-Base`  
