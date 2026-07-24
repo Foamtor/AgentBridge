@@ -27,6 +27,10 @@ jobs:
       - name: Scan core for forbidden business imports
         run: python scripts/import_scan_core.py
 
+      - name: Check AI instruction paths
+        shell: bash
+        run: bash scripts/check_ai_instructions.sh
+
       - name: pytest core
         run: python -m pytest packages/core/tests -v
 
