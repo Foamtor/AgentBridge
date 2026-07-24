@@ -170,8 +170,8 @@ Smoke：`.\scripts\smoke_echo.ps1` / `./scripts/smoke_echo.sh`。
 
 | | |
 |--|--|
-| ✅ 现在 | **v1.0 单机门禁**：M0–M4（含 `/ready` `/metrics` 限流 InputValidator） |
-| ⏭ 建议下一切片 | **Plan4**（Gateway / Context / Filter / Approval，M5–M7） |
-| ⏳ 愿景 | M5–M10；多机仍是 **M9**，不在 v1.0 范围 |
+| ✅ 现在 | **Plan4**：M5–M7（Gateway / Approval / Filter / RAG）叠在 v1.0 单机基线上 |
+| ⏭ 建议下一切片 | **Plan5**（多 Agent / SDK / Redis / Eval） |
+| ⏳ 愿景 | M8–M10；多机仍是 **M9** |
 
 完整定义见 [完整方案 v4.1](docs/00-AgentBridge完整方案.md) 与 [路线图](docs/roadmap.md)。

@@ -41,11 +41,16 @@
 
 | 规格 | Task |
 |------|------|
-| §5.2 Gateway 过渡 | T1–T3 |
-| ContextManager + Prompt | T2 |
-| §4.6 Approval | T4 |
-| DataFilter + Mask + §4.9 Safety | T5–T6 |
-| Retriever + citation + Memory | T7–T8 |
+| §5.2 Gateway 过渡 | T1–T3 ✅ |
+| ContextManager + Prompt | T2 ✅ |
+| §4.6 Approval | T4 ✅ |
+| DataFilter + Mask + §4.9 Safety | T5–T6 ✅ |
+| Retriever + citation + Memory | T7–T8 ✅ |
+
+## Already done
+
+- [x] 上游 Plan1+Plan3（本分支基于 `feat/plan3-single-node-prod`）
+- [x] **T1–T9 已实现**（分支 `feat/plan4-intelligence-governance`）
 
 ---
 

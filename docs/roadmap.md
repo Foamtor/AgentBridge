@@ -28,9 +28,9 @@
 | **M2b** | EventLog（全量已提交）+ 投影（delta 合并）+ replay | ✅ Plan1 |
 | **M3** | DataSource + demo_readonly | ✅ Plan2 |
 | **M4** | 单机生产面（ready/metrics/限流/OTel） | ✅ Plan3 |
-| **M5** | Gateway（direct\|gateway 过渡）+ ContextManager + Prompt | 规划 |
-| **M6** | DataFilter、双轨脱敏、Approval（释放锁/同 run resume） | 规划 |
-| **M7** | Memory extra、RAG、citation | 规划 |
+| **M5** | Gateway（direct\|gateway 过渡）+ ContextManager + Prompt | ✅ Plan4 |
+| **M6** | DataFilter、双轨脱敏、Approval（释放锁/同 run resume） | ✅ Plan4 |
+| **M7** | Memory extra、RAG、citation | ✅ Plan4 |
 | **M8** | 多 Agent（单流 agent_id）、TS SDK、管理 API 鉴权 | 规划 |
 | **M9** | 多机（Redis 锁/限流） | 规划 |
 | **M10** | Eval、策略包版本、合规导出 | 规划 |
