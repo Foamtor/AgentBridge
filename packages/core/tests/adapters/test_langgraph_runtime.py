@@ -1,0 +1,106 @@
+"""Unit tests for LangGraphRuntime extension + tool mapping."""
+
+from __future__ import annotations
+
+from types import SimpleNamespace
+from typing import Any
+
+import pytest
+from agent_base_core.adapters.langgraph_runtime import LangGraphRuntime
+from agent_base_core.protocol.fragments import OUTBOUND_EXTENSIONS_KEY, OutboundFragment
+
+
+class _FakeCompiled:
+    def __init__(self, events: list[dict[str, Any]], state_values: dict[str, Any]):
+        self._events = events
+        self._state_values = state_values
+        self.aget_state_calls: list[Any] = []
+
+    async def astream_events(self, *_args, **_kwargs):
+        for evt in self._events:
+            yield evt
+
+    async def aget_state(self, config):
+        self.aget_state_calls.append(config)
+        return SimpleNamespace(values=self._state_values)
+
+
+@pytest.mark.asyncio
+async def test_runtime_yields_tool_result_and_extensions_via_aget_state():
+    compiled = _FakeCompiled(
+        events=[
+            {
+                "event": "on_tool_start",
+                "name": "add",
+                "run_id": "tc-1",
+                "data": {"input": {"a": 1, "b": 2}},
+            },
+            {
+                "event": "on_tool_end",
+                "name": "add",
+                "run_id": "tc-1",
+                "data": {"output": "3"},
+            },
+        ],
+        state_values={
+            OUTBOUND_EXTENSIONS_KEY: [
+                {"type": "x.demo_tools.finished", "data": {"ok": True}},
+            ]
+        },
+    )
+
+    runtime = LangGraphRuntime()
+    frags: list[OutboundFragment] = []
+    async for frag in runtime.astream(
+        lambda **_kw: compiled,
+        tools=[],
+        checkpointer=None,
+        thread_id="t1",
+        query="hi",
+        cancel_token=None,
+    ):
+        frags.append(frag)
+
+    assert compiled.aget_state_calls
+    assert any(f.type == "tool_call" for f in frags)
+    assert any(f.type == "tool_result" for f in frags)
+    ext = [f for f in frags if f.type == "x.demo_tools.finished"]
+    assert len(ext) == 1
+    assert ext[0].data == {"ok": True}
+
+
+@pytest.mark.asyncio
+async def test_runtime_extensions_not_from_on_chain_end_output():
+    """Even if on_chain_end output contains the key, we only read via aget_state."""
+    compiled = _FakeCompiled(
+        events=[
+            {
+                "event": "on_chain_end",
+                "name": "some_node",
+                "data": {
+                    "output": {
+                        OUTBOUND_EXTENSIONS_KEY: [
+                            {"type": "x.should.not_emit", "data": {}},
+                        ],
+                        "result": "hello",
+                    }
+                },
+            }
+        ],
+        state_values={},  # no extensions in state
+    )
+
+    runtime = LangGraphRuntime()
+    frags: list[OutboundFragment] = []
+    async for frag in runtime.astream(
+        lambda **_kw: compiled,
+        tools=[],
+        checkpointer=None,
+        thread_id="t1",
+        query="hi",
+        cancel_token=None,
+    ):
+        frags.append(frag)
+
+    assert all(f.type != "x.should.not_emit" for f in frags)
+    assert any(f.type == "text_delta" for f in frags)

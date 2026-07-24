@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from typing import Any, Protocol
 
+from agent_base_core.protocol.fragments import OutboundFragment
+
 
 class GraphRuntime(Protocol):
     async def astream(
@@ -17,4 +19,4 @@ class GraphRuntime(Protocol):
         query: str,
         cancel_token: Any,
         extra: dict[str, Any] | None = None,
-    ) -> AsyncIterator[dict[str, Any]]: ...
+    ) -> AsyncIterator[OutboundFragment]: ...
