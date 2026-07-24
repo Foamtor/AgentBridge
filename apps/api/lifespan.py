@@ -10,23 +10,25 @@ from fastapi import FastAPI
 from agent_base_core.adapters.inprocess_cancel import InProcessCancelRegistry
 from agent_base_core.adapters.inprocess_lock import InProcessThreadLock
 from agent_base_core.adapters.langgraph_runtime import LangGraphRuntime
+from agent_base_core.adapters.logging_hooks import LoggingHooks
 from agent_base_core.adapters.memory_checkpointer import MemoryCheckpointerFactory
 from agent_base_core.adapters.noop_hooks import NoopHooks
 from agent_base_core.application.run_lifecycle import RunLifecycle
-from agent_base_core.protocol.fragments import OutboundFragment
 from agent_base_core.registry.graphs import GraphRegistry
 from agent_base_core.registry.input_builders import InputBuilderRegistry
 from agent_base_core.registry.tools import ToolRegistry
 from config.logging import configure_logging
-from config.settings import get_settings
+from config.settings import Settings, get_settings
 from domains.bootstrap import register_all
 
 
-class ApiFakeRuntime:
-    """Deterministic runtime for API tests (AGENT_BASE_FAKE_RUNTIME=1)."""
-
-    async def astream(self, builder: Any, **kwargs: Any):
-        yield OutboundFragment(type="text_delta", data={"content": "ok"})
+def _resolve_postgres_dsn(settings: Settings) -> str:
+    if settings.pg_dsn:
+        return settings.pg_dsn
+    return (
+        f"postgresql://{settings.pg_user}:{settings.pg_password}"
+        f"@{settings.pg_host}:{settings.pg_port}/{settings.pg_database}"
+    )
 
 
 @asynccontextmanager
@@ -49,14 +51,22 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             PostgresCheckpointerFactory,
         )
 
-        dsn = (
-            f"postgresql://{settings.pg_user}:{settings.pg_password}"
-            f"@{settings.pg_host}:{settings.pg_port}/{settings.pg_database}"
-        )
-        checkpointers = PostgresCheckpointerFactory(dsn)
+        checkpointers = PostgresCheckpointerFactory(_resolve_postgres_dsn(settings))
     await checkpointers.setup()
 
-    runtime: Any = ApiFakeRuntime() if settings.fake_runtime else LangGraphRuntime()
+    if settings.fake_runtime:
+        from testing.fake_runtime import ApiFakeRuntime
+
+        runtime: Any = ApiFakeRuntime()
+    else:
+        runtime = LangGraphRuntime()
+
+    hooks: Any
+    if settings.hooks_backend == "logging":
+        hooks = LoggingHooks()
+    else:
+        hooks = NoopHooks()
+
     lifecycle = RunLifecycle(
         locks=locks,
         checkpointers=checkpointers,
@@ -65,16 +75,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         input_builders=input_builders,
         runtime=runtime,
         cancels=cancels,
-        hooks=NoopHooks(),
+        hooks=hooks,
     )
 
+    # Production app.state whitelist: run_lifecycle + settings only.
     app.state.settings = settings
     app.state.run_lifecycle = lifecycle
-    app.state.graphs = graphs
-    app.state.tools = tools
-    app.state.input_builders = input_builders
-    app.state.locks = locks
-    app.state.cancels = cancels
     try:
         yield
     finally:

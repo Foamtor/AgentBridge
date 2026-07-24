@@ -23,8 +23,14 @@ Or from repo root: `./start-dev.sh` / `.\start-dev.ps1`.
 docker compose up -d postgres
 # wait healthy
 # .env: USE_MEMORY_CHECKPOINTER=false
+# Prefer PG_DSN=postgresql://user:pass@host:5432/db (recommended);
+# if empty, falls back to PG_HOST/PORT/DATABASE/USER/PASSWORD.
 pip install -e "packages/core[postgres]"
 ```
+
+**副本与锁：** 当前默认进程内锁，**一期模板可用 ≠ 多副本生产**。水平扩展前须换分布式锁（二期 Redis），见 hardening 规格。
+
+`HOOKS_BACKEND=noop|logging` 可切换运行钩子。
 
 ## Authentik（可选）
 

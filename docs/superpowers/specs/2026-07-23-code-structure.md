@@ -261,12 +261,14 @@ Agent-Base/
   apps.api.domains.*       → agent_base_core.registry (+ langchain/langgraph 按需)
   agent_base_core.application → agent_base_core.ports + registry + protocol
   agent_base_core.adapters    → agent_base_core.ports + protocol + 第三方
+  agent_base_core.adapters.*  → agent_base_core.adapters.*   # 同层允许，但仅白名单边（见 .importlinter independence）
 
 禁止：
   agent_base_core.application → agent_base_core.adapters
   agent_base_core.adapters    → agent_base_core.application
   agent_base_core.*           → apps.api.domains.*
   apps.api.domains.echo       → apps.api.domains.<other>   # 域默认互不依赖
+  adapters 网状互引（除已批准：langgraph_runtime → event_mapper）
 ```
 
 业务包名黑名单（`scripts/import_scan_core.py`）：`ai_map_chat`, `app_ai_chat`, `knowlede` 等产品仓包名不得出现在 `packages/core`。

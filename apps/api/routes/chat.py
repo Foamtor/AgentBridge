@@ -33,17 +33,6 @@ async def chat_stream(
     request: Request,
     lifecycle: RunLifecycle = Depends(get_run_lifecycle),
 ) -> StreamingResponse:
-    graphs = request.app.state.graphs
-    try:
-        graphs.get(body.route)
-    except UnknownRoute as exc:
-        raise _http_error(
-            400,
-            "unknown_route",
-            f"unknown route: {body.route}",
-            route=body.route,
-        ) from exc
-
     queue: asyncio.Queue[dict[str, Any] | None | tuple[str, BaseException]] = asyncio.Queue()
     sink = SseEventSink(queue)  # type: ignore[arg-type]
     cancelled_on_disconnect = False

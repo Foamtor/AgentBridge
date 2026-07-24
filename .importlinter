@@ -35,3 +35,19 @@ source_modules =
     agent_base_core.adapters
 forbidden_modules =
     agent_base_core.registry
+
+[importlinter:contract:adapters_sibling_independence]
+name = adapters modules are independent except approved edges
+type = independence
+modules =
+    agent_base_core.adapters.langgraph_runtime
+    agent_base_core.adapters.event_mapper
+    agent_base_core.adapters.sse_event_sink
+    agent_base_core.adapters.inprocess_lock
+    agent_base_core.adapters.inprocess_cancel
+    agent_base_core.adapters.memory_checkpointer
+    agent_base_core.adapters.postgres_checkpointer
+    agent_base_core.adapters.noop_hooks
+    agent_base_core.adapters.logging_hooks
+ignore_imports =
+    agent_base_core.adapters.langgraph_runtime -> agent_base_core.adapters.event_mapper

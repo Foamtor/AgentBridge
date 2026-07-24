@@ -53,6 +53,17 @@ class RunLifecycle:
         """Test/host hook to swap GraphRuntime without private attribute access."""
         self._runtime = runtime
 
+    async def _test_register_cancel(
+        self,
+        thread_id: str,
+        run_id: str,
+        token: asyncio.Event | None = None,
+    ) -> asyncio.Event:
+        """Test-only: pre-register a cancel token without starting a stream."""
+        token = token or asyncio.Event()
+        await self._cancels.register(thread_id, run_id, token)
+        return token
+
     def _envelope_from_fragment(
         self,
         frag: OutboundFragment,
@@ -97,6 +108,7 @@ class RunLifecycle:
         trace_id = run_id
         sequence = 0
         terminal_sent = False
+        pre_start_failure = False
 
         if not await self._locks.try_acquire(thread_id, run_id):
             raise ThreadBusy(thread_id)
@@ -226,6 +238,11 @@ class RunLifecycle:
                     )
                 )
                 terminal_sent = True
+        except UnknownRoute:
+            # Before start: let host map to HTTP 400; do not close sink here
+            # (close would race ahead of the host __error__ frame).
+            pre_start_failure = True
+            raise
         except Exception as exc:  # noqa: BLE001
             if not terminal_sent and sequence > 0:
                 logger.exception(
@@ -243,6 +260,7 @@ class RunLifecycle:
                 )
                 terminal_sent = True
             else:
+                pre_start_failure = sequence == 0
                 raise
         finally:
             await self._hooks.on_run_end(
@@ -250,7 +268,8 @@ class RunLifecycle:
             )
             await self._locks.release(thread_id, run_id)
             await self._cancels.unregister(thread_id, run_id)
-            await sink.close()
+            if not pre_start_failure:
+                await sink.close()
 
     async def cancel(self, *, thread_id: str, run_id: str | None = None) -> None:
         ok = await self._cancels.request_cancel(thread_id, run_id)
