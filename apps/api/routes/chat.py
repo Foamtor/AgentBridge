@@ -11,10 +11,12 @@ from fastapi.responses import StreamingResponse
 
 from agent_base_core.adapters.sse_event_sink import SseEventSink
 from agent_base_core.application.errors import RunNotFound, ThreadBusy, UnknownRoute
+from agent_base_core.application.pipeline import RequestPipeline
 from agent_base_core.application.run_lifecycle import RunLifecycle
 from agent_base_core.protocol.sse import format_sse_line
 from agent_base_core.public import cancel_run, orchestration_stream
-from deps import get_run_lifecycle
+from auth.run_context import claims_to_run_context
+from deps import get_pipeline, get_run_lifecycle
 from routes.schemas import CancelRequest, ChatStreamRequest
 
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -31,22 +33,27 @@ def _http_error(status: int, code: str, message: str, **extra: Any) -> HTTPExcep
 async def chat_stream(
     body: ChatStreamRequest,
     request: Request,
+    pipeline: RequestPipeline = Depends(get_pipeline),
     lifecycle: RunLifecycle = Depends(get_run_lifecycle),
 ) -> StreamingResponse:
     queue: asyncio.Queue[dict[str, Any] | None | tuple[str, BaseException]] = asyncio.Queue()
     sink = SseEventSink(queue)  # type: ignore[arg-type]
     cancelled_on_disconnect = False
+    settings = request.app.state.settings
+    claims = getattr(request.state, "auth_claims", None)
+    ctx = claims_to_run_context(claims, auth_required=settings.auth_required)
 
     async def _run() -> None:
         try:
             await orchestration_stream(
-                lifecycle,
+                pipeline,
                 query=body.query,
                 thread_id=body.thread_id,
                 route=body.route,
                 sink=sink,
                 model=body.model,
                 extra=body.extra,
+                ctx=ctx,
             )
         except ThreadBusy as exc:
             await queue.put(("__error__", exc))
