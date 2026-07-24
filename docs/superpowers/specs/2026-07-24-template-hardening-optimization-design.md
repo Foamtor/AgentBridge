@@ -1,6 +1,6 @@
 # Agent-Base 全面优化设计 — 模板硬化 + 生产能力（两期）
 
-> 状态：**二次审阅修订完成；待用户确认后进入实施计划**  
+> 状态：**三方评审已写入规格与实施计划**  
 > 日期：2026-07-24  
 > 仓库：`Agent-Base`  
 > 前置：主设计 [2026-07-23-agent-ai-base-design.md](./2026-07-23-agent-ai-base-design.md)、[code-structure](./2026-07-23-code-structure.md)  
@@ -94,9 +94,17 @@ class OutboundFragment(BaseModel):
     status: str | None = None
 ```
 
+- **状态键常量（同文件或 `protocol/constants.py`，禁止魔法字符串）：**
+
+```python
+OUTBOUND_EXTENSIONS_KEY = "outbound_extensions"
+```
+
+域 State 与 runtime **必须**使用该常量读写，不得散落字面量 `"outbound_extensions"`。
+
 - Runtime/mapper **只产** `OutboundFragment`，不写权威 `sequence`/`event_id`。  
-- 完整字段级定义与测试见实施计划 Task 2：  
-  `docs/superpowers/plans/2026-07-24-template-hardening-optimization-implementation.md`
+- 完整字段级定义与测试见实施计划 Task 2。
+
 ### 3.3 Builder：Option B（已拍板）
 
 | 函数 | 职责 |
@@ -127,14 +135,37 @@ class OutboundFragment(BaseModel):
 
 `event_mapper` 须新增 `map_tool_result`；runtime 须处理 `on_tool_end`。
 
-### 3.6 扩展通道（状态约定，已拍板）
+### 3.6 扩展通道（状态约定为默认；callback 为同级高级选项）
 
-1. State 含 `outbound_extensions: list[{type, data}]`。  
-2. Runtime 在适当时机读出并 yield Fragment（type 原样带上）。  
-3. Lifecycle 用 `build_extension_event` 校验并编号。  
+**默认机制：状态约定 + `aget_state`（写死）。**
 
-**禁止：** 域持有 `EventSink`；core 写死域名；默认 **不采用** runtime `event_hook` callback（避免第二推流路径）。  
-仅当状态约定在实现中不可行时，才允许降级为极薄 port（仍禁域名、禁域持 sink）——须在计划中显式变更，不得默默改。
+1. State 使用 `OUTBOUND_EXTENSIONS_KEY`（见 §3.2）存储 `list[{type, data}]`。  
+2. Runtime 在 `astream_events` 主循环结束后（或等价收尾点），调用 LangGraph 标准 API：
+
+   ```python
+   snapshot = await compiled.aget_state(config)  # config 含 thread_id
+   extensions = (snapshot.values or {}).get(OUTBOUND_EXTENSIONS_KEY) or []
+   ```
+
+   对 `extensions` 逐条 yield `OutboundFragment`（type/data 原样；**不在此处做正则校验**）。  
+   **不采用**解析 `on_chain_end` 猜测节点 output（避免依赖节点命名/事件形状）。
+
+3. Lifecycle 用 `build_extension_event` 校验 `x.*` 并编号。
+
+**同级高级选项：`event_hook`（可选，非「降级」。）**
+
+- 适用：嵌套子图、多节点在流中途就要推 `x.*`、仅靠最终 state 不够。  
+- 形态：runtime 可选 `event_hook: Callable[[OutboundFragment], Awaitable[None]] | None`（或同步），由 **lifecycle 注入**「把 Fragment 送进与 astream 同一队列」的闭包；**域仍不得持有 `EventSink`**。  
+- 一期默认实现：**只做状态约定 + `aget_state`**；`demo_tools` 必须走默认路径。  
+- 文档须写清：简单域用 state；复杂域可开 hook——二者同级，不是失败后的迫不得已。
+
+**禁止：** core 写死业务域名；域直接持有 `EventSink`。
+
+### 3.7 Host 与 lifecycle 错误路径（禁止双发）
+
+- lifecycle 已能发 `error` 时，`apps/api/routes/chat.py` **必须删除** `r-host` / `sequence=0` 旁路信封。  
+- `_run` 的 `except Exception` 与 `event_gen` 中假 error 帧若会导致 **lifecycle 已发 error 后再发一帧**，须一并删掉或改为只记日志/关队列，避免重复 `error`。  
+- 该项与 lifecycle `terminal_sent` **同一实施切片完成**（见实施计划 Task 6），不得拖到「只瘦 lifespan」才改。
 
 ---
 
@@ -151,7 +182,7 @@ apps/api/domains/demo_tools/
 
 - **无** ChatModel / **无** `LLM_API_KEY` 依赖。  
 - 真绑定 tool，稳定产生 `tool_call` + `tool_result`。  
-- 结束前写入 ≥1 条 `x.demo_tools.*` 到 `outbound_extensions`。  
+- 结束前写入 ≥1 条 `x.demo_tools.*` 到 State[`OUTBOUND_EXTENSIONS_KEY`]。  
 - `step_update`/`text_delta`：不强制。
 
 ### 4.3 挂载与门禁
@@ -177,14 +208,24 @@ apps/api/domains/demo_tools/
 
 ### 5.1 adapters 同层依赖
 
-**允许** `agent_base_core.adapters.* → adapters.*`（如同 `langgraph_runtime` → `event_mapper`）。  
-实施时在 [code-structure](./2026-07-23-code-structure.md) 补一句，避免与「adapters 只依赖 ports/protocol」表述冲突。
+**允许** `agent_base_core.adapters.* → adapters.*`（如 `langgraph_runtime` → `event_mapper`）。  
+
+实施时：
+
+1. 在 [code-structure](./2026-07-23-code-structure.md) 写明允许同层。  
+2. 在 `.importlinter` 增加**白名单式**约束：仅允许已批准的 adapters 内部边（例如 `langgraph_runtime` → `event_mapper`），禁止 adapters 随意网状互引扩张。
 
 ---
 
 ## 6. 二期（不阻塞一期）
 
 Redis 锁/cancel、`/ready`、JWKS TTL、可配置 hooks/`trace_id`；文档：未换锁不得水平扩展。
+
+可选体验增强（仍不阻塞一期硬验收）：`demo_llm` 域（需 key）、PKCE 闭环。
+
+## 6.1 文档后续（不阻塞一期代码）
+
+- `docs/add-a-domain.md`：「什么时候需要改 core」决策树（专家建议）。
 
 ---
 
@@ -196,7 +237,9 @@ Redis 锁/cancel、`/ready`、JWKS TTL、可配置 hooks/`trace_id`；文档：�
 | LangGraph 版本差 | 字段级映射测 |
 | `app.state` 收敛破测 | 一期改夹具；CI 分目录 |
 | 误读零改 core | §1.1 |
-| 偷偷改用 callback | §3.6 禁止默认；变更须改本规格 |
+| 偷偷用域持 EventSink | §3.6 禁止；code review 红线 |
+| 对外叙事不清 | README/deploy 写清：一期模板可用 ≠ 多副本生产；二期清单显性化 |
+| 状态键拼写漂移 | `OUTBOUND_EXTENSIONS_KEY` 唯一真源 |
 
 ---
 
@@ -211,10 +254,13 @@ Redis 锁/cancel、`/ready`、JWKS TTL、可配置 hooks/`trace_id`；文档：�
 - [ ] 最小 `step_update` 映射存在（demo 验收不强制看到）  
 - [ ] cancel 事件 `data` 含 `thread_id`+`run_id`（测例钉死）  
 - [ ] 终端事件保证（`terminal_sent` / 等价）  
+- [ ] `OUTBOUND_EXTENSIONS_KEY` 常量；runtime 用 `aget_state` 读取  
 - [ ] `outbound_extensions` 通道；core 无域名  
 - [ ] `demo_tools` 无 LLM；流验收通过  
+- [ ] chat **无** `r-host` 旁路、无与 lifecycle 重复的 error 帧  
 - [ ] lifespan 无 Fake 类；`app.state` 不暴露 locks/cancels/graphs/tools/input_builders  
-- [ ] echo/409/cancel/auth 回归；门禁绿  
+- [ ] echo/409/cancel/auth 回归；门禁绿（含 `echo_node`）  
+- [ ] import-linter：adapters 同层白名单  
 
 ### 二期
 
@@ -257,4 +303,18 @@ Redis 锁/cancel、`/ready`、JWKS TTL、可配置 hooks/`trace_id`；文档：�
 | adapters→adapters | **允许**，补 code-structure |
 | ensure_route | **不做** |
 | 实施顺序 | 明确 0→4 步硬前置 |
-| 验收 | 并入非法 `x.*`、cancel data、app.state 收敛等项 |
+### 10.4 三方评审修订（专家 / 架构师 / 程序员）
+
+| 优先级 | 项 | 决定 |
+|--------|----|------|
+| 必须 | 扩展读取 API | **`compiled.aget_state(config)`** + `OUTBOUND_EXTENSIONS_KEY` |
+| 必须 | chat `r-host` | 与 lifecycle 终端保证 **同一切片（计划 Task 6）**；禁双发 error |
+| 建议 | 魔法字符串 | protocol 常量 `OUTBOUND_EXTENSIONS_KEY` |
+| 建议 | callback | **同级高级选项**（非迫不得已降级）；一期默认仍 state+`aget_state` |
+| 建议 | adapters→adapters | code-structure + **import-linter 白名单** |
+| 后续 | 体验 | 一期收口后可加有 LLM 的 `demo_llm`（README 快速体验，不挡一期） |
+| 后续 | 文档 | `add-a-domain.md` 增加「何时必须改 core」决策树 |
+
+### 10.5 对外叙事（专家）
+
+一期宣布「模板可用」时必须同时说清：**单机默认、无分布式锁、无完整 OTel/interrupt**；多副本与生产级可观测属二期。设计质量与覆盖广度分开表述，避免「做对了但说不清楚」。
