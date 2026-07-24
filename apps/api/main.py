@@ -10,6 +10,8 @@ from config.settings import get_settings
 from lifespan import lifespan
 from routes.chat import router as chat_router
 from routes.health import router as health_router
+from routes.runs import router as runs_router
+from routes.threads import router as threads_router
 
 
 def create_app() -> FastAPI:
@@ -31,6 +33,8 @@ def create_app() -> FastAPI:
     )
     app.include_router(health_router)
     app.include_router(chat_router)
+    app.include_router(threads_router)
+    app.include_router(runs_router)
     return app
 
 
