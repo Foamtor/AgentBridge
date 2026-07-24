@@ -1,8 +1,8 @@
 # Plan 1: 可安全接入（M1 + M2a + M2b）Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.  
-> **Rev:** r3 — 对齐 v4.1.1；锁与 graph 共用 `storage_key`；标明对下游 Plan 的 **Produces / 门禁**。  
-> **真源**：`docs/00-AgentBridge完整方案.md` **v4.1.1** §4.1–4.5、§10；路线图 Plan1 → v0.2
+> **阅读提示：** 这是历史设计/实施记录。文中若仍有偏内部的说法，请以仓库根目录 README、docs/roadmap.md、docs/add-a-domain.md 的白话为准。\n\n> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.  
+> **Rev:** r3 — 对齐 v4.1.1；锁与 graph 共用 `storage_key`；标明对下游 Plan 的 **Produces / 验收条件**。  
+> **权威说明**：`docs/00-AgentBridge完整方案.md` **v4.1.1** §4.1–4.5、§10；路线图 Plan1 → v0.2
 
 **Goal:** 交付 v0.2：M1 包装 + M2a（RunContext / list+invoke Policy / 审计 / Pipeline）+ M2b（EventLog append-before-emit / 消息与 Run 投影 / REST / replay）。
 
@@ -10,14 +10,14 @@
 
 **Tech Stack:** Python 3.12+、FastAPI、Pydantic v2、pytest-asyncio、现有 LangGraph Runtime；EventLog/Message **本 plan 默认 Memory adapter**。
 
-## 依赖与门禁
+## 依赖与验收条件
 
 | 方向 | 内容 |
 |------|------|
 | **上游** | 无（基于已有 M0） |
-| **硬下游等待本 Plan** | Plan2 至少要 **M2a 门禁**；Plan3/4/5 要 **Plan1 全量（含 M2b RunStore）** 除非另注 |
-| **本 Plan 内顺序** | T1→T2→T3→T4→T5→T6→T7（**M2a 门禁**）→T8→T9→T10（**M2b 门禁**）→T11；不可跳过 T6 做 T7 |
-| **可提前开工** | Plan2 可在 **M2a 门禁通过后** 与 M2b（T8–T10）并行 |
+| **硬下游等待本 Plan** | Plan2 至少要 **M2a 验收条件**；Plan3/4/5 要 **Plan1 全量（含 M2b RunStore）** 除非另注 |
+| **本 Plan 内顺序** | T1→T2→T3→T4→T5→T6→T7（**M2a 验收条件**）→T8→T9→T10（**M2b 验收条件**）→T11；不可跳过 T6 做 T7 |
+| **可提前开工** | Plan2 可在 **M2a 验收条件通过后** 与 M2b（T8–T10）并行 |
 
 ## Global Constraints
 
@@ -399,7 +399,7 @@ def build_graph_config(*, thread_id: str, ctx: RunContext) -> dict:
 
 - [ ] **Step 5: Commit** `feat(api): wire pipeline RunContext and policy (M2a)`
 
-**M2a 门禁：** viewer/admin 矩阵绿；list 审计有记录；invoke deny 单测绿。
+**M2a 验收条件：** viewer/admin 矩阵绿；list 审计有记录；invoke deny 单测绿。
 
 ---
 
@@ -495,7 +495,7 @@ async def project_turn(
 
 - [ ] **Step 3: Commit** `feat(api): threads/runs/events and replay (M2b)`
 
-**M2b 门禁：** messages 可查；events=EventLog；append 失败测试仍绿。
+**M2b 验收条件：** messages 可查；events=EventLog；append 失败测试仍绿。
 
 ---
 

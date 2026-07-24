@@ -1,47 +1,47 @@
-# Architecture（摘要）
+# 架构说明（摘要）
 
-> 产品真源：[00-AgentBridge完整方案.md](./00-AgentBridge完整方案.md) **v4.1.1**。
+> 正式约定以 [00-AgentBridge完整方案.md](./00-AgentBridge完整方案.md) 为准。
 
-## 当前结构（M0）
+## 现在代码怎么摆
 
-- `packages/core`：application / ports / adapters / registry / protocol
-- `apps/api`：FastAPI；`lifespan.py` 组装根；`domains/*`
+- `packages/core`：流程控制、接口约定、适配器、注册表、协议
+- `apps/api`：FastAPI 服务；启动时在 `lifespan.py` 组装依赖；业务在 `domains/*`
 - `apps/web`：调试台
-- 契约真源：`docs/contracts.md`
+- 对外事件格式：`docs/contracts.md`
 
 ```text
-HTTP → RunLifecycle → LangGraphRuntime → EventSink(SSE)
+HTTP 请求 → 运行生命周期 → LangGraph 执行 → 用 SSE 推给客户端
 ```
 
-## 目标控制流（v4.1）
+## 目标控制流
 
 ```text
-Middleware → Pipeline(before) → RunLifecycle
-                                    ├─ LLM Gateway（模型）
-                                    ├─ Policy.decide（tool/数据）
-                                    └─ append EventLog → 再 SSE emit
+登录中间件 → 请求插件（开始前） → 运行生命周期
+                                    ├─ 模型出口（选模型）
+                                    ├─ 权限判断（工具/数据）
+                                    └─ 先写入事件日志，再 SSE 推送
 ```
 
-要点：
+要点（说人话）：
 
-- **已提交** Event 为真源；append **先于** emit  
-- Policy **按 action**（list_tools / invoke_tool / read_data / emit_text）  
-- RunContext **两阶段**（先身份，创建 run 后再写 run_id）  
-- Checkpointer 键：`{tenant_id}::{thread_id}`  
-- 审批等待：**释放锁**；resume 同 `run_id`  
-- Gateway：`LLM_BACKEND=direct|gateway` 过渡  
-- OTel/metrics：执行期打点，不强制从 EventLog 投影  
+- **以已经写入成功的事件为准**；必须先写入，再推给客户端  
+- 权限按动作判断：列工具、调工具、读数据、向外发文本等  
+- 请求上下文分两步：先填身份，创建本次运行后再写入 run_id  
+- 会话落库键：`{租户}::{会话 id}`  
+- 等人审批时：**先放开会话锁**；继续时用同一个 run_id  
+- 模型：可用 `LLM_BACKEND=direct` 或 `gateway` 过渡  
+- 指标与链路追踪：在执行时打点，不强迫从事件日志反推  
 
-里程碑见 [roadmap.md](./roadmap.md)（v1.0 = M0–M4）。
+能力进度见 [roadmap.md](./roadmap.md)（单机主承诺 = M0–M4）。
 
-## MUST
+## 必须遵守
 
-1. application 不 import adapters  
-2. 域不持有 EventSink  
-3. core 无域名  
-4. adapter 只在组装根构造  
-5. deny 的 tool 不进 list  
-6. 跨租户 Port 失败  
-7. 默认 gateway 后模型必经 Gateway  
+1. 流程层（application）不要直接 import 适配器实现  
+2. 业务插件不要自己拿着 SSE 发送对象乱推  
+3. 核心库源码里不要写死某个业务名  
+4. 具体数据库/检索等实现，只在启动组装处创建  
+5. 没权限的工具不要出现在模型可见列表里  
+6. 跨租户访问应在接口层失败  
+7. 走到 gateway 模式后，模型调用应经过统一出口  
 
-历史规格在 `docs/superpowers/`；冲突以 v4.1 为准。
+历史材料在 `docs/superpowers/`；冲突时以完整方案为准。

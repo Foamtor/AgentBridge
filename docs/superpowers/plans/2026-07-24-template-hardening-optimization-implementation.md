@@ -1,8 +1,8 @@
 # Template Hardening + Production Readiness Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
+> **阅读提示：** 这是历史设计/实施记录。文中若仍有偏内部的说法，请以仓库根目录 README、docs/roadmap.md、docs/add-a-domain.md 的白话为准。\n\n> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
-**Goal:** 按修订规格完成一期模板硬化（契约单源、OutboundFragment、Option B builders、tool_result、demo_tools、组装根瘦身），二期能力在文末单列不阻塞一期。
+**Goal:** 按修订规格完成一期模板硬化（契约单源、OutboundFragment、Option B builders、tool_result、demo_tools、服务启动时的组装代码瘦身），二期能力在文末单列不阻塞一期。
 
 **Status:** 一期 Task 1–9 **已完成**（分支 `feat/template-hardening`）。
 
@@ -14,7 +14,7 @@
 
 ## Global Constraints
 
-- 一期**会改** `packages/core`；硬化后新域零改 core；core 禁止出现 `demo_tools` / 业务节点名硬编码（如 `echo_node`）
+- 一期**会改** `packages/core`；硬化后新业务插件零改 core；core 禁止出现 `demo_tools` / 业务节点名硬编码（如 `echo_node`）
 - `OutboundFragment` 与 **`OUTBOUND_EXTENSIONS_KEY`** 属于 **`protocol/`**，禁止放在 `adapters/` 或 `application/`；域与 runtime **禁止**散落字面量 `"outbound_extensions"`
 - 扩展读取默认：**`compiled.aget_state(config)`**，禁止用 `on_chain_end` 猜节点 output；`event_hook` 为一期**不实现**的同级高级选项（规格允许，计划默认不做）
 - **域不得持有 `EventSink`**（扩展只写 State / 未来 hook，不直推 SSE）
@@ -32,7 +32,7 @@
 
 ## Spec 落地顺序 ↔ Task 映射
 
-规格硬前置 0→4 步与本计划 Task 对应（lifecycle/r-host 为规格一期目标，插在 runtime 与 demo 之间，因 Fragment 产出后必须先改 lifecycle）：
+规格必须先完成 0→4 步与本计划 Task 对应（lifecycle/r-host 为规格一期目标，插在 runtime 与 demo 之间，因 Fragment 产出后必须先改 lifecycle）：
 
 | Spec 步 | 内容 | Plan Task |
 |---------|------|-----------|
@@ -42,7 +42,7 @@
 | （一期目标 6） | cancel `data` + `terminal_sent` + 删 r-host / 禁双发 | **6** |
 | 3 | 挂 `demo_tools` | 7 |
 | 4 | 瘦 lifespan + `app.state` | 8 |
-| 收口 | 文档叙事 / 门禁 / Web 软 / 决策树软 | 9 |
+| 收口 | 文档叙事 / 验收条件 / Web 软 / 决策树软 | 9 |
 
 ## File map（一期）
 
@@ -398,7 +398,7 @@ git commit -m "feat(api): add demo_tools domain with tool SSE and x.* extension"
 
 ---
 
-### Task 8: 宿主瘦身 + DSN + hooks + adapters 门禁
+### Task 8: 宿主瘦身 + DSN + hooks + adapters 验收条件
 
 **Files:**
 - Create: `apps/api/testing/fake_runtime.py`
@@ -463,7 +463,7 @@ def test_cancel_200_when_registered(client):
 
 - [x] **Step 2: `cd apps/api && python -m pytest tests -v` 全绿（含 cancel / 409 / echo / auth）**
 
-- [x] **Step 3: 根目录 `lint-imports` + import/域名扫描**
+- [x] **Step 3: 根目录 `lint-imports` + import/业务插件名扫描**
 
 - [x] **Step 4: Commit**
 
@@ -473,7 +473,7 @@ git commit -m "refactor(api): slim lifespan app.state; DSN and hooks settings"
 
 ---
 
-### Task 9: 文档与门禁收口（一期）
+### Task 9: 文档与验收条件收口（一期）
 
 **Files:**
 - Modify: `README.md`、`docs/add-a-domain.md`、`docs/parity-with-product.md`、`docs/deploy.md`（若叙事未写全）
@@ -483,7 +483,7 @@ git commit -m "refactor(api): slim lifespan app.state; DSN and hooks settings"
 
 - [x] **Step 1: 文档（硬）** — Fragment / Option B / `OUTBOUND_EXTENSIONS_KEY`+`aget_state` / demo_tools 无 LLM / **「模板可用 ≠ 多副本」**（单机默认、无分布式锁、无完整 OTel/interrupt）/ **域不得持 EventSink** / **state 与 event_hook 同级**（hook 一期未实现，复杂域可选）/ §1.1「零改 core」措辞
 
-- [x] **Step 2: 门禁（硬）** — core 禁 `demo_tools`、`echo_node`；确认 Task 8 的 import-linter adapters 白名单已挂且 CI 跑
+- [x] **Step 2: 验收条件（硬）** — core 禁 `demo_tools`、`echo_node`；确认 Task 8 的 import-linter adapters 白名单已挂且 CI 跑
 
 - [x] **Step 3（可选·软）: Web** — Contracts 注明 `demo_tools`/`x.*`；未知 `x.*` 可折叠（不进硬验收红线）
 
@@ -533,7 +533,7 @@ git commit -m "docs: harden runbooks; ci: ban domain names in core"
 | hooks_backend | 8 | |
 | adapters→adapters + import-linter 白名单 | 8 | |
 | echo/409/cancel/auth 回归 | 8 | 含 `_test_register_cancel` 迁移 |
-| core 无 `demo_tools`/`echo_node`；门禁 | 9 | |
+| core 无 `demo_tools`/`echo_node`；验收条件 | 9 | |
 | 对外叙事：模板可用 ≠ 多副本 | 9 | |
 | Web 软 / 决策树软 / demo_llm 后续 | 9 软 / 二期 | |
 | Redis /ready / JWKS | 二期 | |

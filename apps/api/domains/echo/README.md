@@ -1,7 +1,6 @@
-# Echo domain — sample plugin
+# Echo — 最小示例业务插件
 
-Minimal typed LangGraph: `echo_node` copies `query` → `result`.
+一个最小的 LangGraph 流程：`echo_node` 把用户输入拷到结果里。
 
-The `echo` tool is registered for scaffolding/demo of ToolRegistry wiring.
-The sample graph does **not** invoke tools yet; bind them in `graph.py` when you
-want tool_call / tool_result events.
+`echo` 工具会注册到工具表，方便演示注册方式。  
+示例流程图本身**还不会**调用工具；若要看到 tool 相关事件，再在 `graph.py` 里绑定即可。

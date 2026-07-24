@@ -1,6 +1,6 @@
 # Agent-Base 模板硬化设计方案 — 架构评审报告
 
-> 状态：**历史审阅归档**（实施前评审；一期代码已在 `feat/template-hardening` 落地）  
+> **阅读提示：** 这是历史设计/实施记录。文中若仍有偏内部的说法，请以仓库根目录 README、docs/roadmap.md、docs/add-a-domain.md 的白话为准。\n\n> 状态：**历史审阅归档**（实施前评审；一期代码已在 `feat/template-hardening` 落地）  
 > 审阅者：资深系统架构师（ports/adapters 分层 + 构造注入 + 注册表插件架构）
 > 审阅日期：2026-07-24
 > 被审方案：`2026-07-24-template-hardening-optimization-design.md`
@@ -56,14 +56,14 @@
 **评估：通过，但有隐式假设。**
 
 **保护了什么：**
-- **域不持有 EventSink。** 这是硬约束（§3.6「禁止域持有 EventSink」）。域只往自己的 State 写 list，不知道外面怎么消费。这个约束比 callback 方案更安全。
+- **业务插件不要持有 EventSink。** 这是硬约束（§3.6「禁止域持有 EventSink」）。域只往自己的 State 写 list，不知道外面怎么消费。这个约束比 callback 方案更安全。
 - **单推流路径。** 没有第二套「callback 直推 SSE」的通道，所有事件经 runtime → lifecycle → sink 一条链路。
 
 **牺牲了什么：**
-- **域必须知道 `outbound_extensions` 字段名。** 虽然这是 State 约定而非 core import，但域代码中会出现字面量 `"outbound_extensions"`，这构成一个隐式协议。如果未来改名为 `"x_events"` 或换用 TypedDict 的 key，所有域都要改。
+- **域必须知道 `outbound_extensions` 字段名。** 虽然这是 State 约定而非 core import，但业务插件代码中会出现字面量 `"outbound_extensions"`，这构成一个隐式协议。如果未来改名为 `"x_events"` 或换用 TypedDict 的 key，所有域都要改。
 - **隐式依赖 LangGraph State 机制。** 如果未来换用非 LangGraph 运行时（如直接调 LLM SDK），`outbound_extensions` 的抽取逻辑需要在新 runtime 中重新实现。
 
-**建议：** 在 `protocol/` 中定义一个常量 `OUTBOUND_EXTENSIONS_KEY = "outbound_extensions"`，域和 runtime 都引用此常量而非硬编码字符串。这保持了 protocol 层作为契约真源的地位，且不引入反向依赖（protocol 本就对所有层可见）。
+**建议：** 在 `protocol/` 中定义一个常量 `OUTBOUND_EXTENSIONS_KEY = "outbound_extensions"`，域和 runtime 都引用此常量而非硬编码字符串。这保持了 protocol 层作为事件格式以…为准的地位，且不引入反向依赖（protocol 本就对所有层可见）。
 
 ---
 
@@ -155,12 +155,12 @@ elif kind == "on_chain_end":
 |---|---|---|---|
 | 域是否持有 sink | ❌ 否（安全） | ✅ 是（危险） | ❌ 否（安全） |
 | 推流路径数 | 1 条 | 2 条（runtime + callback） | 2 条（runtime + port） |
-| 域代码侵入性 | 中（需知道 `outbound_extensions` key） | 低（调 callback） | 中（调 port 方法） |
+| 业务插件代码侵入性 | 中（需知道 `outbound_extensions` key） | 低（调 callback） | 中（调 port 方法） |
 | 与 LangGraph 耦合 | 高（依赖 State 机制） | 低 | 低 |
 | 扩展事件时序 | 在 graph 节点执行时写入，runtime 在流中 yield（时序可控） | 即时推（可能与 stream 事件交错） | 即时推（可能与 stream 事件交错） |
 
 **方案选择状态约定的理由成立：**
-1. 域不持有 EventSink 是硬约束（防止域直接写 SSE，绕过编号和校验）
+1. 业务插件不要持有 EventSink 是硬约束（防止业务插件直接写 SSE，绕过编号和校验）
 2. 单推流路径避免「第二通道」的时序混乱和调试困难
 3. 与 LangGraph 的耦合在一期可接受——一期就是 LangGraph-only
 
@@ -176,11 +176,11 @@ elif kind == "on_chain_end":
 - 域的扩展事件需要在 graph 执行过程中的**特定时序点**发出（而非 graph 结束后批量），且这个时序与 State 更新不同步
 - 域需要发出的扩展事件数量极大（如高频率进度上报），走 State 写入会显著增加 State 体积
 
-如果降级到 port，方案已明确两条纪律（「仍禁域名、禁域持 sink」），这是正确的。
+如果降级到 port，方案已明确两条纪律（「仍禁业务插件名、禁止业务插件持有 sink」），这是正确的。
 
 ---
 
-## 5. 组装根
+## 5. 服务启动时的组装代码
 
 ### 5.1 lifespan 瘦身 + `app.state` 白名单：方案正确，但测试迁移有隐形成本
 
@@ -348,7 +348,7 @@ async def lifespan(app, _test_overrides=None):
 | 接口设计 | 🟢 通过 | 类型安全有间隙但一期可接受；建议定义 `OUTBOUND_EXTENSIONS_KEY` 常量 |
 | 防腐边界 | 🟡 通过（有注意事项） | `on_chain_end` heuristics 需加注释和针对性测试；建议建防腐覆盖矩阵文档 |
 | 扩展性 | 🟢 通过 | 状态约定选择合理；callback 禁止正确；降级 port 条件建议量化 |
-| 组装根 | 🟡 通过（有条件） | adapters→adapters 需 import-linter 约束；测试注入 pattern 需在实施中明确 |
+| 服务启动时的组装代码 | 🟡 通过（有条件） | adapters→adapters 需 import-linter 约束；测试注入 pattern 需在实施中明确 |
 | 错误处理 | 🟡 通过（有改进空间） | 建议显式 `terminal_sent` 标志；sink.emit 失败已有 finally 兜底 |
 | 测试策略 | 🟡 通过（需补充） | 需明确测试注入 pattern；terminal_sent 的测试覆盖不足 |
 

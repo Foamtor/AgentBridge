@@ -1,5 +1,6 @@
 # apps/api
 
-FastAPI 宿主。组装根：`lifespan.py`；业务在 `domains/*`。
+FastAPI 宿主服务。  
+依赖在 `lifespan.py` 启动时组装；业务在 `domains/*`（一个文件夹 ≈ 一个业务插件）。
 
-产品真源：[docs/00-AgentBridge完整方案.md](../../docs/00-AgentBridge完整方案.md) **v4.1**。
+产品总说明：[docs/00-AgentBridge完整方案.md](../../docs/00-AgentBridge完整方案.md)。

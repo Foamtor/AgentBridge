@@ -1,18 +1,18 @@
 # 数据库接入
 
-> 对齐完整方案 **v4.1.1** 产品线 C / 里程碑 **M3**。  
-> **DataSource Port** 见 Plan2；与 Postgres **checkpointer** 职责分离。  
-> **`ENABLE_DATA_SOURCE` 独立于 `USE_MEMORY_CHECKPOINTER`**（可同时 memory 会话 + 业务 PG，或同实例不同库）。
+> 对应完整方案里「查业务库」能力（M3）。  
+> **业务库访问** 和 **对话会话检查点（checkpointer）** 是两件事，开关也分开。  
+> `ENABLE_DATA_SOURCE` **不依赖** `USE_MEMORY_CHECKPOINTER`（可以一边内存会话、一边连业务 Postgres）。
 
-## 两件事
+## 两件事别混
 
 | 能力 | 用途 | 状态 |
 |------|------|------|
 | Checkpointer（`PG_DSN`） | LangGraph 会话状态 | 已有 |
-| DataSource | 业务 tool 查业务表 | ✅ M3（Plan2） |
-| EventLog / Message 投影 | run 事件与对话查询 | ✅ M2b（可与 checkpointer 同实例分表） |
+| DataSource（业务库接口） | 工具去查业务表 | 已有 |
+| 事件日志 / 消息查询 | 回放与对话历史 | 已有（可与 checkpointer 同库不同表） |
 
-## 目标 API（M3）
+## 业务库接口长什么样
 
 ```python
 class DataSource(Protocol):
@@ -21,20 +21,20 @@ class DataSource(Protocol):
     async def close(self) -> None: ...
 ```
 
-- 一等支持 Postgres；MySQL/Mongo 为扩展 adapter
-- 仅在组装根构造；经 RunContext / 元数据交给 tool
-- tool 内 `get_run_context(config)`；禁止默认参数注入
+- 优先支持 Postgres；MySQL/Mongo 可作为扩展适配器  
+- 只在服务启动时创建；经请求上下文交给工具  
+- 工具里用 `get_run_context(config)` 取上下文；不要用「默认参数偷偷注入」
 
 ## 权限与过滤
 
-- tool 声明 `required_permissions` / `required_roles`（M2a Policy：`list_tools` + `invoke_tool`）
-- DataFilter（M6）：字段白名单 + 参数化；**无规则 = 无数据**
+- 工具声明需要的角色/权限；列工具和执行工具都会检查  
+- 数据过滤（偏治理能力）：字段白名单 + 参数化查询；**没有规则就不要返回数据**
 
-## 现在
+## 现在怎么开
 
-- 默认：`ENABLE_DATA_SOURCE=false` → `NoopDataSource`
-- 开启：`ENABLE_DATA_SOURCE=true`，DSN 用 `DATA_SOURCE_DSN` 或回退 `PG_DSN` / 分量配置
-- 金标域：`demo_readonly`（`list_orders`，需 `order:read`）；迁移见 `apps/api/migrations/002_demo_readonly.sql`
-- optional extra：`pip install -e "apps/api[datasource]"`（asyncpg）
+- 默认：`ENABLE_DATA_SOURCE=false` → 空实现（什么也不查）  
+- 开启：`ENABLE_DATA_SOURCE=true`，DSN 用 `DATA_SOURCE_DSN`，或回退到 `PG_DSN` / 分量配置  
+- 官方示例插件：`demo_readonly`（`list_orders`，需要 `order:read`）；表结构见 `apps/api/migrations/002_demo_readonly.sql`  
+- 可选依赖：`pip install -e "apps/api[datasource]"`（asyncpg）
 
-域内仍可先用自有 DB 客户端；新域优先走 `ctx.metadata["data_source"]` + `get_run_context(config)`。
+业务插件里仍可先用自有数据库客户端；新插件建议走 `ctx.metadata["data_source"]` + `get_run_context(config)`。

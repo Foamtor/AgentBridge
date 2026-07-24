@@ -1,17 +1,17 @@
-# Deploy
+# 部署说明
 
-> 对齐 [00-AgentBridge完整方案.md](./00-AgentBridge完整方案.md) v4.1 **§9**。  
-> **v1.0 = M0–M4**（单机）。多机见 **M9**。
+> 对齐 [00-AgentBridge完整方案.md](./00-AgentBridge完整方案.md)。  
+> **单机主承诺 = M0–M4**。多机见 [multi-instance.md](./multi-instance.md)（对应能力 M9）。
 
-## 部署矩阵
+## 怎么选部署方式
 
-| 模式 | 锁 | 限流 | 事件存储 | 说明 |
-|------|----|------|----------|------|
-| 本地 | 进程内 | 可选 | 内存或 PG | 默认开发 |
-| 单机生产 | 进程内 | 进程内或 Redis | Postgres | 主承诺 |
-| 多机 | Redis/DB | Redis | 集中 Postgres | M9 |
+| 模式 | 会话锁 | 限流 | 事件存储 | 说明 |
+|------|--------|------|----------|------|
+| 本地开发 | 本进程内存 | 可选 | 内存或 Postgres | 默认 |
+| 单机生产 | 本进程内存 | 本进程或 Redis | Postgres | 主承诺 |
+| 多机 | Redis（或数据库锁） | Redis | 集中式 Postgres | 需显式配置 |
 
-## Local (memory checkpointer)
+## 本地（内存会话）
 
 ```bash
 pip install -e "packages/core[dev]" -e "apps/api[dev]"
@@ -20,10 +20,10 @@ cp .env.example .env
 cd apps/api && uvicorn main:app --reload --port 8000
 ```
 
-Web: `cd apps/web && npm install && npm run dev`  
-或根目录：`./start-dev.sh` / `.\start-dev.ps1`。
+调试台：`cd apps/web && npm install && npm run dev`  
+或仓库根目录：`./start-dev.sh` / `.\start-dev.ps1`。
 
-## Postgres checkpointer
+## Postgres 会话检查点
 
 ```bash
 docker compose up -d postgres
@@ -34,41 +34,43 @@ pip install -e "packages/core[postgres]"
 
 `HOOKS_BACKEND=noop|logging` 切换运行钩子。
 
-## Authentik（可选）
+## Authentik（可选登录）
 
-见 `infra/authentik/README.md`。`AUTH_REQUIRED=true` 时配置 `OIDC_ISSUER` 或 `OIDC_JWT_SECRET`；本地可用 `AUTH_DEV_STUB=1`（**禁止生产**）。
+见 `infra/authentik/README.md`。  
+`AUTH_REQUIRED=true` 时配置 `OIDC_ISSUER` 或 `OIDC_JWT_SECRET`。  
+本地可用 `AUTH_DEV_STUB=1`（**禁止用于生产**）。
 
-### JWT → RunContext（M2a+）
+### JWT 里有哪些字段会进请求上下文
 
-| claim | 字段 |
-|-------|------|
+| JWT 字段 | 进上下文的字段 |
+|----------|----------------|
 | `sub` | `user_id` |
 | `tenant_id` / `tid` | `tenant_id` |
 | `roles` | `roles` |
 | `permissions` / `perms` | `permissions` |
 
-两阶段注入与 checkpointer 键 `{tenant_id}::{thread_id}` 见完整方案 §4.1。  
-`AUTH_REQUIRED=false` 时开发默认 admin。
+会话落库键为 `{tenant_id}::{thread_id}`。  
+`AUTH_REQUIRED=false` 时，开发环境默认相当于管理员。
 
-## 单机上线检查清单（L3 = M2 审计 + M4）
+## 单机上线前检查
 
-- [ ] 需要会话持久化时关闭 memory checkpointer，Postgres 可达
-- [ ] `AUTH_REQUIRED=true`，关闭 `AUTH_DEV_STUB`
-- [ ] 确认单实例，或已接受无分布式锁风险
-- [ ] `/health`、`/ready`、`/metrics` 已验证；`RATE_LIMIT_PER_MINUTE>0` 时限流返回 `code=rate_limited`
-- [ ] 超长 query 返回 `400 invalid_input`（InputValidator）
-- [ ] `OTEL_ENABLED` 可选（当前为 noop span，开启不抛错）
-- [ ] 审计可用（M2a）；EventLog/消息可查（M2b）
-- [ ] `ENABLE_DATA_SOURCE` 与 checkpointer 开关独立；开启时 `/ready` 会 `SELECT 1`
-- [ ] 日志不落用户原文 / LLM 全文
-- [ ] 管理面/审批 API 权限已按 §4.7 配置（若已交付）
+- [ ] 需要会话持久化时：关闭内存 checkpointer，确认 Postgres 可达  
+- [ ] `AUTH_REQUIRED=true`，关闭 `AUTH_DEV_STUB`  
+- [ ] 确认是单实例，或已接受「无分布式锁」的风险；多机请按多机文档配置  
+- [ ] 验证 `/health`、`/ready`、`/metrics`；限流打开时超限返回 `code=rate_limited`  
+- [ ] 过长输入返回 `400 invalid_input`  
+- [ ] `OTEL_ENABLED` 可选（当前为占位实现，开启不应直接报错）  
+- [ ] 审计可用；事件与消息可查  
+- [ ] `ENABLE_DATA_SOURCE` 与 checkpointer 开关互不影响；开启业务库时 `/ready` 会做连通性检查  
+- [ ] 日志不要落用户原文 / 模型全文  
+- [ ] 管理接口、审批接口的权限已按方案配置（若你启用了这些接口）
 
-## M4 环境变量（单机生产面）
+## 单机相关环境变量
 
 | 变量 | 默认 | 说明 |
 |------|------|------|
-| `RATE_LIMIT_PER_MINUTE` | `0`（关闭） | 进程内滑动窗口；按客户端 IP |
-| `OTEL_ENABLED` | `false` | 开启后仍为 noop span（可扩展） |
+| `RATE_LIMIT_PER_MINUTE` | `0`（关闭） | 按客户端 IP 计数 |
+| `OTEL_ENABLED` | `false` | 开启后仍为占位 span（可扩展） |
 | `ENABLE_DATA_SOURCE` | `false` | 与 `USE_MEMORY_CHECKPOINTER` 独立 |
 
-运维探针：`GET /health`（存活）、`GET /ready`（依赖；未启用的项 **skipped**）、`GET /metrics`（Prometheus 文本）。
+探针：`GET /health`（活着）、`GET /ready`（依赖；未启用的项标成 skipped）、`GET /metrics`（Prometheus 文本）。

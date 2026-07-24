@@ -1,6 +1,6 @@
 # apps/web
 
-React 调试台（Vite + TypeScript）。
+React 调试台（Vite + TypeScript），用来选业务插件、看流式事件。
 
-产品真源：[docs/00-AgentBridge完整方案.md](../../docs/00-AgentBridge完整方案.md) **v4.1**。  
-SSE 契约：[docs/contracts.md](../../docs/contracts.md)。
+产品总说明：[docs/00-AgentBridge完整方案.md](../../docs/00-AgentBridge完整方案.md)。  
+事件格式：[docs/contracts.md](../../docs/contracts.md)。

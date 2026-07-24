@@ -1,7 +1,7 @@
 # Plan 4: 智能与治理（M5 + M6 + M7）Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task.  
-> **Rev:** r3 — 对齐 v4.1.1；**硬前置含 Plan1 M2b（RunStore）**；HIL 锁键与 Plan1 `storage_key` 一致。
+> **阅读提示：** 这是历史设计/实施记录。文中若仍有偏内部的说法，请以仓库根目录 README、docs/roadmap.md、docs/add-a-domain.md 的白话为准。\n\n> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task.  
+> **Rev:** r3 — 对齐 v4.1.1；**必须先完成含 Plan1 M2b（RunStore）**；HIL 锁键与 Plan1 `storage_key` 一致。
 
 **Goal:** v1.x：M5 Gateway+Context+Prompt；M6 Filter/Mask/Safety/Approval；M7 Retriever+ingest+demo_rag（+可选 Memory）。
 
@@ -9,7 +9,7 @@
 
 **Tech Stack:** LangChain models、tiktoken、pgvector（rag extra）、可选 mem0；pytest。
 
-## 依赖与门禁
+## 依赖与验收条件
 
 | 方向 | 内容 |
 |------|------|
@@ -21,7 +21,7 @@
 
 ## Global Constraints
 
-- 真源：v4.1.1 §4.6–4.9、§5.2
+- 权威说明：v4.1.1 §4.6–4.9、§5.2
 - `LLM_BACKEND=direct|gateway`，默认 `direct`
 - HIL：释锁 / 同 run resume / 超时 deny；**release/acquire 使用与 Plan1 相同的 `storage_key`**
 - DataFilter 无规则 → `[]`
@@ -81,7 +81,7 @@ class LLMGateway(Protocol):
 - [ ] `gateway` 模式下域不新增 `ChatOpenAI(` import（lint 或评审清单）  
 - [ ] Commit `feat: honor LLM_BACKEND gateway path`
 
-**M5 门禁：** direct 默认绿；gateway 换模型别名不改域文件。
+**M5 验收条件：** direct 默认绿；gateway 换模型别名不改域文件。
 
 ---
 
@@ -126,7 +126,7 @@ def apply(self, rows, ctx) -> list[dict]:
 - [ ] 遵守 §4.9：不替代 Policy/Gateway  
 - [ ] Commit `feat: outbound safety hooks`
 
-**M6 门禁：** 释锁/resume/超时三测绿；无规则无数据；脱敏用例绿。
+**M6 验收条件：** 释锁/resume/超时三测绿；无规则无数据；脱敏用例绿。
 
 ---
 

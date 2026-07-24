@@ -1,6 +1,6 @@
 # Agent-Base 全面优化设计 — 模板硬化 + 生产能力（两期）
 
-> **历史规格。** 当前产品真源：[00-AgentBridge完整方案.md](../../00-AgentBridge完整方案.md) **v4.1** 与 [roadmap.md](../../roadmap.md)；冲突时以 v4.1 为准。  
+> **阅读提示：** 这是历史设计/实施记录。文中若仍有偏内部的说法，请以仓库根目录 README、docs/roadmap.md、docs/add-a-domain.md 的白话为准。\n\n> **历史规格。** 当前产品总说明：[00-AgentBridge完整方案.md](../../00-AgentBridge完整方案.md) **v4.1** 与 [roadmap.md](../../roadmap.md)；冲突时以 v4.1 为准。  
 > 状态：**一期验收项已完成（见 §8）；实施在 `feat/template-hardening`**  
 > 日期：2026-07-24  
 > 仓库：`Agent-Base`  
@@ -13,10 +13,10 @@
 
 | 期 | 名称 | 一句话 |
 |----|------|--------|
-| **一期** | 模板硬化 | 契约单源、工具 SSE 防腐、长期 `demo_tools`、组装根瘦身；**不做**分布式锁 |
+| **一期** | 模板硬化 | 契约单源、工具 SSE 防腐、长期 `demo_tools`、服务启动时的组装代码瘦身；**不做**分布式锁 |
 | **二期** | 生产能力 | Redis（优先）锁/cancel、就绪探针、可观测与 JWKS TTL；文档写死多副本前提 |
 
-**落地顺序（硬前置）：**
+**落地顺序（必须先完成）：**
 
 0. 对齐 `contracts.md`（含 cancel `data`、废除「任意透传」）  
 1. OutboundFragment + **Option B** 双 builder + mapper 补 `tool_result` + 最小 `step_update`  
@@ -32,7 +32,7 @@
 |------|------|
 | **本期（一期硬化）** | **会改** `packages/core` |
 | **硬化完成后** | 再挂第三域起：只改 `domains/*` + `bootstrap`（及文档/web） |
-| **硬禁令** | core 不得出现业务域名 / 业务节点名硬编码（如 `demo_tools`、`echo_node`） |
+| **硬禁令** | core 不得出现业务插件名 / 业务节点名硬编码（如 `demo_tools`、`echo_node`） |
 
 ---
 
@@ -44,7 +44,7 @@
 2. **防腐闭合**：Fragment；`tool_call`/`tool_result`；最小 `step_update` 映射。  
 3. **扩展通道**：`outbound_extensions` 状态约定；应用层校验 `x.*`；**域不得持有 `EventSink`**。  
 4. **样板域** `demo_tools`（无 LLM）。  
-5. **组装根瘦身** + `app.state` 白名单。  
+5. **服务启动时的组装代码瘦身** + `app.state` 白名单。  
 6. **修线上缺口**：cancel 事件补 `data`；禁止 host `r-host` 旁路。  
 7. **回归** echo / 409 / cancel / auth。
 
@@ -160,7 +160,7 @@ OUTBOUND_EXTENSIONS_KEY = "outbound_extensions"
 - 一期默认实现：**只做状态约定 + `aget_state`**；`demo_tools` 必须走默认路径。  
 - 文档须写清：简单域用 state；复杂域可开 hook——二者同级，不是失败后的迫不得已。
 
-**禁止：** core 写死业务域名；域直接持有 `EventSink`。
+**禁止：** core 写死业务插件名；业务插件直接持有 `EventSink`。
 
 ### 3.7 Host 与 lifecycle 错误路径（禁止双发）
 
@@ -186,7 +186,7 @@ apps/api/domains/demo_tools/
 - 结束前写入 ≥1 条 `x.demo_tools.*` 到 State[`OUTBOUND_EXTENSIONS_KEY`]。  
 - `step_update`/`text_delta`：不强制。
 
-### 4.3 挂载与门禁
+### 4.3 挂载与验收条件
 
 `register_all` 注册 echo + demo_tools；扫描 core 无 `demo_tools` / 业务节点硬编码。
 
@@ -196,7 +196,7 @@ apps/api/domains/demo_tools/
 
 ---
 
-## 5. 组装根与宿主
+## 5. 服务启动时的组装代码与宿主
 
 | 项 | 拍板 |
 |----|------|
@@ -240,7 +240,7 @@ Redis 锁/cancel、`/ready`、JWKS TTL、可配置 hooks/`trace_id`；文档：�
 | 误读零改 core | §1.1 |
 | 偷偷用域持 EventSink | §3.6 禁止；code review 红线 |
 | 对外叙事不清 | README/deploy 写清：一期模板可用 ≠ 多副本生产；二期清单显性化 |
-| 状态键拼写漂移 | `OUTBOUND_EXTENSIONS_KEY` 唯一真源 |
+| 状态键拼写漂移 | `OUTBOUND_EXTENSIONS_KEY` 唯一权威说明 |
 
 ---
 
@@ -256,11 +256,11 @@ Redis 锁/cancel、`/ready`、JWKS TTL、可配置 hooks/`trace_id`；文档：�
 - [x] cancel 事件 `data` 含 `thread_id`+`run_id`（测例钉死）  
 - [x] 终端事件保证（`terminal_sent` / 等价）  
 - [x] `OUTBOUND_EXTENSIONS_KEY` 常量；runtime 用 `aget_state` 读取  
-- [x] `outbound_extensions` 通道；core 无域名  
+- [x] `outbound_extensions` 通道；core 无业务插件名  
 - [x] `demo_tools` 无 LLM；流验收通过  
 - [x] chat **无** `r-host` 旁路、无与 lifecycle 重复的 error 帧  
 - [x] lifespan 无 Fake 类；`app.state` 不暴露 locks/cancels/graphs/tools/input_builders  
-- [x] echo/409/cancel/auth 回归；门禁绿（含 `echo_node`）  
+- [x] echo/409/cancel/auth 回归；验收条件绿（含 `echo_node`）  
 - [x] import-linter：adapters 同层白名单  
 
 ### 二期
@@ -303,7 +303,7 @@ Redis 锁/cancel、`/ready`、JWKS TTL、可配置 hooks/`trace_id`；文档：�
 | DSN | `pg_dsn` 优先 + 五字段 fallback |
 | adapters→adapters | **允许**，补 code-structure |
 | ensure_route | **不做** |
-| 实施顺序 | 明确 0→4 步硬前置 |
+| 实施顺序 | 明确 0→4 步必须先完成 |
 ### 10.4 三方评审修订（专家 / 架构师 / 程序员）
 
 | 优先级 | 项 | 决定 |

@@ -1,8 +1,8 @@
-# Agent-Base 全栈底座 Implementation Plan
+# Agent-Base 全栈本平台 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **阅读提示：** 这是历史设计/实施记录。文中若仍有偏内部的说法，请以仓库根目录 README、docs/roadmap.md、docs/add-a-domain.md 的白话为准。\n\n> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 落地可复用的 AI 业务底座：分层编排内核 + FastAPI 宿主 + OIDC + React 调试台 + echo 域，行为对齐产品仓契约且代码绿场重写。
+**Goal:** 落地可复用的 AI 业务本平台：分层编排内核 + FastAPI 宿主 + OIDC + React 调试台 + echo 域，行为对齐产品仓契约且代码绿场重写。
 
 **Architecture:** `packages/core`（application / ports / adapters / registry / protocol）由 `apps/api/lifespan.py` 组装注入；业务只通过 `domains/*` 注册；Web 调试台消费稳定 SSE。禁止 core import domains，禁止照抄 RAG_Agent 实现。
 
