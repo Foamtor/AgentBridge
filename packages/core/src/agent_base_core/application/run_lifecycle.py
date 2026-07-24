@@ -31,6 +31,10 @@ from agent_base_core.registry.tools import ToolRegistry
 logger = logging.getLogger(__name__)
 
 
+class EventLogAppendError(Exception):
+    """Raised when EventLog.append fails; callers must not emit the failed event."""
+
+
 class RunLifecycle:
     def __init__(
         self,
@@ -106,8 +110,36 @@ class RunLifecycle:
 
     async def _emit(self, sink: EventSink, evt: dict[str, Any]) -> None:
         if self._event_log is not None:
-            await self._event_log.append(evt["run_id"], evt)
+            try:
+                await self._event_log.append(evt["run_id"], evt)
+            except Exception as exc:  # noqa: BLE001 — fail closed on any append error
+                raise EventLogAppendError(str(exc)) from exc
         await sink.emit(evt)
+
+    async def _emit_append_failed_error(
+        self,
+        sink: EventSink,
+        *,
+        run_id: str,
+        sequence: int,
+        trace_id: str,
+        message: str,
+    ) -> None:
+        try:
+            await self._emit(
+                sink,
+                build_event(
+                    "error",
+                    run_id=run_id,
+                    sequence=sequence,
+                    trace_id=trace_id,
+                    data={"message": message, "code": "event_log_append_failed"},
+                ),
+            )
+        except EventLogAppendError:
+            logger.exception(
+                "event log append failed for error frame run_id=%s", run_id
+            )
 
     def _storage_key_for_api_thread(self, thread_id: str) -> str:
         return self._api_to_storage.get(thread_id, thread_id)
@@ -229,6 +261,17 @@ class RunLifecycle:
                         return
                     sequence += 1
                     await self._emit(sink, evt)
+            except EventLogAppendError as exc:
+                sequence += 1
+                await self._emit_append_failed_error(
+                    sink,
+                    run_id=run_id,
+                    sequence=sequence,
+                    trace_id=trace_id,
+                    message=str(exc),
+                )
+                terminal_sent = True
+                return
             except Exception as exc:  # noqa: BLE001
                 logger.exception("run failed thread_id=%s run_id=%s", thread_id, run_id)
                 sequence += 1
@@ -287,6 +330,20 @@ class RunLifecycle:
         except UnknownRoute:
             pre_start_failure = True
             raise
+        except EventLogAppendError as exc:
+            if not terminal_sent and sequence > 0:
+                sequence += 1
+                await self._emit_append_failed_error(
+                    sink,
+                    run_id=run_id,
+                    sequence=sequence,
+                    trace_id=trace_id,
+                    message=str(exc),
+                )
+                terminal_sent = True
+            else:
+                pre_start_failure = sequence == 0
+                raise
         except Exception as exc:  # noqa: BLE001
             if not terminal_sent and sequence > 0:
                 logger.exception(

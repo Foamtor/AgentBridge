@@ -13,6 +13,7 @@ from agent_base_core.adapters.langgraph_runtime import LangGraphRuntime
 from agent_base_core.adapters.logging_hooks import LoggingHooks
 from agent_base_core.adapters.memory_audit_logger import MemoryAuditLogger
 from agent_base_core.adapters.memory_checkpointer import MemoryCheckpointerFactory
+from agent_base_core.adapters.memory_event_log import MemoryEventLog
 from agent_base_core.adapters.noop_hooks import NoopHooks
 from agent_base_core.adapters.role_policy import RolePolicyEngine
 from agent_base_core.application.pipeline import RequestPipeline, ToolPolicyPlugin
@@ -72,6 +73,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     policy = RolePolicyEngine()
     audit = MemoryAuditLogger()
+    event_log = MemoryEventLog()
 
     lifecycle = RunLifecycle(
         locks=locks,
@@ -84,6 +86,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         hooks=hooks,
         policy=policy,
         audit=audit,
+        event_log=event_log,
     )
     pipeline = RequestPipeline(
         lifecycle=lifecycle,
@@ -96,11 +99,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         ],
     )
 
-    # Production app.state whitelist: lifecycle + pipeline + settings + audit (tests).
+    # Production app.state whitelist: lifecycle + pipeline + settings + stores.
     app.state.settings = settings
     app.state.run_lifecycle = lifecycle
     app.state.pipeline = pipeline
     app.state.audit = audit
+    app.state.event_log = event_log
     app.state.tools = tools
     try:
         yield
