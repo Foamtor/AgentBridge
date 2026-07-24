@@ -6,9 +6,10 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from agent_base_core.application.run_lifecycle import RunLifecycle
-from agent_base_core.errors import UnknownRoute
+from agent_base_core.errors import InvalidInput, UnknownRoute
 from agent_base_core.ports.audit_logger import AuditLogger
 from agent_base_core.ports.event_sink import EventSink
+from agent_base_core.ports.input_validator import InputValidator
 from agent_base_core.ports.policy import PolicyEngine
 from agent_base_core.protocol.context import RunContext
 from agent_base_core.registry.tools import ToolRegistry
@@ -78,6 +79,24 @@ class ToolPolicyPlugin:
             result="ok",
         )
         req.tools_override = filtered
+        return req
+
+    async def after_terminal(self, req: PipelineRequest, result: RunResult) -> None:
+        return None
+
+
+class InputValidatorPlugin:
+    name = "input_validator"
+    order = 10
+
+    def __init__(self, validator: InputValidator) -> None:
+        self._validator = validator
+
+    async def before_run(self, req: PipelineRequest) -> PipelineRequest:
+        try:
+            req.query = self._validator.validate_query(req.query)
+        except ValueError as exc:
+            raise InvalidInput(str(exc)) from exc
         return req
 
     async def after_terminal(self, req: PipelineRequest, result: RunResult) -> None:

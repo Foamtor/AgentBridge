@@ -10,7 +10,12 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from agent_base_core.adapters.sse_event_sink import SseEventSink
-from agent_base_core.application.errors import RunNotFound, ThreadBusy, UnknownRoute
+from agent_base_core.application.errors import (
+    InvalidInput,
+    RunNotFound,
+    ThreadBusy,
+    UnknownRoute,
+)
 from agent_base_core.application.pipeline import RequestPipeline
 from agent_base_core.application.run_lifecycle import RunLifecycle
 from agent_base_core.protocol.sse import format_sse_line
@@ -70,6 +75,9 @@ async def chat_stream(
         except UnknownRoute as exc:
             await queue.put(("__error__", exc))
             await queue.put(None)
+        except InvalidInput as exc:
+            await queue.put(("__error__", exc))
+            await queue.put(None)
         except Exception as exc:  # noqa: BLE001
             # Pre-start failures re-raise from lifecycle (no SSE yet). Mid-stream
             # failures are emitted as error by lifecycle and do not re-raise.
@@ -103,6 +111,8 @@ async def chat_stream(
                 f"unknown route: {body.route}",
                 route=body.route,
             )
+        if isinstance(err, InvalidInput):
+            raise _http_error(400, "invalid_input", err.message)
         raise _http_error(
             500,
             "stream_failed",
