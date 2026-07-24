@@ -54,6 +54,7 @@ async def chat_stream(
                 **ctx.metadata,
                 "data_source": request.app.state.data_source,
                 "llm_gateway": request.app.state.llm_gateway,
+                "retriever": request.app.state.retriever,
             }
         }
     )
