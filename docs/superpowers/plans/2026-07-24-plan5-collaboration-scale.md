@@ -44,17 +44,17 @@
 
 ### Task 1: SSE data.agent_id
 
-- [ ] Lifecycle/emit：若 `ctx.agent_id`，合并进 `event["data"]`  
-- [ ] 契约示例更新  
-- [ ] Commit `feat: SSE data.agent_id`
+- [x] Lifecycle/emit：若 `ctx.agent_id`，合并进 `event["data"]`  
+- [x] 契约示例更新  
+- [x] Commit `feat: SSE data.agent_id`
 
 ---
 
 ### Task 2: demo_multi_agent
 
-- [ ] 顺序节点切换 `ctx.agent_id`（researcher → writer）  
-- [ ] 一轮 stream ≥2 个 agent_id  
-- [ ] Commit `feat: demo_multi_agent golden domain`
+- [x] 顺序节点切换 `ctx.agent_id`（researcher → writer）  
+- [x] 一轮 stream ≥2 个 agent_id  
+- [x] Commit `feat: demo_multi_agent golden domain`
 
 ---
 
@@ -74,8 +74,8 @@ export class AgentBridgeClient {
 }
 ```
 
-- [ ] vitest parseSseChunk  
-- [ ] Commit `feat(sdk): TypeScript client`
+- [x] vitest parseSseChunk  
+- [x] Commit `feat(sdk): TypeScript client`
 
 ---
 
@@ -88,8 +88,8 @@ def require_permission(ctx: RunContext, perm: str) -> None:
     raise HTTPException(403, detail={"code": "forbidden", "message": f"missing {perm}"})
 ```
 
-- [ ] `GET /admin/domains` + 403/200 测试  
-- [ ] Commit `feat(api): admin domains with RBAC`
+- [x] `GET /admin/domains` + 403/200 测试  
+- [x] Commit `feat(api): admin domains with RBAC`
 
 **M8 门禁：** 多 agent_id；SDK 测绿；admin 403。
 
@@ -105,9 +105,9 @@ async def try_acquire(self, thread_id: str, run_id: str) -> bool:
     return await redis.set(f"ab:lock:{thread_id}", run_id, nx=True, ex=self.ttl)
 ```
 
-- [ ] fakeredis 或 skip 测试双 acquire  
-- [ ] settings `lock_backend=memory|redis`  
-- [ ] Commit `feat: redis thread lock`
+- [x] fakeredis 或 skip 测试双 acquire  
+- [x] settings `lock_backend=memory|redis`  
+- [x] Commit `feat: redis thread lock`
 
 ---
 
