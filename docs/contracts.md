@@ -161,9 +161,11 @@
   "sequence": 3,
   "trace_id": "tr-xyz",
   "timestamp": 1721721600200,
-  "data": { "content": "hel" }
+  "data": { "content": "hel", "agent_id": "researcher" }
 }
 ```
+
+多 Agent（§4.8）：若 `RunContext.agent_id` 非空，Lifecycle 会把 `agent_id` **合并进** `data`（fragment 已带则保留）；同流可切换多个 `agent_id`。
 
 **`tool_call`**
 
