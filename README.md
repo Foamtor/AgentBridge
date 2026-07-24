@@ -6,9 +6,9 @@
 
 把流式对话、取消、线程锁、SSE 契约、域插件一次搭好；演进方向是以 **Run/Event 为真源**，统一 **策略引擎** 与 **模型出口（Gateway）**，再按需打开记忆、RAG、审批、多 Agent 与 SDK。
 
-> **当前现状（≈ M0）**：单机模板可用。默认进程内锁。  
+> **当前现状（≈ v1.0 单机）**：M0–M4 已齐（安全接入、查库、ready/metrics/限流/InputValidator/OTel noop）。默认进程内锁与限流。  
 > **能力愿景**：见 [roadmap.md](docs/roadmap.md)（M0–M10，不计人天）。  
-> **主承诺口径**：先把 **单机生产** 做扎实；多机见里程碑 M9。
+> **主承诺口径**：**v1.0 = 单机生产**（非多机）；多机见里程碑 M9。
 
 ---
 
@@ -170,8 +170,8 @@ Smoke：`.\scripts\smoke_echo.ps1` / `./scripts/smoke_echo.sh`。
 
 | | |
 |--|--|
-| ✅ 现在 | M0 编排底座 |
-| ⏭ 建议下一切片 | **M2a** → **M2b**（先身份/Policy/审计，再 EventLog/投影/replay） |
-| ⏳ 愿景 | M3–M10；对外 **v1.0 = M0–M4** |
+| ✅ 现在 | **v1.0 单机门禁**：M0–M4（含 `/ready` `/metrics` 限流 InputValidator） |
+| ⏭ 建议下一切片 | **Plan4**（Gateway / Context / Filter / Approval，M5–M7） |
+| ⏳ 愿景 | M5–M10；多机仍是 **M9**，不在 v1.0 范围 |
 
 完整定义见 [完整方案 v4.1](docs/00-AgentBridge完整方案.md) 与 [路线图](docs/roadmap.md)。
