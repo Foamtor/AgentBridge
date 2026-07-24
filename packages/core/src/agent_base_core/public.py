@@ -1,18 +1,20 @@
 """Stable facade for hosts: orchestration_stream / cancel_run.
 
-Must only forward to an injected RunLifecycle — never construct adapters here.
+Must only forward — never construct adapters here.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from agent_base_core.application.run_lifecycle import RunLifecycle
+
+async def orchestration_stream(target: Any, **kwargs: Any) -> None:
+    handle = getattr(target, "handle", None)
+    if callable(handle):
+        await handle(**kwargs)
+        return
+    await target.start_stream(**kwargs)
 
 
-async def orchestration_stream(lifecycle: RunLifecycle, **kwargs: Any) -> None:
-    await lifecycle.start_stream(**kwargs)
-
-
-async def cancel_run(lifecycle: RunLifecycle, **kwargs: Any) -> None:
+async def cancel_run(lifecycle: Any, **kwargs: Any) -> None:
     await lifecycle.cancel(**kwargs)
