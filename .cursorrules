@@ -1,0 +1,13 @@
+# Agent-Base / AgentBridge — Cursor rules
+
+## 核心规则（MUST）
+
+1. `application` 禁止 import `adapters`
+2. 域代码不持有 `EventSink`
+3. `core` 的 `src/` 不能出现域名称
+4. 所有 adapter 只在 `lifespan.py`（组装根）里构造
+5. 不可用的 tool 不得进入 LLM tool list
+
+跨租户 Port 拒绝、模型经 Gateway：见完整方案；分别在 M2+ / 默认 `LLM_BACKEND=gateway` 后强制。
+
+详细规则与任务手册：`docs/ai-instructions/`
