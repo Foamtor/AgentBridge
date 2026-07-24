@@ -11,8 +11,11 @@ from agent_base_core.adapters.inprocess_cancel import InProcessCancelRegistry
 from agent_base_core.adapters.inprocess_lock import InProcessThreadLock
 from agent_base_core.adapters.langgraph_runtime import LangGraphRuntime
 from agent_base_core.adapters.logging_hooks import LoggingHooks
+from agent_base_core.adapters.memory_audit_logger import MemoryAuditLogger
 from agent_base_core.adapters.memory_checkpointer import MemoryCheckpointerFactory
 from agent_base_core.adapters.noop_hooks import NoopHooks
+from agent_base_core.adapters.role_policy import RolePolicyEngine
+from agent_base_core.application.pipeline import RequestPipeline, ToolPolicyPlugin
 from agent_base_core.application.run_lifecycle import RunLifecycle
 from agent_base_core.registry.graphs import GraphRegistry
 from agent_base_core.registry.input_builders import InputBuilderRegistry
@@ -67,6 +70,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     else:
         hooks = NoopHooks()
 
+    policy = RolePolicyEngine()
+    audit = MemoryAuditLogger()
+
     lifecycle = RunLifecycle(
         locks=locks,
         checkpointers=checkpointers,
@@ -76,11 +82,26 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         runtime=runtime,
         cancels=cancels,
         hooks=hooks,
+        policy=policy,
+        audit=audit,
+    )
+    pipeline = RequestPipeline(
+        lifecycle=lifecycle,
+        plugins=[
+            ToolPolicyPlugin(
+                policy=policy,
+                audit=audit,
+                tools_registry=tools,
+            )
+        ],
     )
 
-    # Production app.state whitelist: run_lifecycle + settings only.
+    # Production app.state whitelist: lifecycle + pipeline + settings + audit (tests).
     app.state.settings = settings
     app.state.run_lifecycle = lifecycle
+    app.state.pipeline = pipeline
+    app.state.audit = audit
+    app.state.tools = tools
     try:
         yield
     finally:

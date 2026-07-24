@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import logging
 from typing import Any
 
@@ -11,6 +12,11 @@ from agent_base_core.protocol.context import RunContext
 from agent_base_core.registry.tool_meta import get_tool_meta
 
 logger = logging.getLogger(__name__)
+
+try:
+    from langchain_core.tools import BaseTool
+except ImportError:  # pragma: no cover
+    BaseTool = ()  # type: ignore[misc, assignment]
 
 
 def _resource_for(tool: Any) -> dict[str, Any]:
@@ -33,12 +39,67 @@ def guard_tools(
     """Return tools wrapped with invoke_tool policy checks."""
     out: list[Any] = []
     for tool in tools:
-        out.append(_GuardProxy(tool, policy=policy, ctx=ctx, audit=audit))
+        if BaseTool and isinstance(tool, BaseTool):
+            out.append(_wrap_base_tool(tool, policy=policy, ctx=ctx, audit=audit))
+        else:
+            out.append(_GuardProxy(tool, policy=policy, ctx=ctx, audit=audit))
     return out
 
 
+def _wrap_base_tool(
+    tool: Any,
+    *,
+    policy: PolicyEngine,
+    ctx: RunContext,
+    audit: AuditLogger | None,
+) -> Any:
+    """Shallow-copy a LangChain BaseTool and wrap func/coroutine in place."""
+    guarded = copy.copy(tool)
+    resource = _resource_for(tool)
+    orig_func = getattr(tool, "func", None)
+    orig_coro = getattr(tool, "coroutine", None)
+
+    def _decide() -> str:
+        return policy.decide(ctx=ctx, action="invoke_tool", resource=resource)
+
+    async def _audit_denied() -> None:
+        if audit is None:
+            return
+        await audit.log(
+            user_id=ctx.user_id,
+            tenant_id=ctx.tenant_id,
+            action="invoke_tool",
+            resource=str(resource.get("name")),
+            detail={"decision": "deny"},
+            result="denied",
+        )
+
+    def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
+        if _decide() != "allow":
+            return "forbidden"
+        if callable(orig_func):
+            return orig_func(*args, **kwargs)
+        raise TypeError("tool has no func")
+
+    async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+        if _decide() != "allow":
+            await _audit_denied()
+            return "forbidden"
+        if callable(orig_coro):
+            return await orig_coro(*args, **kwargs)
+        if callable(orig_func):
+            return orig_func(*args, **kwargs)
+        raise TypeError("tool has no coroutine/func")
+
+    if callable(orig_func):
+        object.__setattr__(guarded, "func", sync_wrapper)
+    if callable(orig_coro) or callable(orig_func):
+        object.__setattr__(guarded, "coroutine", async_wrapper)
+    return guarded
+
+
 class _GuardProxy:
-    """Lightweight proxy: prefer .ainvoke/.invoke; fall back to .func/.coroutine."""
+    """Lightweight proxy for non-BaseTool test doubles."""
 
     def __init__(
         self,
@@ -75,7 +136,6 @@ class _GuardProxy:
 
     def invoke(self, *args: Any, **kwargs: Any) -> Any:
         if self._decide() != "allow":
-            # sync path: best-effort audit skip (async logger)
             return "forbidden"
         inv = getattr(self._tool, "invoke", None)
         if callable(inv):
