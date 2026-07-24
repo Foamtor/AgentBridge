@@ -11,6 +11,8 @@ from lifespan import lifespan
 from middleware.rate_limit import RateLimitMiddleware
 from routes.chat import router as chat_router
 from routes.health import router as health_router
+from routes.metrics import router as metrics_router
+from routes.ready import router as ready_router
 from routes.runs import router as runs_router
 from routes.threads import router as threads_router
 
@@ -38,6 +40,8 @@ def create_app() -> FastAPI:
         limit_per_minute=settings.rate_limit_per_minute,
     )
     app.include_router(health_router)
+    app.include_router(ready_router)
+    app.include_router(metrics_router)
     app.include_router(chat_router)
     app.include_router(threads_router)
     app.include_router(runs_router)

@@ -31,7 +31,9 @@ class OptionalOidcMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next) -> Response:
         path = request.url.path
-        if path == "/health" or path.startswith("/docs") or path.startswith("/openapi"):
+        if path in {"/health", "/ready", "/metrics"} or path.startswith(
+            "/docs"
+        ) or path.startswith("/openapi"):
             return await call_next(request)
 
         if not self.auth_required:
