@@ -15,6 +15,9 @@ from agent_base_core.protocol.tool_meta import get_tool_meta
 
 logger = logging.getLogger(__name__)
 
+# Placeholder until Plan4/5 versioned policy bundles land.
+_POLICY_VERSION = "role_policy/v1"
+
 try:
     from langchain_core.tools import BaseTool
 except ImportError:  # pragma: no cover
@@ -28,6 +31,24 @@ def _resource_for(tool: Any) -> dict[str, Any]:
         "name": name,
         "required_roles": meta["required_roles"],
         "required_permissions": meta["required_permissions"],
+    }
+
+
+def _deny_reason_code(resource: dict[str, Any]) -> str:
+    roles = list(resource.get("required_roles") or [])
+    perms = list(resource.get("required_permissions") or [])
+    if roles and not perms:
+        return "role_mismatch"
+    if perms and not roles:
+        return "permission_mismatch"
+    return "policy_deny"
+
+
+def _deny_audit_detail(resource: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "decision": "deny",
+        "reason_code": _deny_reason_code(resource),
+        "policy_version": _POLICY_VERSION,
     }
 
 
@@ -91,7 +112,7 @@ def _wrap_base_tool(
             tenant_id=ctx.tenant_id,
             action="invoke_tool",
             resource=str(resource.get("name")),
-            detail={"decision": "deny"},
+            detail=_deny_audit_detail(resource),
             result="denied",
         )
 
@@ -141,7 +162,7 @@ class _GuardProxy:
             tenant_id=self._ctx.tenant_id,
             action="invoke_tool",
             resource=str(resource.get("name")),
-            detail={"decision": "deny"},
+            detail=_deny_audit_detail(resource),
             result="denied",
         )
 

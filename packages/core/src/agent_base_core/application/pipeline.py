@@ -63,12 +63,18 @@ class ToolPolicyPlugin:
         if not isinstance(tools, list):
             tools = list(tools) if tools else []
         filtered = self._policy.filter_tools(req.route, tools, req.ctx)
+        before, after = len(tools), len(filtered)
         await self._audit.log(
             user_id=req.ctx.user_id,
             tenant_id=req.ctx.tenant_id,
             action="list_tools",
             resource=req.route,
-            detail={"before": len(tools), "after": len(filtered)},
+            detail={
+                "before": before,
+                "after": after,
+                "reason_code": "list_filtered" if after < before else "list_ok",
+                "policy_version": "role_policy/v1",
+            },
             result="ok",
         )
         req.tools_override = filtered

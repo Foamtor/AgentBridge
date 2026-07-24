@@ -58,5 +58,5 @@ async def test_lifecycle_projects_after_done(graphs, tools) -> None:
     assert msgs[1]["role"] == "assistant"
     assert msgs[1]["content"] == "ok"
     run_id = sink.events[0]["run_id"]
-    assert (await runs.get(run_id))["status"] == "done"
+    assert (await runs.get(run_id, tenant_id="acme"))["status"] == "done"
     assert await messages.list_messages("other", "th-proj") == []

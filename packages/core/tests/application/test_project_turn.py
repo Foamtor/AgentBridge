@@ -55,5 +55,5 @@ async def test_project_turn_merges_deltas_and_isolates_tenant() -> None:
     assert msgs[0] == {"role": "user", "content": "say hi", "run_id": run_id}
     assert msgs[1]["role"] == "assistant"
     assert msgs[1]["content"] == "hello"
-    assert (await runs.get(run_id))["status"] == "done"
+    assert (await runs.get(run_id, tenant_id="acme"))["status"] == "done"
     assert await messages.list_messages("other", "th-1") == []
