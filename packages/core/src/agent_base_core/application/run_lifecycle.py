@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import uuid
 from typing import Any
 
@@ -17,6 +18,8 @@ from agent_base_core.protocol.events import build_event
 from agent_base_core.registry.graphs import GraphRegistry
 from agent_base_core.registry.input_builders import InputBuilderRegistry
 from agent_base_core.registry.tools import ToolRegistry
+
+logger = logging.getLogger(__name__)
 
 
 class RunLifecycle:
@@ -44,6 +47,14 @@ class RunLifecycle:
         """Test/host hook to swap GraphRuntime without private attribute access."""
         self._runtime = runtime
 
+    def _renumber(self, evt: dict[str, Any], *, run_id: str, trace_id: str, sequence: int) -> dict[str, Any]:
+        out = dict(evt)
+        out["run_id"] = run_id
+        out["trace_id"] = trace_id
+        out["sequence"] = sequence
+        out["event_id"] = f"{run_id}-{sequence}"
+        return out
+
     async def start_stream(
         self,
         *,
@@ -63,6 +74,8 @@ class RunLifecycle:
 
         cancel_token = asyncio.Event()
         cancelled = False
+        # Register immediately so /cancel works before start is emitted.
+        await self._cancels.register(thread_id, run_id, cancel_token)
         try:
             builder = self._graphs.get(route)
             try:
@@ -86,28 +99,44 @@ class RunLifecycle:
                 )
             )
 
-            await self._cancels.register(thread_id, run_id, cancel_token)
             checkpointer = await self._checkpointers.get()
 
-            async for evt in self._runtime.astream(
-                builder,
-                tools=tools,
-                checkpointer=checkpointer,
-                thread_id=thread_id,
-                query=query,
-                cancel_token=cancel_token,
-                extra={
-                    **(extra or {}),
-                    "run_id": run_id,
-                    "trace_id": trace_id,
-                    "graph_input": graph_input,
-                    "model": model,
-                },
-            ):
-                if cancel_token.is_set():
-                    cancelled = True
-                    break
-                await sink.emit(evt)
+            try:
+                async for evt in self._runtime.astream(
+                    builder,
+                    tools=tools,
+                    checkpointer=checkpointer,
+                    thread_id=thread_id,
+                    query=query,
+                    cancel_token=cancel_token,
+                    extra={
+                        **(extra or {}),
+                        "run_id": run_id,
+                        "trace_id": trace_id,
+                        "graph_input": graph_input,
+                        "model": model,
+                    },
+                ):
+                    if cancel_token.is_set():
+                        cancelled = True
+                        break
+                    sequence += 1
+                    await sink.emit(
+                        self._renumber(evt, run_id=run_id, trace_id=trace_id, sequence=sequence)
+                    )
+            except Exception as exc:  # noqa: BLE001 — map to SSE error then close
+                logger.exception("run failed thread_id=%s run_id=%s", thread_id, run_id)
+                sequence += 1
+                await sink.emit(
+                    build_event(
+                        "error",
+                        run_id=run_id,
+                        sequence=sequence,
+                        trace_id=trace_id,
+                        data={"message": str(exc), "code": "run_failed"},
+                    )
+                )
+                return
 
             if cancel_token.is_set():
                 cancelled = True

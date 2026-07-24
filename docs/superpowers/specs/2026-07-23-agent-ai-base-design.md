@@ -332,60 +332,60 @@ PKCE 与 SSE 客户端：**重写**，只对齐 Authentik 与契约行为。
 
 | 任务 | 内容 | 完成标准 | 状态 |
 |------|------|----------|------|
-| P1.1 | 目录骨架、README、.gitignore、基础 CI | 空仓可 clone；architecture gates 绿 | **骨架+门禁 CI 已完成**；compose/health 待做 |
-| P1.2 | docker-compose：PG + Redis + Authentik | 容器健康 | 待做 |
-| P1.3 | `apps/api` 空壳：health、config、lifespan | `/health` 通 | 待做 |
-| P1.4 | 鉴权中间件 + 开关 | 开关两种模式可测 | 待做 |
-| P1.5 | start-dev / stop-dev | 文档路径可走通 | 待做 |
+| P1.1 | 目录骨架、README、.gitignore、基础 CI | 空仓可 clone；architecture gates 绿 | **已完成** |
+| P1.2 | docker-compose：PG + Redis + Authentik | 容器健康 | **已完成**（Authentik 为 profile，非 smoke 必过） |
+| P1.3 | `apps/api` 空壳：health、config、lifespan | `/health` 通 | **已完成** |
+| P1.4 | 鉴权中间件 + 开关 | 开关两种模式可测 | **已完成**（HS256/JWKS；stub 仅 `AUTH_DEV_STUB`） |
+| P1.5 | start-dev / stop-dev | 文档路径可走通 | **已完成** |
 
 ### P2 — 核心重写（分层 + 接口 + 注入）
 
 | 任务 | 内容 | 完成标准 | 状态 |
 |------|------|----------|------|
-| P2.1 | ports + registry（含 input_builders） | 单测 | 待做 |
-| P2.2 | adapters：inprocess lock、memory/pg checkpointer | 单测含 409 语义 | 待做 |
-| P2.3 | protocol events + SSE sink | 单测 | 待做 |
-| P2.4 | adapters.langgraph_runtime + Event 防腐映射 | 集成测 | 待做 |
-| P2.5 | application.RunLifecycle（stream/cancel） | 与注册表集成测 | 待做 |
-| P2.6 | hooks 默认空；public 导出面（只转发、不 new 适配器） | 可注入示例 | 待做 |
-| P2.7 | import-linter + 业务包名扫描进 CI | 违规失败 | **已完成**；pytest/ruff 后续补 |
+| P2.1 | ports + registry（含 input_builders） | 单测 | **已完成** |
+| P2.2 | adapters：inprocess lock、memory/pg checkpointer | 单测含 409 语义 | **已完成** |
+| P2.3 | protocol events + SSE sink | 单测 | **已完成** |
+| P2.4 | adapters.langgraph_runtime + Event 防腐映射 | 集成测 | **已完成** |
+| P2.5 | application.RunLifecycle（stream/cancel） | 与注册表集成测 | **已完成** |
+| P2.6 | hooks 默认空；public 导出面（只转发、不 new 适配器） | 可注入示例 | **已完成** |
+| P2.7 | import-linter + 业务包名扫描进 CI | 违规失败 | **已完成**（含 pytest/ruff） |
 
 ### P3 — echo 域
 
-| 任务 | 内容 | 完成标准 |
-|------|------|----------|
-| P3.1 | echo 工具 + 类型化 State 子图 | 注册成功 |
-| P3.2 | API delivery 挂 stream/cancel | HTTP 层通 |
-| P3.3 | 自动化：SSE 生命周期、409、cancel | CI 绿 |
+| 任务 | 内容 | 完成标准 | 状态 |
+|------|------|----------|------|
+| P3.1 | echo 工具 + 类型化 State 子图 | 注册成功 | **已完成** |
+| P3.2 | API delivery 挂 stream/cancel | HTTP 层通 | **已完成** |
+| P3.3 | 自动化：SSE 生命周期、409、cancel | CI 绿 | **已完成** |
 
 ### P4 — React 调试台
 
-| 任务 | 内容 | 完成标准 |
-|------|------|----------|
-| P4.1 | Vite/React 工程与 env 契约 | 可 dev |
-| P4.2 | 重写 auth PKCE + callback | 与 Authentik 联调 |
-| P4.3 | 重写 sseClient | 覆盖稳定事件子集 |
-| P4.4 | Debug 工作台全功能 | 登录/thread/发送/时间线/cancel/409 |
-| P4.5 | `/contracts` 页 | 与 docs 一致 |
-| P4.6 | smoke 脚本端到端 | 文档一步可跑 |
+| 任务 | 内容 | 完成标准 | 状态 |
+|------|------|----------|------|
+| P4.1 | Vite/React 工程与 env 契约 | 可 dev | **已完成** |
+| P4.2 | 重写 auth PKCE + callback | 与 Authentik 联调 | **部分**（手动 Bearer；PKCE 占位） |
+| P4.3 | 重写 sseClient | 覆盖稳定事件子集 | **已完成** |
+| P4.4 | Debug 工作台全功能 | 登录/thread/发送/时间线/cancel/409 | **已完成**（登录=粘贴 token） |
+| P4.5 | `/contracts` 页 | 与 docs 一致 | **已完成** |
+| P4.6 | smoke 脚本端到端 | 文档一步可跑 | **已完成** |
 
 ### P5 — 脚手架与文档
 
-| 任务 | 内容 | 完成标准 |
-|------|------|----------|
-| P5.1 | `domains/_scaffold`（含 State/recursion 注释） | 复制即可改 |
-| P5.2 | add-a-domain / architecture / deploy | 文档齐全 |
-| P5.3 | hooks 示例（日志级） | 可插拔证明 |
-| P5.4 | （可选）protocol Plan/ToolSpec | 纯结构 + 文档 |
+| 任务 | 内容 | 完成标准 | 状态 |
+|------|------|----------|------|
+| P5.1 | `domains/_scaffold`（含 State/recursion 注释） | 复制即可改 | **已完成** |
+| P5.2 | add-a-domain / architecture / deploy | 文档齐全 | **已完成** |
+| P5.3 | hooks 示例（日志级） | 可插拔证明 | **已完成** |
+| P5.4 | （可选）protocol Plan/ToolSpec | 纯结构 + 文档 | **可选未做** |
 
 ### P6 — 对照验收与收口
 
-| 任务 | 内容 | 完成标准 |
-|------|------|----------|
-| P6.1 | 按 parity 清单在本仓跑通 | 差异有记录 |
-| P6.2 | 用 scaffold 做一次「假业务」试挂 | 不改 core |
-| P6.3 | README「从零到绿」走查 | 陌生人可跟做 |
-| P6.4 | 产品仓侧仅文档互链（可选） | 指向本仓地址与原则 |
+| 任务 | 内容 | 完成标准 | 状态 |
+|------|------|----------|------|
+| P6.1 | 按 parity 清单在本仓跑通 | 差异有记录 | **已完成** |
+| P6.2 | 用 scaffold 做一次「假业务」试挂 | 不改 core | **文档指引完成**（不强制提交假域） |
+| P6.3 | README「从零到绿」走查 | 陌生人可跟做 | **已完成** |
+| P6.4 | 产品仓侧仅文档互链（可选） | 指向本仓地址与原则 | **可选未做** |
 
 ### P7 — 后置（不阻塞模板宣布可用）
 
@@ -401,14 +401,15 @@ PKCE 与 SSE 客户端：**重写**，只对齐 Authentik 与契约行为。
 
 ## 14. 成功标准（总验收）
 
-- [ ] compose + API + React 调试台 + OIDC（可关）+ echo 全通  
-- [ ] 同 thread 409、cancel、SSE 稳定事件子集符合 `contracts.md`  
-- [ ] `packages/core` 通过 import-linter；无域/业务包泄漏  
-- [ ] 新域仅通过 register + scaffold，无需改核心源码  
-- [ ] 实现未大段复制产品仓或参照开源仓库代码  
-- [ ] 文档：architecture、contracts、add-a-domain、deploy、parity、调研附录齐全  
-- [ ] CI：architecture gates（import-linter + 包名扫描）绿；pytest/ruff/echo smoke 随 P2/P3 补齐  
-- [ ] ADR-1～10 与实现一致（抽查目录与依赖方向）  
+- [x] compose + API + React 调试台 + OIDC（可关）+ echo 全通  
+- [x] 同 thread 409、cancel、SSE 稳定事件子集符合 `contracts.md`  
+- [x] `packages/core` 通过 import-linter；无域/业务包泄漏  
+- [x] 新域仅通过 register + scaffold，无需改核心源码（runtime 映射不硬编码业务节点名）  
+- [x] 实现未大段复制产品仓或参照开源仓库代码  
+- [x] 文档：architecture、contracts、add-a-domain、deploy、parity、调研附录齐全  
+- [x] CI：architecture gates + pytest/ruff  
+- [x] ADR-1～10 与实现一致（抽查目录与依赖方向）  
+- [ ] P4.2 完整 PKCE ↔ Authentik 联调（后置增强，可用手动 Bearer）  
 
 ---
 

@@ -52,6 +52,6 @@
 
 - [x] echo：`start` → … → `done` 字段符合 contracts.md  
 - [x] 同 `thread_id` 二次 stream → 409 + `thread_busy`  
-- [ ] cancel → 流内出现 `cancel_requested` 与 `cancelled`（HTTP cancel + registry 已测；流内事件可后续补强）  
-- [x] `AUTH_REQUIRED=false` 可调通；`true` 无 token → 401  
+- [x] cancel → 流内出现 `cancel_requested` 与 `cancelled`  
+- [x] `AUTH_REQUIRED=false` 可调通；`true` 无 token → 401（HS256/JWKS；stub 仅 `AUTH_DEV_STUB=1`）  
 - [x] 核心 import 扫描 + import-linter 绿（CI architecture-gates）  
