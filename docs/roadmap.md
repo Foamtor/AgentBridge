@@ -27,7 +27,7 @@
 | **M2a** | 身份 + Tool Policy（list+invoke 双检）+ 审计 + Pipeline | ✅ Plan1 |
 | **M2b** | EventLog（全量已提交）+ 投影（delta 合并）+ replay | ✅ Plan1 |
 | **M3** | DataSource + demo_readonly | ✅ Plan2 |
-| **M4** | 单机生产面（ready/metrics/限流/OTel） | 规划 |
+| **M4** | 单机生产面（ready/metrics/限流/OTel） | ✅ Plan3 |
 | **M5** | Gateway（direct\|gateway 过渡）+ ContextManager + Prompt | 规划 |
 | **M6** | DataFilter、双轨脱敏、Approval（释放锁/同 run resume） | 规划 |
 | **M7** | Memory extra、RAG、citation | 规划 |

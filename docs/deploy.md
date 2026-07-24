@@ -55,7 +55,20 @@ pip install -e "packages/core[postgres]"
 - [ ] 需要会话持久化时关闭 memory checkpointer，Postgres 可达
 - [ ] `AUTH_REQUIRED=true`，关闭 `AUTH_DEV_STUB`
 - [ ] 确认单实例，或已接受无分布式锁风险
-- [ ] `/ready`、`/metrics`（M4）与限流已验证
-- [ ] 审计可用（M2a）；EventLog/消息可查（M2b，若已交付）
+- [ ] `/health`、`/ready`、`/metrics` 已验证；`RATE_LIMIT_PER_MINUTE>0` 时限流返回 `code=rate_limited`
+- [ ] 超长 query 返回 `400 invalid_input`（InputValidator）
+- [ ] `OTEL_ENABLED` 可选（当前为 noop span，开启不抛错）
+- [ ] 审计可用（M2a）；EventLog/消息可查（M2b）
+- [ ] `ENABLE_DATA_SOURCE` 与 checkpointer 开关独立；开启时 `/ready` 会 `SELECT 1`
 - [ ] 日志不落用户原文 / LLM 全文
 - [ ] 管理面/审批 API 权限已按 §4.7 配置（若已交付）
+
+## M4 环境变量（单机生产面）
+
+| 变量 | 默认 | 说明 |
+|------|------|------|
+| `RATE_LIMIT_PER_MINUTE` | `0`（关闭） | 进程内滑动窗口；按客户端 IP |
+| `OTEL_ENABLED` | `false` | 开启后仍为 noop span（可扩展） |
+| `ENABLE_DATA_SOURCE` | `false` | 与 `USE_MEMORY_CHECKPOINTER` 独立 |
+
+运维探针：`GET /health`（存活）、`GET /ready`（依赖；未启用的项 **skipped**）、`GET /metrics`（Prometheus 文本）。

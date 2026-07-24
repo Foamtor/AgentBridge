@@ -32,12 +32,17 @@
 
 | M4 / v1.0 | Task |
 |-----------|------|
-| 限流 middleware | T1 |
-| /metrics | T2 |
-| /ready | T3 |
-| OTel 基础 | T4 |
-| InputValidator | T5 |
-| deploy 清单 + v1.0 标注 | T6 |
+| 限流 middleware | T1 ✅ |
+| /metrics | T2 ✅ |
+| /ready | T3 ✅ |
+| OTel 基础 | T4 ✅ |
+| InputValidator | T5 ✅ |
+| deploy 清单 + v1.0 标注 | T6 ✅ |
+
+## Already done
+
+- [x] 上游 Plan1 全量 + Plan2（本分支基于 `feat/plan2-datasource`）
+- [x] **T1–T6 已实现**（分支 `feat/plan3-single-node-prod`）
 
 ---
 
@@ -122,13 +127,13 @@ chat：校验失败 → HTTP 400 `{"detail":{"code":"invalid_input","message":".
 
 **验收清单（全部勾上才可打 v1.0 tag）：**
 
-- [ ] M0–M3 已按路线图完成（或明确缺口仅文档）  
-- [ ] `/health` `/ready` `/metrics`  
-- [ ] 限流可测  
-- [ ] InputValidator 400  
-- [ ] OTel noop 不抛错  
-- [ ] `docs/deploy.md` 单机清单与实现一致  
-- [ ] README 写明 v1.0=单机、非多机  
+- [x] M0–M3 已按路线图完成（或明确缺口仅文档）  
+- [x] `/health` `/ready` `/metrics`  
+- [x] 限流可测  
+- [x] InputValidator 400  
+- [x] OTel noop 不抛错  
+- [x] `docs/deploy.md` 单机清单与实现一致  
+- [x] README 写明 v1.0=单机、非多机  
 
 ```bash
 python -m pytest packages/core/tests apps/api/tests -v
