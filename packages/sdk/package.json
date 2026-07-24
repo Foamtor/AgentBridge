@@ -1,0 +1,26 @@
+{
+  "name": "@agentbridge/sdk",
+  "version": "0.1.0",
+  "description": "AgentBridge TypeScript client (SSE chat + approvals)",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.0"
+  },
+  "files": [
+    "dist",
+    "src"
+  ]
+}

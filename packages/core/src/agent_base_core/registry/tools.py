@@ -19,3 +19,6 @@ class ToolRegistry:
             return self._items[key]
         except KeyError as exc:
             raise UnknownRoute(key) from exc
+
+    def keys(self) -> list[str]:
+        return sorted(self._items.keys())
