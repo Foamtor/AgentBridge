@@ -75,6 +75,7 @@ body {
 
 input,
 textarea,
+select,
 button {
   font: inherit;
   padding: 0.45rem 0.6rem;
@@ -128,4 +129,21 @@ button:disabled {
 .type-list {
   columns: 2;
   gap: 1rem;
+}
+
+.ext-fold {
+  margin: 1rem 0;
+  border: 1px solid var(--line);
+  padding: 0.5rem 0.75rem;
+  background: #fffdf8;
+}
+
+.ext-fold summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.page h2 {
+  font-size: 1.1rem;
+  margin: 1.25rem 0 0.5rem;
 }

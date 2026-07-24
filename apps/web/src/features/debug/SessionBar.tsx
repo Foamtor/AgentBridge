@@ -7,6 +7,11 @@ type Props = {
   onToken: (v: string) => void;
 };
 
+const ROUTES = [
+  { value: "echo", label: "echo（最小回声）" },
+  { value: "demo_tools", label: "demo_tools（无 LLM / tool + x.*）" },
+];
+
 export function SessionBar({
   threadId,
   route,
@@ -23,7 +28,16 @@ export function SessionBar({
       </label>
       <label>
         route
-        <input value={route} onChange={(e) => onRoute(e.target.value)} />
+        <select value={route} onChange={(e) => onRoute(e.target.value)}>
+          {ROUTES.map((r) => (
+            <option key={r.value} value={r.value}>
+              {r.label}
+            </option>
+          ))}
+          {!ROUTES.some((r) => r.value === route) ? (
+            <option value={route}>{route}</option>
+          ) : null}
+        </select>
       </label>
       <label className="grow">
         Bearer（可选）

@@ -168,6 +168,64 @@ async def test_runtime_tool_error_sets_ok_false():
 
 
 @pytest.mark.asyncio
+async def test_runtime_tool_call_id_from_aimessage_queue():
+    compiled = _FakeCompiled(
+        events=[
+            {
+                "event": "on_chain_end",
+                "name": "prepare_tool_call",
+                "data": {
+                    "output": {
+                        "messages": [
+                            SimpleNamespace(
+                                tool_calls=[
+                                    {
+                                        "name": "add",
+                                        "args": {"a": 1, "b": 2},
+                                        "id": "tc-demo-add-1",
+                                    }
+                                ]
+                            )
+                        ]
+                    }
+                },
+            },
+            {
+                "event": "on_tool_start",
+                "name": "add",
+                "run_id": "lg-run-1",
+                "data": {"input": {"a": 1, "b": 2}},
+            },
+            {
+                "event": "on_tool_end",
+                "name": "add",
+                "run_id": "lg-run-1",
+                "data": {
+                    "output": SimpleNamespace(content="3", tool_call_id="tc-demo-add-1"),
+                    "input": {"a": 1, "b": 2},
+                },
+            },
+        ],
+        state_values={},
+    )
+    runtime = LangGraphRuntime()
+    frags: list[OutboundFragment] = []
+    async for frag in runtime.astream(
+        lambda **_kw: compiled,
+        tools=[],
+        checkpointer=None,
+        thread_id="t1",
+        query="hi",
+        cancel_token=None,
+    ):
+        frags.append(frag)
+    calls = [f for f in frags if f.type == "tool_call"]
+    results = [f for f in frags if f.type == "tool_result"]
+    assert calls[0].data["tool_call_id"] == "tc-demo-add-1"
+    assert results[0].data["tool_call_id"] == "tc-demo-add-1"
+
+
+@pytest.mark.asyncio
 async def test_runtime_rejects_non_compiled_builder():
     runtime = LangGraphRuntime()
     with pytest.raises(RuntimeError, match="astream_events"):
