@@ -161,15 +161,15 @@ class RunLifecycle:
                     if cancel_token.is_set():
                         cancelled = True
                         break
-                    if not isinstance(frag, OutboundFragment):
-                        raise TypeError(
-                            f"runtime must yield OutboundFragment, got {type(frag)!r}"
-                        )
                     try:
+                        if not isinstance(frag, OutboundFragment):
+                            raise TypeError(
+                                f"runtime must yield OutboundFragment, got {type(frag)!r}"
+                            )
                         evt = self._envelope_from_fragment(
                             frag, run_id=run_id, sequence=sequence + 1, trace_id=trace_id
                         )
-                    except ValueError:
+                    except (ValueError, TypeError) as exc:
                         sequence += 1
                         await sink.emit(
                             build_event(
@@ -178,7 +178,7 @@ class RunLifecycle:
                                 sequence=sequence,
                                 trace_id=trace_id,
                                 data={
-                                    "message": f"invalid event type: {frag.type}",
+                                    "message": str(exc),
                                     "code": "invalid_event_type",
                                 },
                             )

@@ -32,8 +32,8 @@ export function ContractsPage() {
 
       <h2>扩展事件</h2>
       <p>
-        形式：<code>^x\.[a-z][a-z0-9_]*\.[a-z0-9_.]+$</code>
-        。样板域 <code>demo_tools</code> 会发出{" "}
+        形式：<code>^x\.[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$</code>
+        （禁止连续点与尾部点）。样板域 <code>demo_tools</code> 会发出{" "}
         <code>x.demo_tools.finished</code>。调试台默认折叠{" "}
         <code>x.*</code>。
       </p>

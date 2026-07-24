@@ -79,7 +79,7 @@
 删除「type 可为自定义字符串；核心原样透传」。改为：
 
 - 稳定九类列表（与现 `EVENT_TYPES` 一致：`start` / `text_delta` / `tool_call` / `tool_result` / `step_update` / `done` / `error` / `cancel_requested` / `cancelled`）
-- 扩展 type 必须匹配 `` `^x\.[a-z][a-z0-9_]*\.[a-z0-9_.]+$` ``
+- 扩展 type 必须匹配 `` `^x\.[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$` ``（禁 `..` / 尾 `.`）
 - 非法扩展 type 不得出站；由应用层 `build_extension_event` 拒绝
 
 确认 `cancel_requested` / `cancelled` 样例 `data` 含 `thread_id`、`run_id`（已有则保留）。确认 `tool_result.data` 字段为 `name` / `ok` / `tool_call_id` / `summary`。
@@ -196,7 +196,7 @@ git commit -m "feat(core): add OutboundFragment and OUTBOUND_EXTENSIONS_KEY"
 
 **Interfaces:**
 - `EVENT_TYPES: frozenset[str]`（不变九类）
-- `EXTENSION_TYPE_RE: re.Pattern[str]` = `re.compile(r"^x\.[a-z][a-z0-9_]*\.[a-z0-9_.]+$")`
+- `EXTENSION_TYPE_RE: re.Pattern[str]` = `re.compile(r"^x\.[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$")`
 - `build_event(...)` — **仅** `type in EVENT_TYPES`，否则 `ValueError`
 - `build_extension_event(type, *, run_id, sequence, trace_id, data=None, step=None, status=None) -> dict` — 仅当 `EXTENSION_TYPE_RE.fullmatch(type)`，否则 `ValueError`（禁止 silent drop）
 - 两者返回完整信封 dict（含 timestamp / event_id）

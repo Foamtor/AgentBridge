@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -13,6 +14,11 @@ from agent_base_core.adapters.event_mapper import (
     map_tool_result,
 )
 from agent_base_core.protocol.fragments import OUTBOUND_EXTENSIONS_KEY, OutboundFragment
+
+logger = logging.getLogger(__name__)
+
+# Framework wrapper names — not domain steps / text sources.
+_SKIP_CHAIN_NAMES = frozenset({"LangGraph", "RunnableSequence"})
 
 
 def _content_to_text(content: Any) -> str | None:
@@ -114,7 +120,20 @@ def _tool_call_id_fallback(event: dict[str, Any], data: dict[str, Any]) -> str:
             val = inp.get(key)
             if isinstance(val, str) and val:
                 return val
-    return str(event.get("run_id") or "tc-unknown")
+    fallback = str(event.get("run_id") or "tc-unknown")
+    if fallback == "tc-unknown":
+        logger.warning(
+            "tool_call_id missing; using fallback %r (event name=%r)",
+            fallback,
+            event.get("name"),
+        )
+    else:
+        logger.warning(
+            "tool_call_id missing; falling back to LangChain run_id=%r (event name=%r)",
+            fallback,
+            event.get("name"),
+        )
+    return fallback
 
 
 class LangGraphRuntime:
@@ -165,10 +184,7 @@ class LangGraphRuntime:
                 name = event.get("name") or ""
                 run_id = str(event.get("run_id") or "")
 
-                if kind == "on_chain_start" and name and name not in {
-                    "LangGraph",
-                    "RunnableSequence",
-                }:
+                if kind == "on_chain_start" and name and name not in _SKIP_CHAIN_NAMES:
                     yield map_step_update(name, "running")
                 elif kind == "on_chat_model_stream":
                     chunk = data.get("chunk")
@@ -218,16 +234,13 @@ class LangGraphRuntime:
                     pending_tool_call_ids.extend(
                         _tool_call_ids_from_chain_output(data.get("output"))
                     )
-                    if name and name not in {"LangGraph", "RunnableSequence"}:
+                    if name and name not in _SKIP_CHAIN_NAMES:
                         yield map_step_update(name, "done")
                     # Prefer token stream; only fallback to full node output when
                     # no chat model stream was seen (e.g. echo-style nodes).
                     if not streamed_model_text:
                         text = _text_from_chain_output(data.get("output"))
-                        if text and name and name not in {
-                            "LangGraph",
-                            "RunnableSequence",
-                        }:
+                        if text and name and name not in _SKIP_CHAIN_NAMES:
                             yield map_text_delta(text)
         finally:
             aclose = getattr(aiter, "aclose", None)

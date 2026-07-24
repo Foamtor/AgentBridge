@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 
 import pytest
 from fastapi.testclient import TestClient
@@ -82,7 +81,6 @@ def test_thread_busy_409(client):
 
 def test_real_echo_stream_has_text_and_done(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("AGENT_BASE_FAKE_RUNTIME", "0")
-    os.environ["AGENT_BASE_FAKE_RUNTIME"] = "0"
     from main import create_app
 
     app = create_app()

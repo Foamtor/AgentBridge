@@ -21,7 +21,8 @@ EVENT_TYPES: frozenset[str] = frozenset(
 )
 
 EXTENSION_TYPE_RE: re.Pattern[str] = re.compile(
-    r"^x\.[a-z][a-z0-9_]*\.[a-z0-9_.]+$"
+    # domain + one-or-more non-empty dotted segments; no ".." or trailing "."
+    r"^x\.[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$"
 )
 
 

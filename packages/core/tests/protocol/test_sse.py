@@ -73,6 +73,8 @@ def test_build_extension_event_ok():
         "x.demo",
         "x.123b.c",
         "x..c",
+        "x.a.b..c",
+        "x.a.b.",
         "x.a.b@d",
     ],
 )
