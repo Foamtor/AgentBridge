@@ -74,6 +74,36 @@ async def test_cancel_emits_cancel_events(graphs, tools, queue_and_sink, drain_e
 
 
 @pytest.mark.asyncio
+async def test_cancel_uses_tenant_storage_key_not_bare_thread(
+    graphs, tools, queue_and_sink, drain_events
+) -> None:
+    """Two tenants can share api thread_id; cancel must hit the right storage_key."""
+    from agent_base_core.application.errors import RunNotFound
+    from agent_base_core.protocol.context import RunContext
+
+    q, sink = queue_and_sink
+    lc = _lc(SlowCancelRuntime(), graphs, tools)
+
+    async def _run():
+        await lc.start_stream(
+            query="hi",
+            thread_id="shared-tid",
+            route="echo",
+            sink=sink,
+            ctx=RunContext(tenant_id="tenant-a", user_id="u1"),
+        )
+
+    task = asyncio.create_task(_run())
+    await asyncio.sleep(0.05)
+    with pytest.raises(RunNotFound):
+        await lc.cancel(thread_id="shared-tid", tenant_id="tenant-b")
+    await lc.cancel(thread_id="shared-tid", tenant_id="tenant-a")
+    await task
+    types = [e["type"] for e in await drain_events(q)]
+    assert "cancelled" in types
+
+
+@pytest.mark.asyncio
 async def test_runtime_error_emits_error_event(graphs, tools, queue_and_sink, drain_events):
     q, sink = queue_and_sink
     lc = _lc(BoomRuntime(), graphs, tools)

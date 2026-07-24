@@ -16,7 +16,7 @@ async def test_project_turn_merges_deltas_and_isolates_tenant() -> None:
     runs = MemoryRunStore()
     run_id = "r-proj"
     await event_log.append(
-        run_id, {"type": "start", "run_id": run_id, "sequence": 1}
+        run_id, {"type": "start", "run_id": run_id, "sequence": 1}, tenant_id="acme"
     )
     await event_log.append(
         run_id,
@@ -26,6 +26,7 @@ async def test_project_turn_merges_deltas_and_isolates_tenant() -> None:
             "sequence": 2,
             "data": {"content": "hel"},
         },
+        tenant_id="acme",
     )
     await event_log.append(
         run_id,
@@ -35,9 +36,10 @@ async def test_project_turn_merges_deltas_and_isolates_tenant() -> None:
             "sequence": 3,
             "data": {"content": "lo"},
         },
+        tenant_id="acme",
     )
     await event_log.append(
-        run_id, {"type": "done", "run_id": run_id, "sequence": 4}
+        run_id, {"type": "done", "run_id": run_id, "sequence": 4}, tenant_id="acme"
     )
     await project_turn(
         event_log=event_log,

@@ -46,3 +46,14 @@ async def test_guard_allows_invoke_for_admin() -> None:
     result = await guarded[0].ainvoke({})
     assert result == "did-delete"
     assert raw.called is True
+
+
+def test_guard_sync_invoke_denies_and_audits() -> None:
+    raw = attach_tool_meta(_T(), required_roles=["admin"])
+    ctx = RunContext(roles=["viewer"], tenant_id="t", user_id="u1")
+    audit = MemoryAuditLogger()
+    guarded = guard_tools([raw], policy=RolePolicyEngine(), ctx=ctx, audit=audit)
+    result = guarded[0].invoke({})
+    assert result == "forbidden"
+    assert raw.called is False
+    assert any(r["result"] == "denied" for r in audit.records)

@@ -14,16 +14,20 @@ def claims_to_run_context(
 ) -> RunContext:
     """Build identity RunContext from optional JWT claims.
 
-    When auth is off (or claims missing while auth off), use the dev default
-    identity: admin with wildcard permissions.
+    Dev default (admin + ``*``) only when ``auth_required`` is False.
+    When auth is required and claims are missing, return an empty identity
+    (no elevated roles/permissions).
     """
-    if not auth_required or claims is None:
+    if not auth_required:
         return RunContext(
             user_id="dev",
             tenant_id="dev",
             roles=["admin"],
             permissions=["*"],
         )
+
+    if claims is None:
+        return RunContext()
 
     roles_raw = claims.get("roles") or []
     if isinstance(roles_raw, str):

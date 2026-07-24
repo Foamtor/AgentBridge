@@ -113,7 +113,11 @@ async def chat_stream(
                     if not cancelled_on_disconnect:
                         cancelled_on_disconnect = True
                         try:
-                            await cancel_run(lifecycle, thread_id=body.thread_id)
+                            await cancel_run(
+                                lifecycle,
+                                thread_id=body.thread_id,
+                                tenant_id=ctx.tenant_id or "default",
+                            )
                         except RunNotFound:
                             pass
                     break
@@ -131,7 +135,11 @@ async def chat_stream(
         finally:
             if not task.done() and not cancelled_on_disconnect:
                 try:
-                    await cancel_run(lifecycle, thread_id=body.thread_id)
+                    await cancel_run(
+                        lifecycle,
+                        thread_id=body.thread_id,
+                        tenant_id=ctx.tenant_id or "default",
+                    )
                 except RunNotFound:
                     pass
             await task
@@ -142,10 +150,19 @@ async def chat_stream(
 @router.post("/cancel")
 async def chat_cancel(
     body: CancelRequest,
+    request: Request,
     lifecycle: RunLifecycle = Depends(get_run_lifecycle),
 ) -> dict[str, bool]:
+    settings = request.app.state.settings
+    claims = getattr(request.state, "auth_claims", None)
+    ctx = claims_to_run_context(claims, auth_required=settings.auth_required)
     try:
-        await cancel_run(lifecycle, thread_id=body.thread_id, run_id=body.run_id)
+        await cancel_run(
+            lifecycle,
+            thread_id=body.thread_id,
+            run_id=body.run_id,
+            tenant_id=ctx.tenant_id or "default",
+        )
     except RunNotFound as exc:
         raise _http_error(
             404,

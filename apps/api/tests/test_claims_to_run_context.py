@@ -39,7 +39,9 @@ def test_auth_on_accepts_tid_and_perms_aliases() -> None:
     assert ctx.permissions == ["write"]
 
 
-def test_auth_on_missing_claims_falls_back_to_dev() -> None:
+def test_auth_on_missing_claims_is_empty_not_admin() -> None:
     ctx = claims_to_run_context(None, auth_required=True)
-    assert ctx.user_id == "dev"
-    assert ctx.roles == ["admin"]
+    assert ctx.user_id == ""
+    assert ctx.tenant_id == ""
+    assert ctx.roles == []
+    assert ctx.permissions == []

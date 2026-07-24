@@ -17,7 +17,7 @@ from agent_base_core.ports.graph_runtime import GraphRuntime
 from agent_base_core.ports.hooks import RunHooks
 from agent_base_core.ports.run_control import RunCancelRegistry
 from agent_base_core.ports.thread_lock import ThreadLock
-from agent_base_core.protocol.context import RunContext
+from agent_base_core.protocol.context import RunContext, checkpoint_thread_key
 from agent_base_core.protocol.events import (
     EVENT_TYPES,
     EXTENSION_TYPE_RE,
@@ -66,7 +66,6 @@ class RunLifecycle:
         self._event_log = event_log
         self._message_store = message_store
         self._run_store = run_store
-        self._api_to_storage: dict[str, str] = {}
 
     def replace_runtime(self, runtime: GraphRuntime) -> None:
         """Test/host hook to swap GraphRuntime without private attribute access."""
@@ -113,10 +112,14 @@ class RunLifecycle:
             )
         raise ValueError(f"invalid outbound fragment type: {frag.type}")
 
-    async def _emit(self, sink: EventSink, evt: dict[str, Any]) -> None:
+    async def _emit(
+        self, sink: EventSink, evt: dict[str, Any], *, tenant_id: str
+    ) -> None:
         if self._event_log is not None:
             try:
-                await self._event_log.append(evt["run_id"], evt)
+                await self._event_log.append(
+                    evt["run_id"], evt, tenant_id=tenant_id
+                )
             except Exception as exc:  # noqa: BLE001 — fail closed on any append error
                 raise EventLogAppendError(str(exc)) from exc
         await sink.emit(evt)
@@ -129,6 +132,7 @@ class RunLifecycle:
         sequence: int,
         trace_id: str,
         message: str,
+        tenant_id: str,
     ) -> None:
         try:
             await self._emit(
@@ -140,14 +144,12 @@ class RunLifecycle:
                     trace_id=trace_id,
                     data={"message": message, "code": "event_log_append_failed"},
                 ),
+                tenant_id=tenant_id,
             )
         except EventLogAppendError:
             logger.exception(
                 "event log append failed for error frame run_id=%s", run_id
             )
-
-    def _storage_key_for_api_thread(self, thread_id: str) -> str:
-        return self._api_to_storage.get(thread_id, thread_id)
 
     async def start_stream(
         self,
@@ -171,12 +173,12 @@ class RunLifecycle:
         run_ctx = run_ctx.model_copy(
             update={"run_id": run_id, "trace_id": run_ctx.trace_id or run_id}
         )
+        # Optional ctx is for hosts/tests; tools must use get_run_context(config).
+        tenant_id = run_ctx.tenant_id or "default"
         graph_cfg = build_graph_config(thread_id=thread_id, ctx=run_ctx)
         storage_key = str(graph_cfg["storage_key"])
-        self._api_to_storage[thread_id] = storage_key
 
         if not await self._locks.try_acquire(storage_key, run_id):
-            self._api_to_storage.pop(thread_id, None)
             raise ThreadBusy(thread_id)
 
         cancel_token = asyncio.Event()
@@ -213,6 +215,7 @@ class RunLifecycle:
                     trace_id=trace_id,
                     data={"thread_id": thread_id, "route": route},
                 ),
+                tenant_id=tenant_id,
             )
 
             checkpointer = await self._checkpointers.get()
@@ -262,12 +265,13 @@ class RunLifecycle:
                                     "code": "invalid_event_type",
                                 },
                             ),
+                            tenant_id=tenant_id,
                         )
                         terminal_sent = True
                         terminal_status = "error"
                         return
                     sequence += 1
-                    await self._emit(sink, evt)
+                    await self._emit(sink, evt, tenant_id=tenant_id)
             except EventLogAppendError as exc:
                 sequence += 1
                 await self._emit_append_failed_error(
@@ -276,6 +280,7 @@ class RunLifecycle:
                     sequence=sequence,
                     trace_id=trace_id,
                     message=str(exc),
+                    tenant_id=tenant_id,
                 )
                 terminal_sent = True
                 terminal_status = "error"
@@ -292,6 +297,7 @@ class RunLifecycle:
                         trace_id=trace_id,
                         data={"message": str(exc), "code": "run_failed"},
                     ),
+                    tenant_id=tenant_id,
                 )
                 terminal_sent = True
                 terminal_status = "error"
@@ -311,6 +317,7 @@ class RunLifecycle:
                         trace_id=trace_id,
                         data={"thread_id": thread_id, "run_id": run_id},
                     ),
+                    tenant_id=tenant_id,
                 )
                 sequence += 1
                 await self._emit(
@@ -322,6 +329,7 @@ class RunLifecycle:
                         trace_id=trace_id,
                         data={"thread_id": thread_id, "run_id": run_id},
                     ),
+                    tenant_id=tenant_id,
                 )
                 terminal_sent = True
                 terminal_status = "cancelled"
@@ -335,6 +343,7 @@ class RunLifecycle:
                         sequence=sequence,
                         trace_id=trace_id,
                     ),
+                    tenant_id=tenant_id,
                 )
                 terminal_sent = True
                 terminal_status = "done"
@@ -350,6 +359,7 @@ class RunLifecycle:
                     sequence=sequence,
                     trace_id=trace_id,
                     message=str(exc),
+                    tenant_id=tenant_id,
                 )
                 terminal_sent = True
                 terminal_status = "error"
@@ -371,6 +381,7 @@ class RunLifecycle:
                         trace_id=trace_id,
                         data={"message": str(exc), "code": "run_failed"},
                     ),
+                    tenant_id=tenant_id,
                 )
                 terminal_sent = True
                 terminal_status = "error"
@@ -390,7 +401,7 @@ class RunLifecycle:
                         event_log=self._event_log,
                         message_store=self._message_store,
                         run_store=self._run_store,
-                        tenant_id=run_ctx.tenant_id or "default",
+                        tenant_id=tenant_id,
                         thread_id=thread_id,
                         run_id=run_id,
                         query=query,
@@ -410,15 +421,17 @@ class RunLifecycle:
                 )
             await self._locks.release(storage_key, run_id)
             await self._cancels.unregister(storage_key, run_id)
-            self._api_to_storage.pop(thread_id, None)
             if not pre_start_failure:
                 await sink.close()
 
-    async def cancel(self, *, thread_id: str, run_id: str | None = None) -> None:
-        key = self._storage_key_for_api_thread(thread_id)
+    async def cancel(
+        self,
+        *,
+        thread_id: str,
+        run_id: str | None = None,
+        tenant_id: str | None = None,
+    ) -> None:
+        key = checkpoint_thread_key(tenant_id or "default", thread_id)
         ok = await self._cancels.request_cancel(key, run_id)
-        if not ok:
-            # Fallback: bare key (tests / race before map filled)
-            ok = await self._cancels.request_cancel(thread_id, run_id)
         if not ok:
             raise RunNotFound(thread_id)

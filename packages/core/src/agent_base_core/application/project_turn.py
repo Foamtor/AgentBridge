@@ -43,7 +43,7 @@ async def project_turn(
     query: str,
     terminal: str,
 ) -> None:
-    events = await event_log.list(run_id)
+    events = await event_log.list(run_id, tenant_id=tenant_id)
     await message_store.append_message(
         tenant_id,
         thread_id,
