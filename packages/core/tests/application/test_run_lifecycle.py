@@ -177,3 +177,34 @@ async def test_hooks_failure_still_releases_lock(graphs, tools, queue_and_sink, 
     key = checkpoint_thread_key("default", "t-hooks")
     assert await locks.try_acquire(key, "r-next")
     await locks.release(key, "r-next")
+
+
+@pytest.mark.asyncio
+async def test_span_enter_failure_still_releases_lock(
+    graphs, tools, queue_and_sink
+) -> None:
+    from contextlib import contextmanager
+
+    @contextmanager
+    def boom_span(*, run_id: str, route: str, tenant_id: str):
+        raise RuntimeError("span enter boom")
+        yield  # pragma: no cover
+
+    q, sink = queue_and_sink
+    locks = InProcessThreadLock()
+    lc = RunLifecycle(
+        locks=locks,
+        checkpointers=FakeCheckpointerFactory(),
+        graphs=graphs,
+        tools=tools,
+        input_builders=InputBuilderRegistry(),
+        runtime=FakeRuntime(),
+        cancels=InProcessCancelRegistry(),
+        hooks=NoopHooks(),
+        span_factory=boom_span,
+    )
+    with pytest.raises(RuntimeError, match="span enter boom"):
+        await lc.start_stream(query="hi", thread_id="t-span", route="echo", sink=sink)
+    key = checkpoint_thread_key("default", "t-span")
+    assert await locks.try_acquire(key, "r-next")
+    await locks.release(key, "r-next")

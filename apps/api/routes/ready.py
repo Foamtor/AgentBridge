@@ -30,8 +30,12 @@ async def _check_event_log(event_log: Any) -> dict[str, Any]:
 async def _check_checkpointer(checkpointers: Any) -> dict[str, Any]:
     if checkpointers is None:
         return {"status": "skipped", "reason": "no checkpointer"}
-    # setup() already ran in lifespan; memory and PG factories expose no ping —
-    # report ok if object exists post-setup.
+    is_setup = getattr(checkpointers, "is_setup", None)
+    if callable(is_setup):
+        if not bool(is_setup()):
+            return {"status": "fail", "error": "checkpointer not set up"}
+        return {"status": "ok"}
+    # Legacy adapters without is_setup: presence after lifespan.setup() only.
     return {"status": "ok"}
 
 
