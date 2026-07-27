@@ -39,6 +39,7 @@ from config.logging import configure_logging
 from config.settings import Settings, get_settings
 from admin.catalog import build_domain_catalog
 from adapters.domain_prompt_registry import DomainFilePromptRegistry
+from adapters.knowledge_status import build_knowledge_status_provider
 from adapters.memory_usage_store import MemoryUsageStore
 from domains.bootstrap import DOMAIN_META_MAP, register_all
 
@@ -149,6 +150,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     from adapters.knowledge_backend import build_retriever
 
     retriever = await build_retriever(settings)
+    knowledge_status_provider = build_knowledge_status_provider(settings, retriever)
     data_source = _build_data_source(settings)
     llm_gateway = _build_llm_gateway(settings)
     from adapters.prometheus_metrics import PrometheusMetrics
@@ -203,6 +205,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.prompt_runtime = prompt_runtime
     app.state.usage_store = usage_store
     app.state.retriever = retriever
+    app.state.knowledge_status_provider = knowledge_status_provider
     app.state.data_source = data_source
     app.state.llm_gateway = llm_gateway
     app.state.metrics = metrics
