@@ -3,8 +3,8 @@
 import asyncio
 
 import pytest
-from agent_base_core.adapters.inprocess_cancel import InProcessCancelRegistry
-from agent_base_core.adapters.inprocess_lock import InProcessThreadLock
+from agentbridge_core.adapters.inprocess_cancel import InProcessCancelRegistry
+from agentbridge_core.adapters.inprocess_lock import InProcessThreadLock
 
 
 @pytest.mark.asyncio

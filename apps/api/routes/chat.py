@@ -9,17 +9,17 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
-from agent_base_core.adapters.sse_event_sink import SseEventSink
-from agent_base_core.application.errors import (
+from agentbridge_core.adapters.sse_event_sink import SseEventSink
+from agentbridge_core.application.errors import (
     InvalidInput,
     RunNotFound,
     ThreadBusy,
     UnknownRoute,
 )
-from agent_base_core.application.pipeline import RequestPipeline
-from agent_base_core.application.run_lifecycle import RunLifecycle
-from agent_base_core.protocol.sse import format_sse_line
-from agent_base_core.public import cancel_run, orchestration_stream
+from agentbridge_core.application.pipeline import RequestPipeline
+from agentbridge_core.application.run_lifecycle import RunLifecycle
+from agentbridge_core.protocol.sse import format_sse_line
+from agentbridge_core.public import cancel_run, orchestration_stream
 from auth.run_context import claims_to_run_context
 from deps import get_pipeline, get_run_lifecycle
 from routes.schemas import CancelRequest, ChatStreamRequest

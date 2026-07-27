@@ -4,9 +4,9 @@ from __future__ import annotations
 
 DOMAIN_META = {"description": "LLM 网关调用示例插件"}
 
-from agent_base_core.registry.graphs import GraphRegistry
-from agent_base_core.registry.input_builders import InputBuilderRegistry
-from agent_base_core.registry.tools import ToolRegistry
+from agentbridge_core.registry.graphs import GraphRegistry
+from agentbridge_core.registry.input_builders import InputBuilderRegistry
+from agentbridge_core.registry.tools import ToolRegistry
 
 from domains.demo_llm.graph import ask_model, build_demo_llm_graph
 

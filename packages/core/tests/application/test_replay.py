@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import pytest
-from agent_base_core.adapters.memory_event_log import MemoryEventLog
-from agent_base_core.application.replay import replay_run
+from agentbridge_core.adapters.memory_event_log import MemoryEventLog
+from agentbridge_core.application.replay import replay_run
 
 
 @pytest.mark.asyncio

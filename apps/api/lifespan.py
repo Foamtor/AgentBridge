@@ -8,34 +8,34 @@ from typing import Any, AsyncIterator
 
 from fastapi import FastAPI
 
-from agent_base_core.adapters.basic_input_validator import BasicInputValidator
-from agent_base_core.adapters.inprocess_cancel import InProcessCancelRegistry
-from agent_base_core.adapters.inprocess_lock import InProcessThreadLock
-from agent_base_core.adapters.langgraph_runtime import LangGraphRuntime
-from agent_base_core.adapters.logging_hooks import LoggingHooks
-from agent_base_core.adapters.memory_approval_store import MemoryApprovalStore
-from agent_base_core.adapters.memory_audit_logger import MemoryAuditLogger
-from agent_base_core.adapters.memory_checkpointer import MemoryCheckpointerFactory
-from agent_base_core.adapters.memory_event_log import MemoryEventLog
-from agent_base_core.adapters.memory_message_store import MemoryMessageStore
-from agent_base_core.adapters.memory_run_store import MemoryRunStore
-from agent_base_core.adapters.memory_ingest_job_store import MemoryIngestJobStore
-from agent_base_core.adapters.memory_config_provider import MemoryConfigProvider
-from agent_base_core.adapters.layered_prompt_registry import LayeredPromptRegistry
-from agent_base_core.adapters.memory_prompt_registry import MemoryPromptRegistry
-from agent_base_core.adapters.noop_data_source import NoopDataSource
-from agent_base_core.adapters.noop_hooks import NoopHooks
-from agent_base_core.adapters.role_policy import RolePolicyEngine
-from agent_base_core.adapters.safety_hooks import SafetyHooks
-from agent_base_core.application.pipeline import (
+from agentbridge_core.adapters.basic_input_validator import BasicInputValidator
+from agentbridge_core.adapters.inprocess_cancel import InProcessCancelRegistry
+from agentbridge_core.adapters.inprocess_lock import InProcessThreadLock
+from agentbridge_core.adapters.langgraph_runtime import LangGraphRuntime
+from agentbridge_core.adapters.logging_hooks import LoggingHooks
+from agentbridge_core.adapters.memory_approval_store import MemoryApprovalStore
+from agentbridge_core.adapters.memory_audit_logger import MemoryAuditLogger
+from agentbridge_core.adapters.memory_checkpointer import MemoryCheckpointerFactory
+from agentbridge_core.adapters.memory_event_log import MemoryEventLog
+from agentbridge_core.adapters.memory_message_store import MemoryMessageStore
+from agentbridge_core.adapters.memory_run_store import MemoryRunStore
+from agentbridge_core.adapters.memory_ingest_job_store import MemoryIngestJobStore
+from agentbridge_core.adapters.memory_config_provider import MemoryConfigProvider
+from agentbridge_core.adapters.layered_prompt_registry import LayeredPromptRegistry
+from agentbridge_core.adapters.memory_prompt_registry import MemoryPromptRegistry
+from agentbridge_core.adapters.noop_data_source import NoopDataSource
+from agentbridge_core.adapters.noop_hooks import NoopHooks
+from agentbridge_core.adapters.role_policy import RolePolicyEngine
+from agentbridge_core.adapters.safety_hooks import SafetyHooks
+from agentbridge_core.application.pipeline import (
     InputValidatorPlugin,
     RequestPipeline,
     ToolPolicyPlugin,
 )
-from agent_base_core.application.run_lifecycle import RunLifecycle
-from agent_base_core.registry.graphs import GraphRegistry
-from agent_base_core.registry.input_builders import InputBuilderRegistry
-from agent_base_core.registry.tools import ToolRegistry
+from agentbridge_core.application.run_lifecycle import RunLifecycle
+from agentbridge_core.registry.graphs import GraphRegistry
+from agentbridge_core.registry.input_builders import InputBuilderRegistry
+from agentbridge_core.registry.tools import ToolRegistry
 from config.logging import configure_logging
 from config.settings import Settings, get_settings
 from admin.catalog import build_domain_catalog
@@ -66,9 +66,9 @@ def _build_data_source(settings: Settings) -> Any:
 
 def _build_llm_gateway(settings: Settings) -> Any:
     """Build gateway; default FakeChatModel keeps CI offline."""
-    from agent_base_core.adapters.alias_llm_gateway import AliasLLMGateway
-    from agent_base_core.adapters.direct_llm_gateway import DirectLLMGateway
-    from agent_base_core.adapters.fake_chat_model import FakeChatModel
+    from agentbridge_core.adapters.alias_llm_gateway import AliasLLMGateway
+    from agentbridge_core.adapters.direct_llm_gateway import DirectLLMGateway
+    from agentbridge_core.adapters.fake_chat_model import FakeChatModel
 
     default_model = FakeChatModel(["direct-ok"])
     if settings.llm_backend == "gateway":
@@ -116,7 +116,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     if settings.use_memory_checkpointer:
         checkpointers = MemoryCheckpointerFactory()
     else:
-        from agent_base_core.adapters.postgres_checkpointer import (
+        from agentbridge_core.adapters.postgres_checkpointer import (
             PostgresCheckpointerFactory,
         )
 

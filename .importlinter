@@ -1,5 +1,5 @@
 [importlinter]
-root_package = agent_base_core
+root_package = agentbridge_core
 
 [importlinter:contract:core_layers]
 name = core layered dependencies (high -> low)
@@ -10,45 +10,45 @@ layers =
     ports
     protocol
 containers =
-    agent_base_core
+    agentbridge_core
 
 [importlinter:contract:application_must_not_import_adapters]
 name = application must not import adapters
 type = forbidden
 source_modules =
-    agent_base_core.application
+    agentbridge_core.application
 forbidden_modules =
-    agent_base_core.adapters
+    agentbridge_core.adapters
 
 [importlinter:contract:adapters_must_not_import_application]
 name = adapters must not import application
 type = forbidden
 source_modules =
-    agent_base_core.adapters
+    agentbridge_core.adapters
 forbidden_modules =
-    agent_base_core.application
+    agentbridge_core.application
 
 [importlinter:contract:adapters_must_not_import_registry]
 name = adapters must not import registry
 type = forbidden
 source_modules =
-    agent_base_core.adapters
+    agentbridge_core.adapters
 forbidden_modules =
-    agent_base_core.registry
+    agentbridge_core.registry
 
 [importlinter:contract:adapters_sibling_independence]
 name = adapters modules are independent except approved edges
 type = independence
 modules =
-    agent_base_core.adapters.langgraph_runtime
-    agent_base_core.adapters.event_mapper
-    agent_base_core.adapters.sse_event_sink
-    agent_base_core.adapters.inprocess_lock
-    agent_base_core.adapters.inprocess_cancel
-    agent_base_core.adapters.memory_checkpointer
-    agent_base_core.adapters.postgres_checkpointer
-    agent_base_core.adapters.noop_hooks
-    agent_base_core.adapters.logging_hooks
-    agent_base_core.adapters.langchain_pg_retriever
+    agentbridge_core.adapters.langgraph_runtime
+    agentbridge_core.adapters.event_mapper
+    agentbridge_core.adapters.sse_event_sink
+    agentbridge_core.adapters.inprocess_lock
+    agentbridge_core.adapters.inprocess_cancel
+    agentbridge_core.adapters.memory_checkpointer
+    agentbridge_core.adapters.postgres_checkpointer
+    agentbridge_core.adapters.noop_hooks
+    agentbridge_core.adapters.logging_hooks
+    agentbridge_core.adapters.langchain_pg_retriever
 ignore_imports =
-    agent_base_core.adapters.langgraph_runtime -> agent_base_core.adapters.event_mapper
+    agentbridge_core.adapters.langgraph_runtime -> agentbridge_core.adapters.event_mapper

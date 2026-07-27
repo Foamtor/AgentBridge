@@ -1,4 +1,4 @@
-from agent_base_core.protocol.fragments import (
+from agentbridge_core.protocol.fragments import (
     OUTBOUND_EXTENSIONS_KEY,
     OutboundFragment,
 )

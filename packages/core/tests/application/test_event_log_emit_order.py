@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import pytest
-from agent_base_core.adapters.inprocess_cancel import InProcessCancelRegistry
-from agent_base_core.adapters.inprocess_lock import InProcessThreadLock
-from agent_base_core.adapters.memory_event_log import MemoryEventLog
-from agent_base_core.adapters.noop_hooks import NoopHooks
-from agent_base_core.application.run_lifecycle import RunLifecycle
-from agent_base_core.protocol.fragments import OutboundFragment
-from agent_base_core.registry.input_builders import InputBuilderRegistry
+from agentbridge_core.adapters.inprocess_cancel import InProcessCancelRegistry
+from agentbridge_core.adapters.inprocess_lock import InProcessThreadLock
+from agentbridge_core.adapters.memory_event_log import MemoryEventLog
+from agentbridge_core.adapters.noop_hooks import NoopHooks
+from agentbridge_core.application.run_lifecycle import RunLifecycle
+from agentbridge_core.protocol.fragments import OutboundFragment
+from agentbridge_core.registry.input_builders import InputBuilderRegistry
 
 from fakes import FakeCheckpointerFactory, FakeRuntime
 

@@ -7,7 +7,7 @@ import logging
 import pytest
 from langchain_core.documents import Document
 
-from agent_base_core.adapters.langchain_pg_retriever import LangchainPgRetriever
+from agentbridge_core.adapters.langchain_pg_retriever import LangchainPgRetriever
 
 
 class _FakeStore:

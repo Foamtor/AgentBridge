@@ -7,7 +7,7 @@ from typing import Any
 
 import httpx
 
-from agent_base_core.protocol.knowledge import (
+from agentbridge_core.protocol.knowledge import (
     KnowledgeHit,
     doc_to_knowledge_hit,
     require_tenant_id,

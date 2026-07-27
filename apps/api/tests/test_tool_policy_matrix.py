@@ -5,11 +5,11 @@ from __future__ import annotations
 import os
 
 import pytest
-from agent_base_core.adapters.memory_audit_logger import MemoryAuditLogger
-from agent_base_core.adapters.role_policy import RolePolicyEngine
-from agent_base_core.application.pipeline import PipelineRequest, ToolPolicyPlugin
-from agent_base_core.application.tool_guard import guard_tools
-from agent_base_core.protocol.context import RunContext
+from agentbridge_core.adapters.memory_audit_logger import MemoryAuditLogger
+from agentbridge_core.adapters.role_policy import RolePolicyEngine
+from agentbridge_core.application.pipeline import PipelineRequest, ToolPolicyPlugin
+from agentbridge_core.application.tool_guard import guard_tools
+from agentbridge_core.protocol.context import RunContext
 from fastapi.testclient import TestClient
 from jose import jwt
 
@@ -68,7 +68,7 @@ def test_chat_stream_with_viewer_jwt_audits_list_tools(monkeypatch: pytest.Monke
     monkeypatch.setenv("AUTH_REQUIRED", "true")
     monkeypatch.setenv("AUTH_DEV_STUB", "false")
     monkeypatch.setenv("OIDC_JWT_SECRET", secret)
-    monkeypatch.setenv("AGENT_BASE_FAKE_RUNTIME", "1")
+    monkeypatch.setenv("AGENTBRIDGE_FAKE_RUNTIME", "1")
     os.environ["AUTH_REQUIRED"] = "true"
     os.environ["AUTH_DEV_STUB"] = "false"
     os.environ["OIDC_JWT_SECRET"] = secret

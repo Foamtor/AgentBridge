@@ -14,7 +14,7 @@ FORBIDDEN_PREFIXES = (
 ROOT = Path(__file__).resolve().parents[1]
 SCAN_ROOTS = (
     ROOT / "apps" / "api" / "domains",
-    ROOT / "packages" / "core" / "src" / "agent_base_core" / "application",
+    ROOT / "packages" / "core" / "src" / "agentbridge_core" / "application",
 )
 
 

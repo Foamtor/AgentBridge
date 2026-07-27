@@ -1,14 +1,14 @@
 import asyncio
 
 import pytest
-from agent_base_core.adapters.event_mapper import (
+from agentbridge_core.adapters.event_mapper import (
     map_step_update,
     map_text_delta,
     map_tool_call,
     map_tool_result,
 )
-from agent_base_core.adapters.sse_event_sink import SseEventSink
-from agent_base_core.protocol.fragments import OutboundFragment
+from agentbridge_core.adapters.sse_event_sink import SseEventSink
+from agentbridge_core.protocol.fragments import OutboundFragment
 
 
 @pytest.mark.asyncio

@@ -5,8 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from agent_base_core.adapters.file_prompt_registry import FilePromptRegistry
-from agent_base_core.adapters.token_budget_context_manager import (
+from agentbridge_core.adapters.file_prompt_registry import FilePromptRegistry
+from agentbridge_core.adapters.token_budget_context_manager import (
     TokenBudgetContextManager,
 )
 

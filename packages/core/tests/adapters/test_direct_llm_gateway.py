@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import pytest
-from agent_base_core.adapters.direct_llm_gateway import DirectLLMGateway
-from agent_base_core.adapters.fake_chat_model import FakeChatModel
-from agent_base_core.protocol.context import RunContext
+from agentbridge_core.adapters.direct_llm_gateway import DirectLLMGateway
+from agentbridge_core.adapters.fake_chat_model import FakeChatModel
+from agentbridge_core.protocol.context import RunContext
 
 
 @pytest.mark.asyncio

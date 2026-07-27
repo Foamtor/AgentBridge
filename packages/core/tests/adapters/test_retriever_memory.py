@@ -5,9 +5,9 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-from agent_base_core.adapters.fake_retriever import FakeRetriever
-from agent_base_core.adapters.timeout_memory_store import TimeoutMemoryStore
-from agent_base_core.protocol.context import RunContext
+from agentbridge_core.adapters.fake_retriever import FakeRetriever
+from agentbridge_core.adapters.timeout_memory_store import TimeoutMemoryStore
+from agentbridge_core.protocol.context import RunContext
 
 
 @pytest.mark.asyncio

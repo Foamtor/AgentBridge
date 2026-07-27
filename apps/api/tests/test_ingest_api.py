@@ -48,7 +48,7 @@ def test_ingest_rejects_invalid_doc(client) -> None:
 
 
 def test_ingest_unsupported_for_external_backend(client) -> None:
-    from agent_base_core.adapters.unsupported_knowledge_ingest import (
+    from agentbridge_core.adapters.unsupported_knowledge_ingest import (
         UnsupportedKnowledgeIngest,
     )
 
@@ -66,7 +66,7 @@ def test_ingest_requires_knowledge_write(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setenv("AUTH_REQUIRED", "true")
     monkeypatch.setenv("AUTH_DEV_STUB", "false")
     monkeypatch.setenv("OIDC_JWT_SECRET", secret)
-    monkeypatch.setenv("AGENT_BASE_FAKE_RUNTIME", "1")
+    monkeypatch.setenv("AGENTBRIDGE_FAKE_RUNTIME", "1")
     os.environ["AUTH_REQUIRED"] = "true"
     os.environ["AUTH_DEV_STUB"] = "false"
     os.environ["OIDC_JWT_SECRET"] = secret

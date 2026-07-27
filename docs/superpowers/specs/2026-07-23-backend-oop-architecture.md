@@ -27,7 +27,7 @@
                            │ 只调「应用服务」
                            ▼
 ┌────────────────────────────────────────────────────────────┐
-│  ② 应用层（Application）  agent_base_core/application       │
+│  ② 应用层（Application）  agentbridge_core/application       │
 │  职责：一次「跑对话 / 取消」的步骤编排（加锁→建 Run→推流）   │
 │  类比：Application Service / UseCase                         │
 │  特点：这里写「流程」，不写 SQL，不写 JWT 细节                │
@@ -35,7 +35,7 @@
                            │ 只依赖「接口」（Protocol）
                            ▼
 ┌────────────────────────────────────────────────────────────┐
-│  ③ 接口层（Ports）  agent_base_core/ports                   │
+│  ③ 接口层（Ports）  agentbridge_core/ports                   │
 │  职责：定义抽象能力 —— 「我需要能加锁 / 存状态 / 发事件」    │
 │  类比：Java Interface / C# interface / 抽象基类              │
 │  特点：只有方法签名，没有具体实现                            │
@@ -43,7 +43,7 @@
                            │ 运行时由具体类实现
                            ▼
 ┌────────────────────────────────────────────────────────────┐
-│  ④ 实现层（Adapters）  agent_base_core/adapters             │
+│  ④ 实现层（Adapters）  agentbridge_core/adapters             │
 │  职责：真正干活 —— 进程内锁、Postgres、LangGraph、SSE 队列  │
 │  类比：Repository 实现类、基础设施类                         │
 └────────────────────────────────────────────────────────────┘

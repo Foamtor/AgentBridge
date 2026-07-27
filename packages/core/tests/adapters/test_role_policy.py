@@ -1,8 +1,8 @@
 from types import SimpleNamespace
 
-from agent_base_core.adapters.role_policy import RolePolicyEngine
-from agent_base_core.protocol.context import RunContext
-from agent_base_core.protocol.tool_meta import attach_tool_meta
+from agentbridge_core.adapters.role_policy import RolePolicyEngine
+from agentbridge_core.protocol.context import RunContext
+from agentbridge_core.protocol.tool_meta import attach_tool_meta
 
 
 def _tool(name: str, **meta):

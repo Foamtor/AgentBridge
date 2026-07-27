@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from agent_base_core.adapters.allowlist_data_filter import AllowlistDataFilter
-from agent_base_core.adapters.regex_data_masker import RegexDataMasker
-from agent_base_core.protocol.context import RunContext
+from agentbridge_core.adapters.allowlist_data_filter import AllowlistDataFilter
+from agentbridge_core.adapters.regex_data_masker import RegexDataMasker
+from agentbridge_core.protocol.context import RunContext
 
 
 def test_data_filter_no_rules_returns_empty() -> None:

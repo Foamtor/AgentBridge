@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import pytest
-from agent_base_core.adapters.memory_message_store import MemoryMessageStore
-from agent_base_core.adapters.memory_run_store import MemoryRunStore
+from agentbridge_core.adapters.memory_message_store import MemoryMessageStore
+from agentbridge_core.adapters.memory_run_store import MemoryRunStore
 
 
 @pytest.mark.asyncio

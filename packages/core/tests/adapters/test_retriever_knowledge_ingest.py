@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from agent_base_core.adapters.fake_retriever import FakeRetriever
-from agent_base_core.adapters.memory_ingest_job_store import MemoryIngestJobStore
-from agent_base_core.adapters.retriever_knowledge_ingest import RetrieverKnowledgeIngest
+from agentbridge_core.adapters.fake_retriever import FakeRetriever
+from agentbridge_core.adapters.memory_ingest_job_store import MemoryIngestJobStore
+from agentbridge_core.adapters.retriever_knowledge_ingest import RetrieverKnowledgeIngest
 
 
 @pytest.mark.asyncio

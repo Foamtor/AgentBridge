@@ -5,17 +5,17 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-from agent_base_core.adapters.approval_aware_runtime import ApprovalAwareRuntime
-from agent_base_core.adapters.inprocess_cancel import InProcessCancelRegistry
-from agent_base_core.adapters.inprocess_lock import InProcessThreadLock
-from agent_base_core.adapters.memory_approval_store import MemoryApprovalStore
-from agent_base_core.adapters.memory_event_log import MemoryEventLog
-from agent_base_core.adapters.memory_message_store import MemoryMessageStore
-from agent_base_core.adapters.memory_run_store import MemoryRunStore
-from agent_base_core.adapters.noop_hooks import NoopHooks
-from agent_base_core.application.run_lifecycle import RunLifecycle
-from agent_base_core.protocol.context import RunContext, checkpoint_thread_key
-from agent_base_core.registry.input_builders import InputBuilderRegistry
+from agentbridge_core.adapters.approval_aware_runtime import ApprovalAwareRuntime
+from agentbridge_core.adapters.inprocess_cancel import InProcessCancelRegistry
+from agentbridge_core.adapters.inprocess_lock import InProcessThreadLock
+from agentbridge_core.adapters.memory_approval_store import MemoryApprovalStore
+from agentbridge_core.adapters.memory_event_log import MemoryEventLog
+from agentbridge_core.adapters.memory_message_store import MemoryMessageStore
+from agentbridge_core.adapters.memory_run_store import MemoryRunStore
+from agentbridge_core.adapters.noop_hooks import NoopHooks
+from agentbridge_core.application.run_lifecycle import RunLifecycle
+from agentbridge_core.protocol.context import RunContext, checkpoint_thread_key
+from agentbridge_core.registry.input_builders import InputBuilderRegistry
 
 from fakes import FakeCheckpointerFactory
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from agent_base_core.adapters.safety_hooks import SafetyHooks
+from agentbridge_core.adapters.safety_hooks import SafetyHooks
 
 
 def test_safety_hooks_redacts_phone() -> None:

@@ -1,6 +1,6 @@
-# Agent-Base
+# AgentBridge
 
-> 产品对外名字也可以叫 **AgentBridge**。仓库和 Python 包目前仍叫 Agent-Base / `agent_base_*`，以后若改名会单独说明。
+> 自托管 Agent 接入底座。Python 包：`agentbridge-core`（import `agentbridge_core`）、`agentbridge-api`。
 
 **这是什么：**  
 一个可以自己部署的 **Agent 接入平台**。业务团队主要写「对话怎么走、调用哪些工具」；流式输出、互斥、取消、登录校验、权限、审计这些公共能力由平台统一提供。

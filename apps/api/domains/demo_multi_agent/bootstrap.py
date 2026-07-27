@@ -2,9 +2,9 @@ from __future__ import annotations
 
 DOMAIN_META = {"description": "多 Agent 协作示例插件"}
 
-from agent_base_core.registry.graphs import GraphRegistry
-from agent_base_core.registry.input_builders import InputBuilderRegistry
-from agent_base_core.registry.tools import ToolRegistry
+from agentbridge_core.registry.graphs import GraphRegistry
+from agentbridge_core.registry.input_builders import InputBuilderRegistry
+from agentbridge_core.registry.tools import ToolRegistry
 
 from domains.demo_multi_agent.graph import build_demo_multi_agent_graph
 

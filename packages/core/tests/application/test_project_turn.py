@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import pytest
-from agent_base_core.adapters.memory_event_log import MemoryEventLog
-from agent_base_core.adapters.memory_message_store import MemoryMessageStore
-from agent_base_core.adapters.memory_run_store import MemoryRunStore
-from agent_base_core.application.project_turn import project_turn
+from agentbridge_core.adapters.memory_event_log import MemoryEventLog
+from agentbridge_core.adapters.memory_message_store import MemoryMessageStore
+from agentbridge_core.adapters.memory_run_store import MemoryRunStore
+from agentbridge_core.application.project_turn import project_turn
 
 
 @pytest.mark.asyncio

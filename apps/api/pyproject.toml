@@ -1,9 +1,9 @@
 [project]
-name = "agent-base-api"
+name = "agentbridge-api"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
-  "agent-base-core",
+  "agentbridge-core",
   "fastapi>=0.115",
   "uvicorn[standard]>=0.30",
   "pydantic>=2.8",
@@ -24,7 +24,7 @@ redis = [
   "redis>=5.0,<6",
 ]
 rag = [
-  "agent-base-core[rag]",
+  "agentbridge-core[rag]",
 ]
 
 [build-system]
@@ -40,4 +40,4 @@ packages = ["auth", "config", "routes", "domains", "adapters", "testing", "middl
 "deps.py" = "deps.py"
 
 [tool.uv.sources]
-agent-base-core = { path = "../../packages/core", editable = true }
+agentbridge-core = { path = "../../packages/core", editable = true }

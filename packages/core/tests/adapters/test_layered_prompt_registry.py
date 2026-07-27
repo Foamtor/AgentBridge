@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from agent_base_core.adapters.file_prompt_registry import FilePromptRegistry
-from agent_base_core.adapters.layered_prompt_registry import LayeredPromptRegistry
-from agent_base_core.adapters.memory_prompt_registry import MemoryPromptRegistry
+from agentbridge_core.adapters.file_prompt_registry import FilePromptRegistry
+from agentbridge_core.adapters.layered_prompt_registry import LayeredPromptRegistry
+from agentbridge_core.adapters.memory_prompt_registry import MemoryPromptRegistry
 
 
 def test_layered_prompt_prefers_published_platform(tmp_path: Path) -> None:

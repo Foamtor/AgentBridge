@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import pytest
-from agent_base_core.adapters.fake_data_source import FakeDataSource
-from agent_base_core.adapters.role_policy import RolePolicyEngine
-from agent_base_core.protocol.context import RUN_CONTEXT_KEY, RunContext, get_run_context
-from agent_base_core.protocol.tool_meta import get_tool_meta
+from agentbridge_core.adapters.fake_data_source import FakeDataSource
+from agentbridge_core.adapters.role_policy import RolePolicyEngine
+from agentbridge_core.protocol.context import RUN_CONTEXT_KEY, RunContext, get_run_context
+from agentbridge_core.protocol.tool_meta import get_tool_meta
 from fastapi.testclient import TestClient
 from jose import jwt
 
@@ -61,7 +61,7 @@ async def test_list_orders_uses_tenant_and_data_source() -> None:
 
 
 def test_chat_injects_data_source_into_run_context(client: TestClient) -> None:
-    from agent_base_core.adapters.fake_data_source import FakeDataSource
+    from agentbridge_core.adapters.fake_data_source import FakeDataSource
 
     fake = FakeDataSource()
     client.app.state.data_source = fake
@@ -90,7 +90,7 @@ def test_viewer_jwt_hides_list_orders_from_tool_list(monkeypatch: pytest.MonkeyP
     monkeypatch.setenv("AUTH_REQUIRED", "true")
     monkeypatch.setenv("AUTH_DEV_STUB", "false")
     monkeypatch.setenv("OIDC_JWT_SECRET", secret)
-    monkeypatch.setenv("AGENT_BASE_FAKE_RUNTIME", "1")
+    monkeypatch.setenv("AGENTBRIDGE_FAKE_RUNTIME", "1")
     import os
 
     os.environ["AUTH_REQUIRED"] = "true"

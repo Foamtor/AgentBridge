@@ -551,7 +551,7 @@ slowapi → 自研/Redis；Langfuse 不强制自托管；Guardrails 不必装。
 - 无官方托管与 Studio  
 - 多 Agent = subgraph 委托，非研究型 GroupChat  
 - 多机仅 M9；默认单机  
-- 包名可能仍为 `agent_base_*`，与产品名 AgentBridge 并存直至重命名  
+- 包名：`agentbridge_*` / PyPI：`agentbridge-core`  
 - 合规认证需项目侧补齐  
 
 ## 附录 C：v4.1 / v4.1.1 修订摘要

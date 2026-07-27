@@ -1,13 +1,13 @@
 import asyncio
 
 import pytest
-from agent_base_core.adapters.inprocess_cancel import InProcessCancelRegistry
-from agent_base_core.adapters.inprocess_lock import InProcessThreadLock
-from agent_base_core.adapters.noop_hooks import NoopHooks
-from agent_base_core.application.errors import ThreadBusy
-from agent_base_core.application.run_lifecycle import RunLifecycle
-from agent_base_core.protocol.context import checkpoint_thread_key
-from agent_base_core.registry.input_builders import InputBuilderRegistry
+from agentbridge_core.adapters.inprocess_cancel import InProcessCancelRegistry
+from agentbridge_core.adapters.inprocess_lock import InProcessThreadLock
+from agentbridge_core.adapters.noop_hooks import NoopHooks
+from agentbridge_core.application.errors import ThreadBusy
+from agentbridge_core.application.run_lifecycle import RunLifecycle
+from agentbridge_core.protocol.context import checkpoint_thread_key
+from agentbridge_core.registry.input_builders import InputBuilderRegistry
 
 from fakes import (
     BadExtensionRuntime,
@@ -78,8 +78,8 @@ async def test_cancel_uses_tenant_storage_key_not_bare_thread(
     graphs, tools, queue_and_sink, drain_events
 ) -> None:
     """Two tenants can share api thread_id; cancel must hit the right storage_key."""
-    from agent_base_core.application.errors import RunNotFound
-    from agent_base_core.protocol.context import RunContext
+    from agentbridge_core.application.errors import RunNotFound
+    from agentbridge_core.protocol.context import RunContext
 
     q, sink = queue_and_sink
     lc = _lc(SlowCancelRuntime(), graphs, tools)

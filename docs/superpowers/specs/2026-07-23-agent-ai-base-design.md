@@ -1,9 +1,9 @@
-# Agent-Base 全栈 AI 基底模板 — 设计规格
+# AgentBridge 全栈 AI 基底模板 — 设计规格
 
 > **阅读提示：** 这是历史设计/实施记录。文中若仍有偏内部的说法，请以仓库根目录 README、docs/roadmap.md、docs/add-a-domain.md 的白话为准。\n\n> **历史规格。** 当前产品总说明：[00-AgentBridge完整方案.md](../../00-AgentBridge完整方案.md) **v4.1**；冲突时以 v4.1 为准。  
 > 状态：**审阅高优项已修复**（见 §19）；可写实施计划；P0 待填 contracts JSON 样例  
 > 日期：2026-07-23  
-> 仓库：`D:\WorkSpace\code\project\Agent-Base`（模板仓，绿场）  
+> 仓库：`D:\WorkSpace\code\project\AgentBridge`（模板仓，绿场）  
 > 参照产品仓：`D:\WorkSpace\code\project\RAG_Agent`（继续演进，不整包拷贝）  
 > 架构必读：[OO 分层说明](./2026-07-23-backend-oop-architecture.md)  
 > 代码结构：[完整目录树](./2026-07-23-code-structure.md)  
@@ -74,7 +74,7 @@
 ## 4. 双仓关系
 
 ```text
-RAG_Agent（产品仓）                    Agent-Base（本仓）
+RAG_Agent（产品仓）                    AgentBridge（本仓）
 继续演进业务                            绿场本平台权威说明
         │                                      ▲
         │  提供：能力清单、验收场景、踩坑经验     │
@@ -144,7 +144,7 @@ Run 简化状态：`accepted → running → succeeded | failed | cancelled`；t
 摘要：
 
 ```text
-packages/core/src/agent_base_core/   # application · ports · adapters · registry · protocol
+packages/core/src/agentbridge_core/   # application · ports · adapters · registry · protocol
 apps/api/                            # main · lifespan(服务启动时的组装代码) · auth · routes · domains
 apps/web/src/                        # features/auth|debug|contracts · lib/sseClient
 ```
@@ -157,7 +157,7 @@ apps/web ──HTTP──▶ apps/api (delivery / lifespan)
                       │  lifespan：new adapters，注入 RunLifecycle
                       │  domains.bootstrap → registry.register_*
                       ▼
-              agent_base_core.application  (RunLifecycle)
+              agentbridge_core.application  (RunLifecycle)
                       │ 只依赖 ports + registry + protocol
                       ▼
                    ports（接口）

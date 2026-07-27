@@ -7,8 +7,8 @@ import os
 import pytest
 
 pytestmark = pytest.mark.skipif(
-    not os.environ.get("AGENT_BASE_TEST_PG_DSN"),
-    reason="AGENT_BASE_TEST_PG_DSN not set",
+    not os.environ.get("AGENTBRIDGE_TEST_PG_DSN"),
+    reason="AGENTBRIDGE_TEST_PG_DSN not set",
 )
 
 
@@ -16,7 +16,7 @@ pytestmark = pytest.mark.skipif(
 async def test_postgres_data_source_roundtrip() -> None:
     from adapters.postgres_data_source import PostgresDataSource
 
-    dsn = os.environ["AGENT_BASE_TEST_PG_DSN"]
+    dsn = os.environ["AGENTBRIDGE_TEST_PG_DSN"]
     ds = PostgresDataSource(dsn)
     try:
         await ds.execute(

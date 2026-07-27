@@ -7,7 +7,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from agent_base_core.application.errors import RunNotFound, ThreadBusy
+from agentbridge_core.application.errors import RunNotFound, ThreadBusy
 from auth.run_context import claims_to_run_context
 
 router = APIRouter(prefix="/approvals", tags=["approvals"])

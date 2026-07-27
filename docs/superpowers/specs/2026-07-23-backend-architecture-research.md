@@ -1,4 +1,4 @@
-# Agent-Base 后端架构调研
+# AgentBridge 后端架构调研
 
 > **阅读提示：** 这是历史设计/实施记录。文中若仍有偏内部的说法，请以仓库根目录 README、docs/roadmap.md、docs/add-a-domain.md 的白话为准。\n\n> 日期：2026-07-23  
 > 目的：为绿场重写提供依据——对照业界实践与开源项目，选定分层、模式与技术边界  
@@ -163,7 +163,7 @@
 ## 7. 建议的核心包内部结构（相对初稿加细）
 
 ```text
-packages/core/src/agent_base_core/
+packages/core/src/agentbridge_core/
   application/
     run_lifecycle.py      # start_stream / cancel
     errors.py             # ThreadBusy, RunNotFound, …

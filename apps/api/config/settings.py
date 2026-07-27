@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     pg_dsn: str = Field(default="", validation_alias="PG_DSN")
     pg_host: str = "localhost"
     pg_port: int = 5432
-    pg_database: str = "agent_base"
+    pg_database: str = "agentbridge"
     pg_user: str = "postgres"
     pg_password: str = "postgres"
     oidc_issuer: str = ""
@@ -30,7 +30,7 @@ class Settings(BaseSettings):
         default=False, validation_alias="ENABLE_DATA_SOURCE"
     )
     data_source_dsn: str = Field(default="", validation_alias="DATA_SOURCE_DSN")
-    fake_runtime: bool = Field(default=False, validation_alias="AGENT_BASE_FAKE_RUNTIME")
+    fake_runtime: bool = Field(default=False, validation_alias="AGENTBRIDGE_FAKE_RUNTIME")
     hooks_backend: str = Field(default="noop", validation_alias="HOOKS_BACKEND")
     rate_limit_per_minute: int = Field(
         default=0, validation_alias="RATE_LIMIT_PER_MINUTE"

@@ -48,14 +48,14 @@
 
 | 路径 | 职责 |
 |------|------|
-| `packages/core/src/agent_base_core/protocol/fragments.py` | **新建** `OutboundFragment` + `OUTBOUND_EXTENSIONS_KEY` |
-| `packages/core/src/agent_base_core/protocol/events.py` | `build_event` 收紧；新增 `build_extension_event` + `EXTENSION_TYPE_RE` |
-| `packages/core/src/agent_base_core/protocol/__init__.py` | 按需导出 |
-| `packages/core/src/agent_base_core/adapters/event_mapper.py` | 返回 Fragment；加 `map_tool_result` |
-| `packages/core/src/agent_base_core/adapters/langgraph_runtime.py` | `on_tool_end` / 最小 step / **`aget_state` 读扩展** |
-| `packages/core/src/agent_base_core/ports/graph_runtime.py` | Protocol 返回类型改为 `AsyncIterator[OutboundFragment]` |
-| `packages/core/src/agent_base_core/application/run_lifecycle.py` | Fragment→信封；cancel data；terminal_sent |
-| `packages/core/src/agent_base_core/ports/event_sink.py` | 仍 emit `dict`（完整信封） |
+| `packages/core/src/agentbridge_core/protocol/fragments.py` | **新建** `OutboundFragment` + `OUTBOUND_EXTENSIONS_KEY` |
+| `packages/core/src/agentbridge_core/protocol/events.py` | `build_event` 收紧；新增 `build_extension_event` + `EXTENSION_TYPE_RE` |
+| `packages/core/src/agentbridge_core/protocol/__init__.py` | 按需导出 |
+| `packages/core/src/agentbridge_core/adapters/event_mapper.py` | 返回 Fragment；加 `map_tool_result` |
+| `packages/core/src/agentbridge_core/adapters/langgraph_runtime.py` | `on_tool_end` / 最小 step / **`aget_state` 读扩展** |
+| `packages/core/src/agentbridge_core/ports/graph_runtime.py` | Protocol 返回类型改为 `AsyncIterator[OutboundFragment]` |
+| `packages/core/src/agentbridge_core/application/run_lifecycle.py` | Fragment→信封；cancel data；terminal_sent |
+| `packages/core/src/agentbridge_core/ports/event_sink.py` | 仍 emit `dict`（完整信封） |
 | `apps/api/routes/chat.py` | **与 Task 6 同改**：删 r-host、禁双发 error |
 | `docs/contracts.md` | 对齐稳定九类 + `x.*`；cancel data 样例保留 |
 | `docs/superpowers/specs/2026-07-23-code-structure.md` | adapters 同层允许 |
@@ -96,8 +96,8 @@ git commit -m "docs(contracts): stable event types plus x.* extension rules"
 ### Task 2: protocol.OutboundFragment + OUTBOUND_EXTENSIONS_KEY
 
 **Files:**
-- Create: `packages/core/src/agent_base_core/protocol/fragments.py`
-- Modify: `packages/core/src/agent_base_core/protocol/__init__.py`（可选 re-export）
+- Create: `packages/core/src/agentbridge_core/protocol/fragments.py`
+- Modify: `packages/core/src/agentbridge_core/protocol/__init__.py`（可选 re-export）
 - Create: `packages/core/tests/protocol/test_fragments.py`
 
 **Interfaces:**
@@ -107,7 +107,7 @@ git commit -m "docs(contracts): stable event types plus x.* extension rules"
 **模型定义（必须按此实现，放在 protocol 层）：**
 
 ```python
-# packages/core/src/agent_base_core/protocol/fragments.py
+# packages/core/src/agentbridge_core/protocol/fragments.py
 """Semantic outbound payload before RunLifecycle assigns envelope fields."""
 
 from __future__ import annotations
@@ -139,7 +139,7 @@ class OutboundFragment(BaseModel):
 
 ```python
 # packages/core/tests/protocol/test_fragments.py
-from agent_base_core.protocol.fragments import (
+from agentbridge_core.protocol.fragments import (
     OUTBOUND_EXTENSIONS_KEY,
     OutboundFragment,
 )
@@ -182,7 +182,7 @@ Expected: PASS
 - [x] **Step 5: Commit**
 
 ```bash
-git add packages/core/src/agent_base_core/protocol packages/core/tests/protocol/test_fragments.py
+git add packages/core/src/agentbridge_core/protocol packages/core/tests/protocol/test_fragments.py
 git commit -m "feat(core): add OutboundFragment and OUTBOUND_EXTENSIONS_KEY"
 ```
 
@@ -191,7 +191,7 @@ git commit -m "feat(core): add OutboundFragment and OUTBOUND_EXTENSIONS_KEY"
 ### Task 3: Option B builders + extension regex
 
 **Files:**
-- Modify: `packages/core/src/agent_base_core/protocol/events.py`
+- Modify: `packages/core/src/agentbridge_core/protocol/events.py`
 - Modify: `packages/core/tests/protocol/test_sse.py`
 
 **Interfaces:**
@@ -205,7 +205,7 @@ git commit -m "feat(core): add OutboundFragment and OUTBOUND_EXTENSIONS_KEY"
 
 ```python
 import pytest
-from agent_base_core.protocol.events import build_event, build_extension_event
+from agentbridge_core.protocol.events import build_event, build_extension_event
 
 
 def test_build_event_rejects_extension_type():
@@ -260,7 +260,7 @@ git commit -m "feat(core): Option B build_event vs build_extension_event"
 ### Task 4: event_mapper → OutboundFragment + map_tool_result
 
 **Files:**
-- Modify: `packages/core/src/agent_base_core/adapters/event_mapper.py`
+- Modify: `packages/core/src/agentbridge_core/adapters/event_mapper.py`
 - Modify: `packages/core/tests/adapters/test_event_mapper.py`
 
 **Interfaces:**
@@ -298,13 +298,13 @@ git commit -m "feat(core): mappers return OutboundFragment; add map_tool_result"
 ### Task 5: LangGraphRuntime 防腐闭合 + Port 签名
 
 **Files:**
-- Modify: `packages/core/src/agent_base_core/ports/graph_runtime.py`
-- Modify: `packages/core/src/agent_base_core/adapters/langgraph_runtime.py`
+- Modify: `packages/core/src/agentbridge_core/ports/graph_runtime.py`
+- Modify: `packages/core/src/agentbridge_core/adapters/langgraph_runtime.py`
 - Create/Modify: `packages/core/tests/adapters/test_langgraph_runtime.py`（或扩展现有测）
 
 **Interfaces:**
 - `GraphRuntime.astream(...) -> AsyncIterator[OutboundFragment]`（Protocol 与实现一致；**不再** `AsyncIterator[dict]`）
-- 扩展键：从 `agent_base_core.protocol.fragments` import `OUTBOUND_EXTENSIONS_KEY`
+- 扩展键：从 `agentbridge_core.protocol.fragments` import `OUTBOUND_EXTENSIONS_KEY`
 
 **行为（对齐规格 §3.5 / §3.6）:**
 1. `async for` yield **`OutboundFragment`**（不是完整 event dict）
@@ -333,7 +333,7 @@ git commit -m "feat(core): runtime emits fragments via aget_state extensions"
 ### Task 6: RunLifecycle 终端保证 + chat 删除 r-host（同一切片）
 
 **Files:**
-- Modify: `packages/core/src/agent_base_core/application/run_lifecycle.py`
+- Modify: `packages/core/src/agentbridge_core/application/run_lifecycle.py`
 - Modify: `packages/core/tests/application/test_run_lifecycle.py`
 - Modify: `packages/core/tests/conftest.py`（FakeRuntime yield `OutboundFragment`）
 - Modify: `apps/api/routes/chat.py`（**本 Task 必须改完**，勿留到 Task 8）
@@ -386,7 +386,7 @@ git commit -m "feat(core,api): lifecycle envelopes + remove chat r-host duplicat
 
 - [x] **Step 1: 实现域 + bootstrap 注册**
 
-- [x] **Step 2: 集成测绿（`AGENT_BASE_FAKE_RUNTIME=0`）**
+- [x] **Step 2: 集成测绿（`AGENTBRIDGE_FAKE_RUNTIME=0`）**
 
 - [x] **Step 3: 确认 `rg demo_tools packages/core` 无匹配**
 
@@ -402,7 +402,7 @@ git commit -m "feat(api): add demo_tools domain with tool SSE and x.* extension"
 
 **Files:**
 - Create: `apps/api/testing/fake_runtime.py`
-- Modify: `packages/core/src/agent_base_core/application/run_lifecycle.py`（测试钩子，见下）
+- Modify: `packages/core/src/agentbridge_core/application/run_lifecycle.py`（测试钩子，见下）
 - Modify: `apps/api/lifespan.py`、`config/settings.py`、`main.py`（如需）
 - Modify: `apps/api/tests/test_chat_cancel.py`（及任何 `app.state.cancels`/`locks` 直访）
 - Modify: `docs/superpowers/specs/2026-07-23-code-structure.md`（写明 adapters→adapters 允许）
@@ -430,7 +430,7 @@ await client.app.state.cancels.register("t-cancel", "r1", token)
 Task 8 后 `app.state.cancels` 不再存在。给 `RunLifecycle` 加**仅测试用**钩子（与既有 `replace_runtime` 同风格），经 `app.state.run_lifecycle` 调用，**不**把 registry 挂回 `app.state`：
 
 ```python
-# packages/core/src/agent_base_core/application/run_lifecycle.py
+# packages/core/src/agentbridge_core/application/run_lifecycle.py
 async def _test_register_cancel(
     self,
     thread_id: str,

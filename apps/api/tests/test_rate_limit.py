@@ -26,9 +26,9 @@ def test_sliding_window_disabled_when_limit_zero() -> None:
 
 def test_rate_limit_middleware_returns_429(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("RATE_LIMIT_PER_MINUTE", "2")
-    monkeypatch.setenv("AGENT_BASE_FAKE_RUNTIME", "1")
+    monkeypatch.setenv("AGENTBRIDGE_FAKE_RUNTIME", "1")
     os.environ["RATE_LIMIT_PER_MINUTE"] = "2"
-    os.environ["AGENT_BASE_FAKE_RUNTIME"] = "1"
+    os.environ["AGENTBRIDGE_FAKE_RUNTIME"] = "1"
     from testing.app_factory import create_test_app as create_app
 
     app = create_app()

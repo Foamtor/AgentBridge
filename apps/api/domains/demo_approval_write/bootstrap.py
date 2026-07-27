@@ -2,9 +2,9 @@ from __future__ import annotations
 
 DOMAIN_META = {"description": "写操作审批门禁示例插件"}
 
-from agent_base_core.registry.graphs import GraphRegistry
-from agent_base_core.registry.input_builders import InputBuilderRegistry
-from agent_base_core.registry.tools import ToolRegistry
+from agentbridge_core.registry.graphs import GraphRegistry
+from agentbridge_core.registry.input_builders import InputBuilderRegistry
+from agentbridge_core.registry.tools import ToolRegistry
 
 from domains.demo_approval_write.graph import build_demo_approval_write_graph
 

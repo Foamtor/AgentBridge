@@ -49,7 +49,7 @@ def test_admin_tools_ok_with_admin_read(monkeypatch: pytest.MonkeyPatch) -> None
     monkeypatch.setenv("AUTH_REQUIRED", "true")
     monkeypatch.setenv("AUTH_DEV_STUB", "false")
     monkeypatch.setenv("OIDC_JWT_SECRET", secret)
-    monkeypatch.setenv("AGENT_BASE_FAKE_RUNTIME", "1")
+    monkeypatch.setenv("AGENTBRIDGE_FAKE_RUNTIME", "1")
     os.environ["AUTH_REQUIRED"] = "true"
     os.environ["AUTH_DEV_STUB"] = "false"
     os.environ["OIDC_JWT_SECRET"] = secret
@@ -80,7 +80,7 @@ def test_tool_invoke_denied_by_policy_when_enabled(
     monkeypatch.setenv("AUTH_DEV_STUB", "false")
     monkeypatch.setenv("OIDC_JWT_SECRET", secret)
     monkeypatch.setenv("ADMIN_TOOL_INVOKE_ENABLED", "true")
-    monkeypatch.setenv("AGENT_BASE_FAKE_RUNTIME", "1")
+    monkeypatch.setenv("AGENTBRIDGE_FAKE_RUNTIME", "1")
     os.environ["AUTH_REQUIRED"] = "true"
     os.environ["AUTH_DEV_STUB"] = "false"
     os.environ["OIDC_JWT_SECRET"] = secret

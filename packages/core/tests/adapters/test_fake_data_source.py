@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import pytest
-from agent_base_core.adapters.fake_data_source import FakeDataSource
-from agent_base_core.adapters.noop_data_source import NoopDataSource
+from agentbridge_core.adapters.fake_data_source import FakeDataSource
+from agentbridge_core.adapters.noop_data_source import NoopDataSource
 
 
 @pytest.mark.asyncio

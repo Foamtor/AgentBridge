@@ -8,7 +8,7 @@ import threading
 import time
 
 import anyio
-from agent_base_core.protocol.fragments import OutboundFragment
+from agentbridge_core.protocol.fragments import OutboundFragment
 
 
 def test_cancel_404_when_idle(client):
@@ -18,7 +18,7 @@ def test_cancel_404_when_idle(client):
 
 
 def test_cancel_200_when_registered(client):
-    from agent_base_core.protocol.context import checkpoint_thread_key
+    from agentbridge_core.protocol.context import checkpoint_thread_key
 
     async def _reg():
         # Must match auth-off tenant "dev" used by cancel → storage_key.

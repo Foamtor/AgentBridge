@@ -1,9 +1,9 @@
-# Agent-Base 全面优化设计 — 模板硬化 + 生产能力（两期）
+# AgentBridge 全面优化设计 — 模板硬化 + 生产能力（两期）
 
 > **阅读提示：** 这是历史设计/实施记录。文中若仍有偏内部的说法，请以仓库根目录 README、docs/roadmap.md、docs/add-a-domain.md 的白话为准。\n\n> **历史规格。** 当前产品总说明：[00-AgentBridge完整方案.md](../../00-AgentBridge完整方案.md) **v4.1** 与 [roadmap.md](../../roadmap.md)；冲突时以 v4.1 为准。  
 > 状态：**一期验收项已完成（见 §8）；实施在 `feat/template-hardening`**  
 > 日期：2026-07-24  
-> 仓库：`Agent-Base`  
+> 仓库：`AgentBridge`  
 > 前置：主设计 [2026-07-23-agent-ai-base-design.md](./2026-07-23-agent-ai-base-design.md)、[code-structure](./2026-07-23-code-structure.md)  
 > 决策摘要：路径 D · 扩展事件稳定集+`x.*` · 长期 `demo_tools` · **build_event=Option B** · 扩展通道=状态约定
 
@@ -83,7 +83,7 @@
 
 ### 3.2 OutboundFragment（protocol 层，Pydantic）
 
-- **位置（硬性）：** `packages/core/src/agent_base_core/protocol/fragments.py`  
+- **位置（硬性）：** `packages/core/src/agentbridge_core/protocol/fragments.py`  
   **禁止**放在 `adapters/` 或 `application/`。
 - **形态：** Pydantic v2 `BaseModel`，`model_config = ConfigDict(extra="forbid")`，字段：
 
@@ -209,7 +209,7 @@ apps/api/domains/demo_tools/
 
 ### 5.1 adapters 同层依赖
 
-**允许** `agent_base_core.adapters.* → adapters.*`（如 `langgraph_runtime` → `event_mapper`）。  
+**允许** `agentbridge_core.adapters.* → adapters.*`（如 `langgraph_runtime` → `event_mapper`）。  
 
 实施时：
 

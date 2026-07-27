@@ -6,8 +6,8 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-from agent_base_core.adapters.langgraph_runtime import LangGraphRuntime
-from agent_base_core.protocol.fragments import OUTBOUND_EXTENSIONS_KEY, OutboundFragment
+from agentbridge_core.adapters.langgraph_runtime import LangGraphRuntime
+from agentbridge_core.protocol.fragments import OUTBOUND_EXTENSIONS_KEY, OutboundFragment
 
 
 class _FakeCompiled:

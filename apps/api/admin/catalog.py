@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from agent_base_core.protocol.tool_meta import get_tool_meta
+from agentbridge_core.protocol.tool_meta import get_tool_meta
 
 
 def _tool_name(tool: Any) -> str:

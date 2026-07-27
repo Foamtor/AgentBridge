@@ -19,10 +19,10 @@ def _parse_sse(body: str) -> list[dict]:
 
 
 def test_demo_multi_agent_two_agent_ids(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("AGENT_BASE_FAKE_RUNTIME", "0")
+    monkeypatch.setenv("AGENTBRIDGE_FAKE_RUNTIME", "0")
     import os
 
-    os.environ["AGENT_BASE_FAKE_RUNTIME"] = "0"
+    os.environ["AGENTBRIDGE_FAKE_RUNTIME"] = "0"
     from testing.app_factory import create_test_app as create_app
 
     app = create_app()

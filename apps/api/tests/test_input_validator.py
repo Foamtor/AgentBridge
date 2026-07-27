@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import pytest
-from agent_base_core.adapters.basic_input_validator import BasicInputValidator
-from agent_base_core.application.pipeline import InputValidatorPlugin, PipelineRequest
-from agent_base_core.errors import InvalidInput
-from agent_base_core.protocol.context import RunContext
+from agentbridge_core.adapters.basic_input_validator import BasicInputValidator
+from agentbridge_core.application.pipeline import InputValidatorPlugin, PipelineRequest
+from agentbridge_core.errors import InvalidInput
+from agentbridge_core.protocol.context import RunContext
 
 
 @pytest.mark.asyncio

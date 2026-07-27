@@ -1,10 +1,10 @@
-"""Deterministic GraphRuntime for API tests (AGENT_BASE_FAKE_RUNTIME=1)."""
+"""Deterministic GraphRuntime for API tests (AGENTBRIDGE_FAKE_RUNTIME=1)."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from agent_base_core.protocol.fragments import OutboundFragment
+from agentbridge_core.protocol.fragments import OutboundFragment
 
 
 class ApiFakeRuntime:

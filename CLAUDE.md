@@ -1,4 +1,4 @@
-# Agent-Base / AgentBridge
+# AgentBridge / AgentBridge
 
 本文件与 `AGENTS.md` 内容相同，给 Claude 等工具读取。请以 `AGENTS.md` 为准。
 
