@@ -1,12 +1,12 @@
 # 底座 R-A 实施设计（langchain_pg 真检索）
 
-> **状态：** 审阅修订稿（2026-07-27）  
+> **状态：** 设计定稿 · 实施计划已就绪（2026-07-27）  
 > **日期：** 2026-07-27  
 > **归属：** 设计三类之 **① 底座**（见 [design-tracks.md](../../design-tracks.md)）  
 > **上位 Spec：** [platform-final-spec.md](./2026-07-27-platform-final-spec.md)  
 > **收敛依据：** [scheme-convergence.md](./2026-07-27-scheme-convergence.md)  
 > **多后端地图：** [rag-production-design.md](./2026-07-27-rag-production-design.md)  
-> **实施计划：** 本设计定稿后由 writing-plans 产出（对齐 [Plan6](../plans/2026-07-27-plan6-rag-production.md) R-A / T1–T8）
+> **实施计划：** [../plans/2026-07-27-platform-ra.md](../plans/2026-07-27-platform-ra.md)（对齐 [Plan6](../plans/2026-07-27-plan6-rag-production.md) R-A / T1–T8）
 
 ---
 
@@ -270,9 +270,8 @@ Compose：已有 `postgres-rag`（`pgvector/pgvector:pg16`，`--profile rag`）�
 
 ## 9. 下一步
 
-1. 用户确认本修订稿  
-2. 通过后 → **writing-plans** 产出可执行任务清单（Plan6 T1–T8）  
-3. 再开实施会话按计划编码  
+1. 按 [platform-ra 实施计划](../plans/2026-07-27-platform-ra.md) 执行 Task 1–8  
+2. R-A 手测通过后再开 R-B（`/ingest`）  
 
 ---
 
