@@ -1,6 +1,6 @@
 # AgentBridge 管理后端最终形态 Spec（开源可发布级）
 
-> **状态：** 设计定稿 v2（C0–C4 分期对齐，待实现对齐）  
+> **状态：** 设计定稿 v2.1（C0–C4 + 代码复核对齐，待实现对齐）  
 > **日期：** 2026-07-27（修订 2026-07-27）  
 > **读者：** 平台管理员 · 集成开发者 · 开源贡献者  
 > **归属：** 设计三类之 **② 管理后台**（见 [design-tracks.md](../../design-tracks.md)）  
@@ -69,6 +69,7 @@
 | Run 列表 API | 新增 `GET /admin/runs`（管理列表）；**不**占用业务契约 `GET /runs` |
 | C3 Token 粒度 | `tenant_id` + `route` + `model` 三维分组 |
 | Plan7 T7 `demo_datasource` | **属 ③ 业务插件轨**，不在本 spec 范围 |
+| 代码复核（v2.1） | C0 前置：Run 投影扩展（§6.2）、域元数据（§6.3）、配置 manifest（§5.3）；`domains` 响应由数组改为对象 |
 
 ---
 
@@ -94,10 +95,10 @@ AI 控制台
 
 **总览页**（数据来自 `GET /admin/overview`，线框详见 [console-design §5.1](./2026-07-27-ai-admin-console-design.md)）
 - 卡片 1：插件数（已注册 / graph 就绪）
-- 卡片 2：LLM Backend 类型 + 状态
-- 卡片 3：Knowledge Backend 类型 + 状态
-- 卡片 4：`/ready` 摘要（各依赖 healthy / degraded / skipped）
-- 卡片 5：近 24h Run 总数、错误 Run 数（**不含 Token**）
+- 卡片 2：LLM Backend 类型 + **探测状态**（见 §4.1 overview 规则）
+- 卡片 3：Knowledge Backend 类型 + **探测状态**（与 `/ready` 解耦）
+- 卡片 4：**基础设施就绪**（透传 `GET /ready` 的 `checks`；词汇 `ready` / `not_ready`）
+- 卡片 5：近 24h Run 总数、错误 Run 数（**不含 Token**；依赖 §6.2 Run 投影）
 - 底部：最近 5 条失败 run（可选，有则展示）
 
 **调试页**
@@ -119,7 +120,7 @@ AI 控制台
 
 | API | 阶段 | 权限 | 说明 |
 |-----|------|------|------|
-| `GET /admin/overview` | C0 | `admin:read` | 总览聚合（24h Run/错误、ready 摘要） |
+| `GET /admin/overview` | C0 | `admin:read` | 总览聚合（24h Run/错误、backend 探测、infra ready） |
 | `GET /admin/domains` | C0 | `admin:domains` | 插件列表与摘要 |
 | `GET /admin/config` | C0 | `admin:config` / `admin:read` | 配置只读分档 |
 | `GET /admin/audit/export` | 已有 | `admin:audit` | 审计导出 |
@@ -140,15 +141,16 @@ AI 控制台
 
 ```json
 {
-  "domains": { "registered": 4, "graph_ready": 4 },
-  "llm_backend": { "type": "gateway", "status": "healthy" },
-  "knowledge_backend": { "type": "langchain_pg", "status": "degraded" },
-  "ready": {
-    "status": "degraded",
-    "checks": [
-      { "name": "postgres", "status": "healthy" },
-      { "name": "embedding", "status": "degraded", "message": "optional" }
-    ]
+  "domains": { "registered": 7, "graph_ready": 7 },
+  "llm_backend": { "type": "gateway", "status": "ok" },
+  "knowledge_backend": { "type": "langchain_pg", "status": "degraded", "message": "embed probe failed" },
+  "infra_ready": {
+    "status": "ready",
+    "checks": {
+      "checkpointer": { "status": "ok" },
+      "event_log": { "status": "ok" },
+      "data_source": { "status": "skipped", "reason": "ENABLE_DATA_SOURCE=false" }
+    }
   },
   "runs_24h": { "total": 128, "errors": 5 },
   "recent_failed_runs": [
@@ -162,25 +164,44 @@ AI 控制台
 }
 ```
 
-规则：按 JWT `tenant_id` 统计近 24h；`runs_24h` **不含 Token**；无数据时计数为 `0`，`recent_failed_runs` 可为 `[]`。
+**字段规则**
+
+| 块 | 来源 | 说明 |
+|----|------|------|
+| `domains` | `domain_catalog`（§6.3） | `registered` = 已注册 route 数；`graph_ready` = 有 graph 的 route 数 |
+| `llm_backend.type` | `settings.llm_backend` | `direct` / `gateway` |
+| `llm_backend.status` | 管理端探测 | `ok` / `degraded` / `skipped`；**不**复用 `/ready` 词汇 |
+| `knowledge_backend.type` | `settings.knowledge_backend` | `fake` / `langchain_pg` |
+| `knowledge_backend.status` | 管理端探测 | `fake` → `skipped`；`langchain_pg` → 轻量 probe（如 retriever 可达性），失败 → `degraded` |
+| `infra_ready` | 内部调用与 `GET /ready` 相同逻辑 | 字段名刻意与 backend 探测区分；`status` 为 `ready` / `not_ready` |
+| `runs_24h` | `RunStore` + §6.2 时间字段 | 按 JWT `tenant_id`、近 24h 窗统计；**不含 Token** |
+| `recent_failed_runs` | 同上 | `status in (error, cancelled)`，最多 5 条，按 `started_at` 倒序 |
+
+无 Run 数据时：`runs_24h` 为 `{ "total": 0, "errors": 0 }`，`recent_failed_runs` 为 `[]`。
 
 #### `GET /admin/config`
+
+C0 从 `Settings` + **§5.3 manifest** 投影；档 A 在 C0 可为空列表。
 
 ```json
 {
   "items": [
     { "key": "LLM_BACKEND",       "value": "gateway",  "tier": "B", "description": "模型路由方式" },
     { "key": "KNOWLEDGE_BACKEND", "value": "fake",     "tier": "B", "description": "知识后端类型" },
-    { "key": "EMBED_MODEL",       "value": "text-embedding-3-small", "tier": "B", "description": "Embedding 模型" },
+    { "key": "AUTH_REQUIRED",     "value": false,      "tier": "B", "description": "是否强制鉴权" },
+    { "key": "EMBED_MODEL",       "value": "text-embedding-3-small", "tier": "B", "description": "Embedding 模型名" },
     { "key": "EMBED_API_KEY",     "value": null,       "tier": "C", "configured": true, "description": "Embedding API Key" },
-    { "key": "MAX_TOOL_RETRIES",  "value": 3,          "tier": "A", "description": "工具重试上限" }
+    { "key": "LLM_API_KEY",       "value": null,       "tier": "C", "configured": false, "description": "LLM API Key" },
+    { "key": "OIDC_JWT_SECRET",   "value": null,       "tier": "C", "configured": true, "description": "JWT 验签密钥" }
   ]
 }
 ```
 
-规则：`tier=C` 项 `value` 始终为 `null`，用 `configured` 表示是否已配；`tier=A` 项 C2+ 可写。
+规则：`tier=C` 项 `value` 始终为 `null`，用 `configured` 表示是否已配；`tier=A` 项 **C0 不返回**（或返回空）；C2+ 可写项随 ConfigProvider 扩展 manifest。
 
 #### `GET /admin/domains`
+
+**迁移说明（相对当前代码）：** 现有实现返回 JSON **数组** `[{"name","kind"}]`；C0 目标为 **对象** `{ "domains": [...] }`（破坏性变更，仅测试依赖，以对齐本契约）。
 
 ```json
 {
@@ -195,7 +216,7 @@ AI 控制台
     {
       "name": "demo_tools",
       "description": "工具联动示例",
-      "tools": ["get_weather", "web_search"],
+      "tools": ["add", "delete_records"],
       "required_permissions": [],
       "graph_registered": true
     }
@@ -203,7 +224,17 @@ AI 控制台
 }
 ```
 
-**聚合规则：** `required_permissions` = 该插件已注册各 tool 上 `attach_tool_meta(... required_permissions)` 的**并集**（去重排序）。插件 bootstrap 不必再单独声明一份插件级权限列表。
+**字段来源（§6.3）**
+
+| 字段 | 规则 |
+|------|------|
+| `name` | `ToolRegistry` / `GraphRegistry` 的 route 键 |
+| `description` | 各域 `bootstrap.DOMAIN_META["description"]` |
+| `tools[]` | 该 route 下各 tool 的 `tool.name` |
+| `required_permissions` | 各 tool `attach_tool_meta(... required_permissions)` 的**并集**（去重排序）；`required_roles` **不计入**此字段 |
+| `graph_registered` | 同名 route 在 `GraphRegistry` 已注册 |
+
+插件 bootstrap 不必单独声明插件级权限列表。
 
 ### 4.2 C0 禁止项（API）
 
@@ -236,7 +267,12 @@ AI 控制台
 }
 ```
 
-`matrix` 为当前 `role_policy` 包的**只读投影**，非写接口。
+**权限矩阵规则**
+
+- `matrix.roles` 来自环境变量 `POLICY_MATRIX_ROLES`（逗号分隔，默认 `admin,viewer`）；**不是** JWT 运行时枚举
+- 对每个 `(role, tool)`：用 `RunContext(roles=[role])` 调用 `RolePolicyEngine.filter_tools(route, tools, ctx)`；在结果中 → `allow`，否则 → `deny`
+- `required_roles` 类 tool（如 `delete_records`）同样参与矩阵，但**不**进入 `required_permissions` 并集
+- `matrix` 为只读投影，非写接口
 
 #### `POST /admin/tools/{name}/invoke`
 
@@ -261,7 +297,7 @@ AI 控制台
       "run_id": "r-abc",
       "thread_id": "t-1",
       "route": "demo_rag",
-      "status": "completed",
+      "status": "done",
       "tenant_id": "acme",
       "started_at": "2026-07-27T10:00:00Z",
       "ended_at": "2026-07-27T10:00:05Z"
@@ -271,7 +307,9 @@ AI 控制台
 }
 ```
 
-实现基于 `RunStore.list_by_tenant` + 过滤分页；单 Run 详情与事件仍用 `GET /runs/{id}`、`GET /runs/{id}/events`。
+`status` 枚举与 RunStore 一致：`done` | `error` | `awaiting_approval` | `cancelled` | `pending`（进行中，若有）。
+
+实现基于 `RunStore.list_by_tenant` + §6.2 字段过滤分页；单 Run 详情与事件仍用 `GET /runs/{id}`、`GET /runs/{id}/events`。
 
 ### 4.4 C2 响应示例
 
@@ -282,10 +320,10 @@ AI 控制台
 仅 **tier=A**；tier B/C → **400** `config_not_writable`。
 
 ```json
-{ "value": 5 }
+{ "value": 60 }
 ```
 
-响应：`{ "key": "MAX_TOOL_RETRIES", "value": 5, "tier": "A" }`。写操作必审计。
+响应：`{ "key": "RATE_LIMIT_PER_MINUTE", "value": 60, "tier": "A" }`（示例；实际档 A 键以 ConfigProvider manifest 为准）。写操作必审计。
 
 #### `/prompts/*`（管理轨新增）
 
@@ -367,6 +405,35 @@ Prompt 优先级见 §5.2。
 
 **冲突规则（C2+）：** 若平台为某 `route` 配置了覆盖项，**平台配置优先**于插件目录文件；未配置则回退插件文件。禁止两套同时「静默生效」却无优先级说明。
 
+### 5.3 C0 配置 manifest（`Settings` 投影）
+
+`GET /admin/config` **不得**硬编码虚构键；C0 至少包含下表（env 名 → `apps/api/config/settings.py` 字段）：
+
+| tier | key（响应用大写 env 名） | settings 字段 | 说明 |
+|------|-------------------------|---------------|------|
+| B | `LLM_BACKEND` | `llm_backend` | 模型路由 |
+| B | `KNOWLEDGE_BACKEND` | `knowledge_backend` | 知识后端 |
+| B | `AUTH_REQUIRED` | `auth_required` | 鉴权开关 |
+| B | `LOCK_BACKEND` | `lock_backend` | 线程锁后端 |
+| B | `RATE_LIMIT_BACKEND` | `rate_limit_backend` | 限流后端 |
+| B | `USE_MEMORY_CHECKPOINTER` | `use_memory_checkpointer` | 内存 checkpoint |
+| B | `ENABLE_DATA_SOURCE` | `enable_data_source` | 查数 Port 开关 |
+| B | `HOOKS_BACKEND` | `hooks_backend` | Hooks 实现 |
+| B | `EMBED_MODEL` | `embed_model` | Embedding 模型 |
+| B | `EMBED_API_BASE` | `embed_api_base` | Embedding HTTP 基址 |
+| B | `EMBED_DIMENSIONS` | `embed_dimensions` | 向量维度 |
+| B | `POLICY_BUNDLE_VERSION` | `policy_bundle_version` | 策略包版本 |
+| C | `EMBED_API_KEY` | `embed_api_key` | Embedding 密钥 |
+| C | `LLM_API_KEY` | `llm_api_key` | LLM 密钥 |
+| C | `OIDC_JWT_SECRET` | `oidc_jwt_secret` | JWT 验签 |
+| C | `PG_PASSWORD` | `pg_password` | 数据库密码 |
+| C | `DATA_SOURCE_DSN` | `data_source_dsn` | 查数 DSN |
+| C | `KB_DSN` | `kb_dsn` | 知识库 DSN |
+
+**档 A（C0）：** manifest 返回 **空** 或省略 tier A 分组；C2+ 随 ConfigProvider 扩展（如 `RATE_LIMIT_PER_MINUTE` 等热配项）。
+
+实现建议：`apps/api/routes/admin_config.py` 内维护 `_CONFIG_MANIFEST: list[ConfigItemSpec]`，单测断言与 `Settings` 字段同步。
+
 ---
 
 ## 6. 数据与存储（管理后端）
@@ -379,7 +446,51 @@ Prompt 优先级见 §5.2。
 ### 6.1 最低数据库前提
 
 - 与底座一致：PG ≥ 16  
-- C0 不要求新增表（可从现有 settings + audit + runs 投影）
+- C0 不要求新增表（可从现有 settings + audit + runs 投影）  
+- C0 默认 `MemoryRunStore`（进程内）；重启丢 Run 列表——开发可接受；生产持久化 RunStore 为 C1+ 可选增强
+
+### 6.2 Run 投影扩展（C0 前置，① 底座）
+
+**现状：** `RunStore.upsert` 仅写 `run_id`、`tenant_id`、`thread_id`、`status`；**无** `route` / 时间戳，无法支撑 24h 统计与 `GET /admin/runs` 筛选。
+
+**C0 实施前必须在 `run_lifecycle` / `project_turn` 补齐：**
+
+| 字段 | 写入时机 | 格式 |
+|------|----------|------|
+| `route` | run 开始时 | 与 `/chat/stream` 的 `route` 一致 |
+| `started_at` | run 开始时 | ISO-8601 UTC |
+| `ended_at` | 终端状态（`done` / `error` / `cancelled`） | ISO-8601 UTC |
+| `status` | 已有；枚举见 §4.3 | `done` \| `error` \| `awaiting_approval` \| … |
+
+`awaiting_approval` 暂停时也应保留 `route` + `started_at`（已有 upsert 路径需扩展字段）。
+
+**验收：** 跑一次 `/chat/stream` 后，`GET /runs/{id}` JSON 含 `route` 与 `started_at`；overview 24h 窗统计非恒 0（有 run 时）。
+
+### 6.3 域元数据与 catalog（C0 前置，② 组装）
+
+**现状：** `GET /admin/domains` 读 `tools.keys()`；无 `description`；`GraphRegistry` 未暴露给 route。
+
+**约定：**
+
+1. 每个 `apps/api/domains/*/bootstrap.py` 导出 `DOMAIN_META = {"description": "..."}`  
+2. `lifespan.py` 在 `register_all` 后构建 **`domain_catalog`**（只读快照），挂 `app.state.domain_catalog`：
+
+```python
+# 形状示意
+[
+  {
+    "name": "demo_rag",
+    "description": "...",
+    "tools": ["search_knowledge"],
+    "required_permissions": ["knowledge:read"],
+    "graph_registered": True,
+  },
+  ...
+]
+```
+
+3. **禁止** route 直接持有可变 `GraphRegistry` 引用；catalog 在启动时一次性投影  
+4. `GET /admin/domains` 返回 `{ "domains": app.state.domain_catalog }`
 
 ---
 
@@ -419,12 +530,17 @@ Prompt 优先级见 §5.2。
 
 ### 8.1 C0 验收
 
-- [ ] 控制台可看到插件、ready 状态、配置只读  
-- [ ] 总览展示近 24h Run 总数与错误数（**无 Token 字段**）
+- [ ] §6.2 Run 投影字段已落地（`route`、`started_at` 等）  
+- [ ] §6.3 各域 `DOMAIN_META` + `domain_catalog` 已落地  
+- [ ] `GET /admin/domains` 返回 `{ "domains": [...] }`（非裸数组）  
+- [ ] `GET /admin/overview`：backend 探测与 `infra_ready` 分离；24h 统计有效  
+- [ ] `GET /admin/config` 按 §5.3 manifest 投影；档 A 为空；密钥不明文  
+- [ ] 控制台可看到插件、infra ready、配置只读  
+- [ ] 总览展示近 24h Run 总数与错误数（**无 Token 字段**）  
 - [ ] 调试页可发起请求并看到 SSE 事件  
 - [ ] 可跳转查看 run/threads 回放  
 - [ ] 无 `admin:*` 不可访问管理页关键 API  
-- [ ] 不出现业务前端信息架构
+- [ ] 不出现业务前端信息架构  
 - [ ] `PUT /admin/config/*` 不可用（404/501）
 
 ### 8.3 C1 验收
@@ -499,6 +615,9 @@ Prompt 优先级见 §5.2。
 | token 数据不准 | 未完成 LLM Gateway 上报契约前不展示账单结论 |
 | 多实例配置漂移 | ConfigProvider 实现前只读，避免伪热配 |
 | Prompt 双真源 | 见 §5.2 时间线与冲突规则 |
+| Run 投影缺失导致 overview/runs 不可用 | §6.2 列为 C0 前置；Plan7 T0 先落地 |
+| MemoryRunStore 重启丢历史 | 文档说明；生产 PG RunStore 后续增强 |
+| domains 响应破坏性变更 | 仅内部测试依赖旧数组形态；C0 一次性切换 |
 
 ---
 

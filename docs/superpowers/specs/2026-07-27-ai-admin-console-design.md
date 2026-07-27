@@ -1,6 +1,6 @@
 # AI 控制台（管理后台）— 架构设计
 
-> **状态：** 设计稿 v2（与 [管理后端 final-spec](./2026-07-27-admin-backend-final-spec.md) 对齐）  
+> **状态：** 设计稿 v2.1（与 [管理后端 final-spec](./2026-07-27-admin-backend-final-spec.md) 对齐；含代码复核修订）  
 > **日期：** 2026-07-27（修订 2026-07-27）  
 > **归属：** 设计三类之 **② 管理后台**（见 [design-tracks.md](../../design-tracks.md)）  
 > **前端策略：** **C0 起升级现有 `apps/web`**，不另起 `apps/admin`（膨胀后再拆）  
@@ -107,9 +107,12 @@ AI 控制台（apps/web）
 
 数据来自 `GET /admin/overview`（契约见 [管理 Spec §4.1](./2026-07-27-admin-backend-final-spec.md)）。
 
-- 4 卡片：插件数、LLM backend、Knowledge backend、`/ready` 摘要
-- 近 24h：**Run 总数**、**错误 Run 数**（**不展示 Token**）
-- 底部：最近失败 run 列表（最多 5 条，可点进回放）
+- 卡片：插件数（`domains.registered` / `graph_ready`）
+- LLM backend 类型 + **探测状态**（`ok` / `degraded` / `skipped`）
+- Knowledge backend 类型 + **探测状态**（与 `/ready` 解耦）
+- **基础设施就绪**（`infra_ready`：透传 `/ready` 的 checks）
+- 近 24h：**Run 总数**、**错误 Run 数**（依赖 §6.2 Run 投影；**不展示 Token**）
+- 底部：最近失败 run（最多 5 条）
 
 ### 5.2 调试（C0 核心）
 
@@ -123,15 +126,16 @@ AI 控制台（apps/web）
 | 审批操作 | 对接 `/approvals/*` |
 | 一键打开本次 Run 回放 | 调 `/runs/{id}/events` |
 
-### 5.3 业务插件
+### 5.3 业务插件（C0）
 
-- 扩展 `GET /admin/domains`：名称、权限要求、tools 列表摘要、健康  
-- 不提供业务侧配置页；插件若需深链，仅显示可选 URL（插件自声明）
+- `GET /admin/domains` → `{ "domains": [...] }`（**非**裸数组；见管理 Spec 迁移说明）
+- 字段：`name`、`description`（`DOMAIN_META`）、`tools[]`、`required_permissions`、`graph_registered`
+- 调试页 route 下拉：**动态拉取** domains 列表（勿硬编码 echo/demo_tools）
 
 ### 5.4 Tools（C1）
 
 - 只读目录：name、domain、`required_permissions`、描述  
-- 权限矩阵：角色 × 工具可见/可调（只读可视化，来自 `GET /admin/tools` 的 `matrix`）  
+- 权限矩阵：`matrix.roles` 来自 `POLICY_MATRIX_ROLES`（默认 `admin,viewer`）；见管理 Spec §4.3
 - 试调：`POST /admin/tools/{name}/invoke`；`ADMIN_TOOL_INVOKE_ENABLED` 默认关；需 `admin:tools` + 审计
 
 **线框：** 表格 + 矩阵热力图；选中 tool 显示「试调」按钮（仅开关开启时可用）。
@@ -175,7 +179,7 @@ AI 控制台（apps/web）
 | 能力 | API（目标） | 阶段 |
 |------|-------------|------|
 | 总览聚合 | `GET /admin/overview` | C0 |
-| 插件列表 | `GET /admin/domains`（扩展字段） | C0 |
+| 插件列表 | `GET /admin/domains` → `{domains:[]}` | C0 |
 | 审计导出 | `GET /admin/audit/export` | 已有 |
 | 配置只读 | `GET /admin/config` | C0 |
 | 配置热写 | `PUT /admin/config/{key}` | **C2+** |
@@ -194,7 +198,7 @@ AI 控制台（apps/web）
 
 | 期 | 侧栏 / 页面 | 验收（说人话） |
 |----|-------------|----------------|
-| **C0** | 总览、调试、插件、配置只读 | 看见接了啥、通不通、24h Run/错误；**无 Token、无写配置** |
+| **C0** | 总览、调试、插件、配置只读 | §6.2/6.3 前置完成；24h Run/错误；无 Token、无写配置 |
 | **C1** | + 运行与回放 `/runs`、Tools `/tools` | 工具目录与权限矩阵；Run 列表可筛可回放；试调默认关 |
 | **C2** | + Prompts、配置档 A 可写 | 改 Prompt 与热配并审计 |
 | **C3** | + 模型与用量 | `tenant`/`route`/`model` Token 分组；无数据不造假 |
