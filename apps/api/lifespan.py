@@ -19,6 +19,7 @@ from agent_base_core.adapters.memory_checkpointer import MemoryCheckpointerFacto
 from agent_base_core.adapters.memory_event_log import MemoryEventLog
 from agent_base_core.adapters.memory_message_store import MemoryMessageStore
 from agent_base_core.adapters.memory_run_store import MemoryRunStore
+from agent_base_core.adapters.memory_ingest_job_store import MemoryIngestJobStore
 from agent_base_core.adapters.memory_config_provider import MemoryConfigProvider
 from agent_base_core.adapters.layered_prompt_registry import LayeredPromptRegistry
 from agent_base_core.adapters.memory_prompt_registry import MemoryPromptRegistry
@@ -39,6 +40,7 @@ from config.logging import configure_logging
 from config.settings import Settings, get_settings
 from admin.catalog import build_domain_catalog
 from adapters.domain_prompt_registry import DomainFilePromptRegistry
+from adapters.knowledge_ingest_factory import build_knowledge_ingest
 from adapters.knowledge_status import build_knowledge_status_provider
 from adapters.memory_usage_store import MemoryUsageStore
 from domains.bootstrap import DOMAIN_META_MAP, register_all
@@ -150,7 +152,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     from adapters.knowledge_backend import build_retriever
 
     retriever = await build_retriever(settings)
-    knowledge_status_provider = build_knowledge_status_provider(settings, retriever)
+    ingest_job_store = MemoryIngestJobStore()
+    knowledge_ingest = build_knowledge_ingest(settings, retriever, ingest_job_store)
+    knowledge_status_provider = build_knowledge_status_provider(
+        settings,
+        retriever,
+        ingest_jobs=ingest_job_store,
+    )
     data_source = _build_data_source(settings)
     llm_gateway = _build_llm_gateway(settings)
     from adapters.prometheus_metrics import PrometheusMetrics
@@ -205,6 +213,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.prompt_runtime = prompt_runtime
     app.state.usage_store = usage_store
     app.state.retriever = retriever
+    app.state.ingest_job_store = ingest_job_store
+    app.state.knowledge_ingest = knowledge_ingest
     app.state.knowledge_status_provider = knowledge_status_provider
     app.state.data_source = data_source
     app.state.llm_gateway = llm_gateway
