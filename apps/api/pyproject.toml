@@ -23,6 +23,9 @@ datasource = [
 redis = [
   "redis>=5.0,<6",
 ]
+rag = [
+  "agent-base-core[rag]",
+]
 
 [build-system]
 requires = ["hatchling"]

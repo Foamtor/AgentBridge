@@ -23,6 +23,11 @@ postgres = [
 tiktoken = [
   "tiktoken>=0.7",
 ]
+rag = [
+  "langchain-postgres>=0.0.14",
+  "langchain-openai>=0.2",
+  "asyncpg>=0.29,<1",
+]
 
 [build-system]
 requires = ["hatchling"]
