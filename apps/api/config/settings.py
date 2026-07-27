@@ -57,6 +57,14 @@ class Settings(BaseSettings):
     embed_model: str = Field(default="", validation_alias="EMBED_MODEL")
     embed_dimensions: int = Field(default=0, validation_alias="EMBED_DIMENSIONS")
     embed_api_key: str = Field(default="", validation_alias="EMBED_API_KEY")
+    kb_external_base_url: str = Field(default="", validation_alias="KB_EXTERNAL_BASE_URL")
+    kb_external_api_key: str = Field(default="", validation_alias="KB_EXTERNAL_API_KEY")
+    kb_external_timeout_seconds: float = Field(
+        default=5.0, validation_alias="KB_EXTERNAL_TIMEOUT_SECONDS"
+    )
+    kb_external_failure_policy: str = Field(
+        default="empty_hits", validation_alias="KB_EXTERNAL_FAILURE_POLICY"
+    )
 
 
 def get_settings() -> Settings:

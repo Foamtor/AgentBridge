@@ -47,6 +47,20 @@ def test_ingest_rejects_invalid_doc(client) -> None:
     assert r.json()["detail"]["code"] == "invalid_doc"
 
 
+def test_ingest_unsupported_for_external_backend(client) -> None:
+    from agent_base_core.adapters.unsupported_knowledge_ingest import (
+        UnsupportedKnowledgeIngest,
+    )
+
+    client.app.state.knowledge_ingest = UnsupportedKnowledgeIngest("external")
+    r = client.post(
+        "/ingest",
+        json={"docs": [{"chunk_id": "x", "text": "y"}]},
+    )
+    assert r.status_code == 501
+    assert r.json()["detail"]["code"] == "unsupported"
+
+
 def test_ingest_requires_knowledge_write(monkeypatch: pytest.MonkeyPatch) -> None:
     secret = "ingest-perm-secret"
     monkeypatch.setenv("AUTH_REQUIRED", "true")

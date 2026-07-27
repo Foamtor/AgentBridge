@@ -30,6 +30,24 @@ class KnowledgeStatusProvider:
 
     async def get_status(self, *, tenant_id: str) -> dict[str, Any]:
         backend = (self._settings.knowledge_backend or "fake").strip().lower()
+        if backend == "external":
+            health = await self._external_health()
+            embedding = {
+                "status": "skipped",
+                "model": None,
+                "message": "managed by external RAG",
+            }
+            healthy = health.get("status") == "ok"
+            jobs: list[dict[str, Any]] = []
+            if self._ingest_jobs is not None:
+                jobs = await self._ingest_jobs.list_jobs(tenant_id=tenant_id)
+            return {
+                "backend": backend,
+                "healthy": healthy,
+                "embedding": embedding,
+                "ingest_jobs": jobs,
+                "health": health,
+            }
         embedding = await self._embedding_status(backend)
         healthy = embedding.get("status") in {"ok", "skipped"}
         jobs: list[dict[str, Any]] = []
@@ -42,9 +60,24 @@ class KnowledgeStatusProvider:
             "ingest_jobs": jobs,
         }
 
+    async def _external_health(self) -> dict[str, Any]:
+        probe = getattr(self._retriever, "health_check", None)
+        if not callable(probe):
+            return {"status": "fail", "message": "retriever has no health_check"}
+        result = await probe()
+        if not isinstance(result, dict):
+            return {"status": "fail", "message": "invalid health_check result"}
+        return result
+
     async def _embedding_status(self, backend: str) -> dict[str, Any]:
         if backend == "fake":
             return {"status": "skipped", "model": self._settings.embed_model or None}
+        if backend == "external":
+            return {
+                "status": "skipped",
+                "model": None,
+                "message": "managed by external RAG",
+            }
         if backend != "langchain_pg":
             return {
                 "status": "fail",
