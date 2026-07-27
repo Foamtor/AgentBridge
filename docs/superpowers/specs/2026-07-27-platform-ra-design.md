@@ -6,7 +6,7 @@
 > **上位 Spec：** [platform-final-spec.md](./2026-07-27-platform-final-spec.md)  
 > **收敛依据：** [scheme-convergence.md](./2026-07-27-scheme-convergence.md)  
 > **多后端地图：** [rag-production-design.md](./2026-07-27-rag-production-design.md)  
-> **实施计划：** [../plans/2026-07-27-platform-ra.md](../plans/2026-07-27-platform-ra.md)（对齐 [Plan6](../plans/2026-07-27-plan6-rag-production.md) R-A / T1–T8）
+> **实施计划：** [../plans/2026-07-27-platform-ra.md](../plans/2026-07-27-platform-ra.md)（对齐 [Plan6](../plans/2026-07-27-plan6-rag-production.md) R-A / T1–T8；**已审阅修订对齐本 Spec**）
 
 ---
 

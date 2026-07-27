@@ -11,21 +11,26 @@
 **Design spec:** [../specs/2026-07-27-platform-ra-design.md](../specs/2026-07-27-platform-ra-design.md)  
 **Parent map:** [./2026-07-27-plan6-rag-production.md](./2026-07-27-plan6-rag-production.md) (R-A / T1–T8)
 
+> **Plan review (2026-07-27):** Aligned to R-A design after gap scan — see §「Plan ↔ Spec 修订说明」at end.
+
 ## Global Constraints
 
-- `application` must not import `adapters`
-- Domains must not import `langchain_postgres`, `langchain_openai`, or other engine SDKs
-- Adapters constructed only in `apps/api/lifespan.py`
+- `application` must not import `adapters` (existing import-linter)
+- **`application` and `domains` must not import** `langchain_postgres` / `langchain_openai` / `langchain_community` (CI scan)
+- **Retriever instances are created only from `apps/api/lifespan.py`** (may call a thin composition helper under `apps/api/adapters/`, same pattern as DataSource — helper is not a second assembly root)
 - Port method names: `similarity_search`, `ingest` (no parallel `search` truth)
-- Empty / blank `tenant_id` → raise `ValueError` (never default to `"default"`)
-- Cross-tenant search → empty list (no leak)
-- Runtime TEI/PG failure on search → empty list + log (do not 500 the chat)
+- Empty / blank `tenant_id` → raise `ValueError` (never coerce to `"default"` — includes `demo_rag`)
+- Cross-tenant search → empty list (no leak); return-path must drop mismatched `tenant_id`
+- Runtime TEI/PG failure on **search** → empty list + log (do not 500 the chat); **ingest** failures propagate (no silent success)
 - Missing `rag` extra / embed config when `KNOWLEDGE_BACKEND=langchain_pg` → **startup failure**
 - R-A: vector similarity only (no hybrid); no HTTP `/ingest`; no `KnowledgeIngest` Port
 - Optional extra name pinned: **`rag`**
 - `k` default **5**; `demo_rag` may pass `k=3`
 - Citation envelope: `data.route` + `data.citations[]` as `KnowledgeHit` fields
 - Default CI must stay green without pgvector/TEI
+- Knowledge DB: schema `knowledge`, table `kb_chunks`; **migration owns DDL**; `LangchainPgRetriever.create` must **not** call `init_vectorstore_table` in R-A (avoid dual schema owners)
+- Checkpointer (`psycopg`) and knowledge (`asyncpg` / langchain-postgres) are **separate pools**; do not borrow checkpointer connections for RAG
+- `/ready` embedding status matrix (platform-final-spec §11.1): **optional stretch**, not an R-A exit gate (search-not-500 is the gate)
 
 ## File map
 
@@ -34,16 +39,17 @@
 | `packages/core/src/agent_base_core/protocol/knowledge.py` | `KnowledgeHit` TypedDict + `require_tenant_id` + `normalize_ingest_doc` + `doc_to_knowledge_hit` |
 | `packages/core/src/agent_base_core/ports/retriever.py` | Port signatures → `list[KnowledgeHit]`, `k: int = 5` |
 | `packages/core/src/agent_base_core/adapters/fake_retriever.py` | In-memory backend aligned to KnowledgeHit |
-| `packages/core/src/agent_base_core/adapters/langchain_pg_retriever.py` | PG+TEI backend (lazy imports) |
+| `packages/core/src/agent_base_core/adapters/langchain_pg_retriever.py` | PG+TEI backend (lazy imports); no DDL init |
 | `packages/core/pyproject.toml` | optional-deps `rag` |
-| `apps/api/pyproject.toml` | re-export/extra `rag` depending on core |
+| `apps/api/pyproject.toml` | extra `rag` → `agent-base-core[rag]` |
 | `apps/api/config/settings.py` | `knowledge_backend`, `kb_dsn`, `embed_*` |
-| `apps/api/lifespan.py` | `_build_retriever` + teardown |
-| `apps/api/domains/demo_rag/graph.py` | citation fields |
-| `apps/api/migrations/003_knowledge_pgvector.sql` | schema/table for filterable `tenant_id` |
-| `scripts/ingest_demo_rag.py` | seed helper using KnowledgeHit fields |
-| `scripts/import_scan_domains_rag.py` | forbid engine imports under `apps/api/domains` |
-| `.importlinter` | register new adapter module in independence contract if required |
+| `apps/api/adapters/knowledge_backend.py` | `resolve_kb_dsn` / `validate_langchain_pg_settings` / `build_retriever` (called only from lifespan) |
+| `apps/api/lifespan.py` | `await build_retriever(settings)` + teardown `close()` |
+| `apps/api/domains/demo_rag/graph.py` | citation fields; **no** `tenant_id or "default"` |
+| `apps/api/migrations/003_knowledge_pgvector.sql` | schema/table + filterable `tenant_id` column |
+| `scripts/ingest_demo_rag.py` | seed Fake **or** `langchain_pg` via Settings / `build_retriever` |
+| `scripts/import_scan_rag_engines.py` | forbid engine imports under `domains` **and** `application` |
+| `.importlinter` | register `langchain_pg_retriever` in independence list if required |
 | `.env.example`, `docs/knowledge-base.md`, `docs/deploy.md` | R-A ops notes |
 | tests under `packages/core/tests/...`, `apps/api/tests/...` | Fake + mocked langchain_pg + demo_rag |
 
@@ -630,7 +636,9 @@ class LangchainPgRetriever:
             dimensions=embed_dimensions,
         )
         engine = PGEngine.from_connection_string(url=dsn)
-        # Table must already exist (migration 003) with tenant_id column.
+        # Table must already exist (migration 003) with tenant_id as a *column*
+        # (not only JSONB). Do NOT call init_vectorstore_table here — migration
+        # is the single DDL owner for R-A.
         store = await PGVectorStore.create(
             engine=engine,
             table_name=table_name,
@@ -732,6 +740,7 @@ git commit -m "feat(core): add LangchainPgRetriever with tenant filter and degra
 ### Task 5: Settings + lifespan wiring + startup validation
 
 **Files:**
+- Create: `apps/api/adapters/knowledge_backend.py`
 - Modify: `apps/api/config/settings.py`
 - Modify: `apps/api/lifespan.py`
 - Create: `apps/api/tests/test_knowledge_backend_settings.py`
@@ -739,10 +748,11 @@ git commit -m "feat(core): add LangchainPgRetriever with tenant filter and degra
 **Interfaces:**
 - Consumes: `FakeRetriever`, `LangchainPgRetriever.create`
 - Produces: `app.state.retriever` selected by `KNOWLEDGE_BACKEND`; `close()` on shutdown
+- Note: `build_retriever` lives under `apps/api/adapters/` but is **only** invoked from `lifespan` (composition helper, not a domain import)
 
 - [ ] **Step 1: Write failing tests for settings resolution helper**
 
-Prefer a small pure helper in lifespan (or `apps/api/adapters/knowledge_backend.py`) so tests do not boot full FastAPI:
+Prefer a small pure helper so tests do not boot full FastAPI:
 
 ```python
 # apps/api/adapters/knowledge_backend.py
@@ -861,6 +871,9 @@ In `apps/api/lifespan.py`:
 - Replace `retriever = FakeRetriever()` with `retriever = await build_retriever(settings)`
 - Import `build_retriever` from `adapters.knowledge_backend`
 - In `finally`, if `hasattr(retriever, "close")`, await close (same pattern as redis)
+- Do **not** share checkpointer connections with the knowledge engine (separate pool / engine)
+
+Also add test that missing `rag` import surfaces as startup `RuntimeError` when backend is `langchain_pg` — can unit-test by monkeypatching `LangchainPgRetriever.create` to raise `RuntimeError` matching the adapter message, or by asserting `validate` + documenting that `create`'s `ImportError` path is covered in Task 4. Minimum for Task 5: config validation tests above.
 
 - [ ] **Step 4: Run api unit tests for settings + existing demo_rag still under Fake**
 
@@ -911,14 +924,35 @@ Update seed + asserts in `apps/api/tests/test_demo_rag.py`:
     assert c0["tenant_id"] == "dev"
 ```
 
-Also fix graph if it still uses `ctx.tenant_id or "default"` — blank tenant should not be invented for Port calls; if context tenant is missing in tests, ensure test auth/context provides `dev` (match existing test behavior). Keep `k=3` in tool call.
+Also update `search_knowledge` — **remove** `or "default"` (violates Spec §2.1 / §5):
+
+```python
+@tool
+async def search_knowledge(
+    query: str,
+    config: Annotated[RunnableConfig, InjectedToolArg],
+) -> list[dict[str, Any]]:
+    """Search tenant knowledge base via Retriever in metadata."""
+    ctx = get_run_context(config)
+    retriever = ctx.metadata.get("retriever")
+    if retriever is None:
+        return []
+    tenant_id = ctx.tenant_id
+    if tenant_id is None or not str(tenant_id).strip():
+        raise ValueError("tenant_id is required and must be non-blank")
+    return await retriever.similarity_search(
+        query, tenant_id=str(tenant_id).strip(), k=3
+    )
+```
+
+Ensure the demo_rag test still supplies a non-blank tenant via existing auth/context (`dev`). Keep `k=3` in the tool call.
 
 - [ ] **Step 2: Run test — expect fail on citation fields**
 
 Run: `python -m pytest apps/api/tests/test_demo_rag.py -v`  
-Expected: FAIL missing chunk_id
+Expected: FAIL missing chunk_id (and/or fail if `"default"` path still present until Step 3)
 
-- [ ] **Step 3: Update `_cite` in demo_rag**
+- [ ] **Step 3: Update `_cite` in demo_rag** + `search_knowledge` as above
 
 ```python
 def _cite(state: DemoRagState) -> dict[str, Any]:
@@ -971,21 +1005,22 @@ git commit -m "feat(demo_rag): align citation payload with KnowledgeHit"
 
 ---
 
-### Task 7: Architecture gates (domains cannot import engine SDKs)
+### Task 7: Architecture gates (domains + application cannot import engine SDKs)
 
 **Files:**
-- Create: `scripts/import_scan_domains_rag.py`
+- Create: `scripts/import_scan_rag_engines.py`
 - Modify: `.github/workflows/ci.yml` (architecture-gates job)
 
 **Interfaces:**
-- Consumes: AST scan of `apps/api/domains`
-- Produces: CI failure if domains import `langchain_postgres` / `langchain_openai` / `langchain_community`
+- Consumes: AST scan of `apps/api/domains` **and** `packages/core/src/agent_base_core/application`
+- Produces: CI failure if those trees import `langchain_postgres` / `langchain_openai` / `langchain_community`
+- Note: engine imports are allowed only under `agent_base_core.adapters` (lazy) and `apps/api` composition/lifespan
 
-- [ ] **Step 1: Write scanner + a tiny negative fixture check (optional unit via subprocess)**
+- [ ] **Step 1: Write scanner**
 
 ```python
-# scripts/import_scan_domains_rag.py
-"""Fail if apps/api/domains imports knowledge engine SDKs."""
+# scripts/import_scan_rag_engines.py
+"""Fail if domains or core application import knowledge engine SDKs."""
 
 from __future__ import annotations
 
@@ -998,7 +1033,11 @@ FORBIDDEN_PREFIXES = (
     "langchain_openai",
     "langchain_community",
 )
-DOMAINS = Path(__file__).resolve().parents[1] / "apps" / "api" / "domains"
+ROOT = Path(__file__).resolve().parents[1]
+SCAN_ROOTS = (
+    ROOT / "apps" / "api" / "domains",
+    ROOT / "packages" / "core" / "src" / "agent_base_core" / "application",
+)
 
 
 def _imports(path: Path) -> list[tuple[int, str]]:
@@ -1014,22 +1053,23 @@ def _imports(path: Path) -> list[tuple[int, str]]:
 
 
 def main() -> int:
-    if not DOMAINS.is_dir():
-        print(f"domains not found: {DOMAINS}", file=sys.stderr)
-        return 1
     violations: list[str] = []
-    for py in DOMAINS.rglob("*.py"):
-        rel = py.relative_to(DOMAINS.parents[2])
-        for lineno, mod in _imports(py):
-            for bad in FORBIDDEN_PREFIXES:
-                if mod == bad or mod.startswith(f"{bad}."):
-                    violations.append(f"{rel}:{lineno} imports {mod!r}")
+    for base in SCAN_ROOTS:
+        if not base.is_dir():
+            print(f"scan root missing: {base}", file=sys.stderr)
+            return 1
+        for py in base.rglob("*.py"):
+            rel = py.relative_to(ROOT)
+            for lineno, mod in _imports(py):
+                for bad in FORBIDDEN_PREFIXES:
+                    if mod == bad or mod.startswith(f"{bad}."):
+                        violations.append(f"{rel}:{lineno} imports {mod!r}")
     if violations:
-        print("Forbidden engine imports in domains:", file=sys.stderr)
+        print("Forbidden engine imports:", file=sys.stderr)
         for v in violations:
             print(f"  - {v}", file=sys.stderr)
         return 1
-    print("import_scan_domains_rag: OK")
+    print("import_scan_rag_engines: OK")
     return 0
 
 
@@ -1039,23 +1079,23 @@ if __name__ == "__main__":
 
 - [ ] **Step 2: Run scanner**
 
-Run: `python scripts/import_scan_domains_rag.py`  
-Expected: `import_scan_domains_rag: OK`
+Run: `python scripts/import_scan_rag_engines.py`  
+Expected: `import_scan_rag_engines: OK`
 
 - [ ] **Step 3: Wire CI**
 
 In `.github/workflows/ci.yml` under `architecture-gates` steps, after `import_scan_core.py`:
 
 ```yaml
-      - name: Scan domains for forbidden RAG engine imports
-        run: python scripts/import_scan_domains_rag.py
+      - name: Scan domains/application for forbidden RAG engine imports
+        run: python scripts/import_scan_rag_engines.py
 ```
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add scripts/import_scan_domains_rag.py .github/workflows/ci.yml
-git commit -m "ci: forbid knowledge engine imports inside domains"
+git add scripts/import_scan_rag_engines.py .github/workflows/ci.yml
+git commit -m "ci: forbid knowledge engine imports in domains and application"
 ```
 
 ---
@@ -1069,12 +1109,11 @@ git commit -m "ci: forbid knowledge engine imports inside domains"
 - Modify: `.env.example`
 - Modify: `docs/knowledge-base.md`
 - Modify: `docs/deploy.md`
-- Modify: `docs/superpowers/plans/2026-07-27-plan6-rag-production.md` (link R-A detailed plan; mark T1–T8 checklist pointers)
-- Modify: `docs/superpowers/specs/2026-07-27-platform-ra-design.md` (point **实施计划** to this file; status → 实施中/计划已就绪)
+- Modify: `docs/superpowers/plans/2026-07-27-plan6-rag-production.md` (link R-A detailed plan if not already)
 
 **Interfaces:**
-- Consumes: Fake / langchain_pg Port
-- Produces: operable hand-test path with TEI
+- Consumes: Fake / langchain_pg Port via `build_retriever` when env says so
+- Produces: operable hand-test path with local TEI (Spec §7.2)
 
 - [ ] **Step 1: Add migration SQL**
 
@@ -1089,7 +1128,7 @@ CREATE SCHEMA IF NOT EXISTS knowledge;
 
 -- Column set aligned with LangchainPgRetriever.create metadata_columns.
 -- embedding vector size must match EMBED_DIMENSIONS at runtime; default 1024.
--- If your TEI model uses another size, adjust before first ingest OR recreate table.
+-- If your TEI model uses another size, edit vector(N) before first apply.
 CREATE TABLE IF NOT EXISTS knowledge.kb_chunks (
     langchain_id UUID PRIMARY KEY,
     content TEXT NOT NULL,
@@ -1104,36 +1143,92 @@ CREATE INDEX IF NOT EXISTS kb_chunks_tenant_id_idx
     ON knowledge.kb_chunks (tenant_id);
 ```
 
-Document in `migrations/README.md`: apply with existing migration runner; for RAG profile use pgvector image; **vector dimensions must match `EMBED_DIMENSIONS`**.
+Document in `migrations/README.md`:
+- Apply with existing migration runner
+- Use compose `--profile rag` (pgvector image)
+- **`EMBED_DIMENSIONS` must equal** the `vector(N)` in this file
+- R-A does **not** use `init_vectorstore_table`; DDL is this migration only
 
-If `langchain-postgres` expects different default column names for your pinned version, adjust SQL **and** `LangchainPgRetriever.create(...)` together in the same commit.
+If pinned `langchain-postgres` expects different column names, adjust SQL **and** `LangchainPgRetriever.create(...)` in the same commit.
 
-- [ ] **Step 2: Update seed script**
+- [ ] **Step 2: Update seed script (Fake + langchain_pg)**
+
+Replace `scripts/ingest_demo_rag.py` with a complete script that honors `KNOWLEDGE_BACKEND`:
 
 ```python
-# scripts/ingest_demo_rag.py — use KnowledgeHit fields; still defaults to Fake offline
-...
-    n = await r.ingest(
-        [
-            {
-                "chunk_id": "d1",
-                "doc_id": "doc-refund",
-                "text": "refund policy allows 30 days",
-            },
-            {
-                "chunk_id": "d2",
-                "doc_id": "doc-ship",
-                "text": "shipping takes 5 days",
-            },
-        ],
-        tenant_id="acme",
-    )
-    hits = await r.similarity_search("refund policy", tenant_id="acme", k=5)
-    ...
-    assert hits[0]["chunk_id"] == "d1"
-```
+#!/usr/bin/env python3
+"""Seed demo knowledge docs via Retriever.ingest (R-A; no HTTP /ingest).
 
-Add a short module docstring note: for `langchain_pg`, run against a live API process / write a small async main that builds retriever via settings (optional follow-up); Fake path remains the default offline smoke.
+Fake (default, offline):
+  python scripts/ingest_demo_rag.py
+
+langchain_pg (needs TEI + pgvector + rag extra + .env):
+  set KNOWLEDGE_BACKEND=langchain_pg and EMBED_* / PG_DSN (or KB_DSN)
+  python scripts/ingest_demo_rag.py
+"""
+
+from __future__ import annotations
+
+import asyncio
+import os
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "packages" / "core" / "src"))
+sys.path.insert(0, str(ROOT / "apps" / "api"))
+
+DOCS = [
+    {
+        "chunk_id": "d1",
+        "doc_id": "doc-refund",
+        "text": "refund policy allows 30 days",
+    },
+    {
+        "chunk_id": "d2",
+        "doc_id": "doc-ship",
+        "text": "shipping takes 5 days",
+    },
+]
+
+
+async def _build_retriever():
+    backend = (os.environ.get("KNOWLEDGE_BACKEND") or "fake").strip().lower()
+    if backend == "fake":
+        from agent_base_core.adapters.fake_retriever import FakeRetriever
+
+        return FakeRetriever(), True
+    if backend == "langchain_pg":
+        from adapters.knowledge_backend import build_retriever
+        from config.settings import get_settings
+
+        return await build_retriever(get_settings()), False
+    raise SystemExit(f"unsupported KNOWLEDGE_BACKEND={backend!r}")
+
+
+async def main() -> None:
+    r, is_fake = await _build_retriever()
+    try:
+        n = await r.ingest(DOCS, tenant_id="acme")
+        hits = await r.similarity_search("refund policy", tenant_id="acme", k=5)
+        cross = await r.similarity_search("refund policy", tenant_id="other", k=5)
+        print(
+            f"backend={'fake' if is_fake else 'langchain_pg'} "
+            f"ingested={n} hits={len(hits)} cross_tenant={len(cross)}"
+        )
+        assert hits and hits[0]["chunk_id"] == "d1"
+        assert not cross
+    finally:
+        close = getattr(r, "close", None)
+        if close is not None:
+            result = close()
+            if hasattr(result, "__await__"):
+                await result
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
 
 - [ ] **Step 3: Docs + env**
 
@@ -1146,26 +1241,24 @@ KNOWLEDGE_BACKEND=fake
 # KB_DSN=                 # optional; falls back to PG_DSN
 # EMBED_API_BASE=http://127.0.0.1:8080/v1
 # EMBED_MODEL=your-tei-model
-# EMBED_DIMENSIONS=1024
+# EMBED_DIMENSIONS=1024   # must match migrations/003 vector(N)
 # EMBED_API_KEY=
 ```
 
 `docs/knowledge-base.md`:
-- Say current Port method is `similarity_search` (not `search`)
-- R-A: `langchain_pg` + local TEI; install `pip install -e "apps/api[rag]"`
-- Hand-test steps from design §7.2
-- Note HTTP `/ingest` is R-B
+- Port method is `similarity_search` (not `search`)
+- R-A: `langchain_pg` + local TEI; `pip install -e "apps/api[rag]"`
+- Hand-test: compose `--profile rag` → migrate → seed script → `demo_rag`
+- HTTP `/ingest` is R-B
 
-`docs/deploy.md`: confirm `rag` extra name and compose `--profile rag`
-
-Update Plan6 header to link: **Detailed R-A plan:** `./2026-07-27-platform-ra.md`
+`docs/deploy.md`: `rag` extra + `--profile rag` + TEI is external
 
 - [ ] **Step 4: Run full default CI-equivalent suite**
 
 ```bash
 lint-imports
 python scripts/import_scan_core.py
-python scripts/import_scan_domains_rag.py
+python scripts/import_scan_rag_engines.py
 python -m pytest packages/core/tests apps/api/tests -q
 ```
 
@@ -1174,17 +1267,17 @@ Expected: all green
 - [ ] **Step 5: Manual R-A acceptance (operator checklist — not CI)**
 
 1. `docker compose --profile rag up -d`
-2. Apply `003_knowledge_pgvector.sql` (dimensions match TEI)
+2. Apply `003_knowledge_pgvector.sql` (`vector(N)` matches TEI / `EMBED_DIMENSIONS`)
 3. `pip install -e "apps/api[rag]"`
 4. `.env`: `KNOWLEDGE_BACKEND=langchain_pg`, `EMBED_*` → local TEI, DSN → rag postgres
-5. Seed via temporary Python calling `build_retriever` + `ingest`, or extended script
-6. `POST /chat/stream` route `demo_rag` → citations; second tenant sees nothing
+5. `python scripts/ingest_demo_rag.py` → hits>0, cross_tenant=0
+6. Start API; `POST /chat/stream` route `demo_rag` → `x.bridge.citation` with `chunk_id`/`doc_id`; other tenant empty
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add apps/api/migrations/003_knowledge_pgvector.sql apps/api/migrations/README.md scripts/ingest_demo_rag.py .env.example docs/knowledge-base.md docs/deploy.md docs/superpowers/plans/2026-07-27-plan6-rag-production.md docs/superpowers/specs/2026-07-27-platform-ra-design.md
-git commit -m "docs: R-A migration, seed script, and knowledge ops notes"
+git add apps/api/migrations/003_knowledge_pgvector.sql apps/api/migrations/README.md scripts/ingest_demo_rag.py .env.example docs/knowledge-base.md docs/deploy.md docs/superpowers/plans/2026-07-27-plan6-rag-production.md
+git commit -m "docs: R-A migration, dual-mode seed script, and knowledge ops notes"
 ```
 
 ---
@@ -1195,18 +1288,34 @@ git commit -m "docs: R-A migration, seed script, and knowledge ops notes"
 |------------------|------|
 | `KnowledgeHit` TypedDict | T1 |
 | Port `similarity_search` / `ingest`, `k=5` | T1–T2 |
-| Fake aligned + blank tenant raises | T2 |
+| Fake aligned + blank tenant raises + whole-batch ingest fail | T2 |
 | `rag` extra only | T3 |
-| `LangchainPgRetriever` + TEI HTTP + single collection + tenant column filter | T4 |
-| Search degrade to `[]` | T4 |
-| `KNOWLEDGE_BACKEND` lifespan + startup validation | T5 |
-| `demo_rag` citation + `data.route` | T6 |
-| Domains forbid engine imports | T7 |
-| Migration / seed / docs / hand-test | T8 |
+| `LangchainPgRetriever` + TEI HTTP + single table + tenant **column** filter | T4 |
+| No `init_vectorstore_table` (migration owns DDL) | T4 / T8 |
+| Search degrade to `[]`; ingest errors propagate | T4 |
+| `KNOWLEDGE_BACKEND` lifespan + startup validation + separate pools | T5 |
+| `demo_rag` citation + `data.route`; no `or "default"` | T6 |
+| Domains **and** application forbid engine imports | T7 |
+| Migration / seed supports Fake+langchain_pg / docs / hand-test §7.2 | T8 |
+| `/ready` embedding matrix | Out of scope (optional stretch) |
 | No HTTP `/ingest`, no hybrid, no external/product | Out of scope (explicit) |
 
 ## Placeholder / consistency scan
 
-- No TBD steps; TEI base path documented as OpenAI-compatible (`EMBED_API_BASE` ending such that client hits `/v1/embeddings` — if TEI serves at root, set base accordingly in `.env`, same as RAG_Agent).
-- Types: `KnowledgeHit`, `LangchainPgRetriever`, `build_retriever` names stable across tasks.
-- If `langchain-postgres` API differs at install time, only Task 4/8 adapter+SQL may adjust; Port stays fixed.
+- No TBD / “optional follow-up” for Spec-required seed path
+- TEI: OpenAI-compatible; set `EMBED_API_BASE` so the client reaches `/v1/embeddings` (same convention as RAG_Agent)
+- Types: `KnowledgeHit`, `LangchainPgRetriever`, `build_retriever` stable across tasks
+- If `langchain-postgres` API differs at install time, only Task 4/8 adapter+SQL may adjust; Port stays fixed
+
+## Plan ↔ Spec 修订说明（相对初版 plan）
+
+| Spec 缺口 / 偏差 | 修订 |
+|------------------|------|
+| 组装根写 lifespan，plan 却只提 `_build_retriever` 且未列入 `knowledge_backend.py` | 明确 composition helper 可放 `apps/api/adapters/`，**仅 lifespan 调用** |
+| Spec：domains **与** application 禁引擎包；plan 只扫 domains | Task 7 → `import_scan_rag_engines.py` 扫两处 |
+| Spec：禁止静默 `default` 租户；`demo_rag` 仍有 `or "default"` | Task 6 给出完整替换代码 |
+| Spec §7.2 种子脚本须能支撑手测；plan 把 langchain_pg 种子标成 optional | Task 8 完整双模式 `ingest_demo_rag.py` |
+| Spec：migration 建表 + 单集合；plan 未禁 `init_vectorstore_table` | Task 4/8 钉死 migration 唯一 DDL |
+| Spec §2.2 双驱动分池 | Global Constraints + Task 5 写明 |
+| Spec：`/ready` 建议非门禁 | 标为 optional stretch，不挡 R-A |
+| File map 与 Task 5 Files 不一致 | 已对齐 |
