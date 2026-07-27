@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import json
+from types import SimpleNamespace
 
 import pytest
 from agent_base_core.adapters.fake_retriever import FakeRetriever
 from fastapi.testclient import TestClient
+from domains.demo_rag.graph import _cite
 
 
 def _parse_sse(body: str) -> list[dict]:
@@ -54,3 +56,31 @@ async def test_demo_rag_emits_citation(monkeypatch: pytest.MonkeyPatch) -> None:
     assert c0["doc_id"] == "doc-1"
     assert "refund" in c0["text"]
     assert c0["tenant_id"] == "dev"
+
+
+def test_cite_skips_invalid_citation_items() -> None:
+    state = {
+        "messages": [
+            SimpleNamespace(
+                name="search_knowledge",
+                content=[
+                    {
+                        "chunk_id": "ok-1",
+                        "doc_id": "doc-ok",
+                        "text": "valid hit",
+                        "tenant_id": "dev",
+                    },
+                    {
+                        "chunk_id": "",
+                        "doc_id": "doc-bad",
+                        "text": "invalid hit",
+                        "tenant_id": "dev",
+                    },
+                ],
+            )
+        ]
+    }
+    payload = _cite(state)
+    citations = payload["outbound_extensions"][0]["data"]["citations"]
+    assert len(citations) == 1
+    assert citations[0]["chunk_id"] == "ok-1"
