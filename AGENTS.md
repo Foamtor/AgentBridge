@@ -1,4 +1,4 @@
-# AgentBridge / AgentBridge
+# AgentBridge
 
 ## 必须遵守
 
