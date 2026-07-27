@@ -37,10 +37,27 @@ def validate_langchain_pg_settings(settings: Settings) -> None:
         )
 
 
+def validate_external_settings(settings: Settings) -> None:
+    if not (settings.kb_external_base_url or "").strip():
+        raise RuntimeError(
+            "KNOWLEDGE_BACKEND=external missing required config: KB_EXTERNAL_BASE_URL"
+        )
+
+
 async def build_retriever(settings: Settings) -> Any:
     backend = (settings.knowledge_backend or "fake").strip().lower()
     if backend == "fake":
         return FakeRetriever()
+    if backend == "external":
+        validate_external_settings(settings)
+        from adapters.external_rag_retriever import ExternalRagRetriever
+
+        return ExternalRagRetriever(
+            base_url=settings.kb_external_base_url.strip(),
+            api_key=settings.kb_external_api_key or "",
+            timeout_seconds=float(settings.kb_external_timeout_seconds),
+            failure_policy=settings.kb_external_failure_policy,
+        )
     if backend == "langchain_pg":
         validate_langchain_pg_settings(settings)
         from agent_base_core.adapters.langchain_pg_retriever import LangchainPgRetriever
@@ -53,5 +70,5 @@ async def build_retriever(settings: Settings) -> Any:
             embed_api_key=settings.embed_api_key or "",
         )
     raise RuntimeError(
-        f"Unsupported KNOWLEDGE_BACKEND={backend!r}; use fake|langchain_pg"
+        f"Unsupported KNOWLEDGE_BACKEND={backend!r}; use fake|langchain_pg|external"
     )

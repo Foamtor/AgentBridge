@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import pytest
-from adapters.knowledge_backend import validate_langchain_pg_settings
+from adapters.knowledge_backend import (
+    validate_external_settings,
+    validate_langchain_pg_settings,
+)
 from config.settings import Settings
 
 
@@ -26,3 +29,11 @@ def test_validate_langchain_pg_ok(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("EMBED_DIMENSIONS", "1024")
     s = Settings(_env_file=None)
     validate_langchain_pg_settings(s)
+
+
+def test_validate_external_requires_base_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("KNOWLEDGE_BACKEND", "external")
+    monkeypatch.setenv("KB_EXTERNAL_BASE_URL", "")
+    s = Settings(_env_file=None)
+    with pytest.raises(RuntimeError, match="KB_EXTERNAL_BASE_URL"):
+        validate_external_settings(s)
