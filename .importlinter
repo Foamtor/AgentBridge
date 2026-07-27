@@ -49,5 +49,6 @@ modules =
     agent_base_core.adapters.postgres_checkpointer
     agent_base_core.adapters.noop_hooks
     agent_base_core.adapters.logging_hooks
+    agent_base_core.adapters.langchain_pg_retriever
 ignore_imports =
     agent_base_core.adapters.langgraph_runtime -> agent_base_core.adapters.event_mapper
