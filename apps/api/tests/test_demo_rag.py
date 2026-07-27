@@ -5,7 +5,9 @@ from __future__ import annotations
 import json
 from types import SimpleNamespace
 
+import httpx
 import pytest
+from adapters.external_rag_retriever import ExternalRagRetriever
 from agent_base_core.adapters.fake_retriever import FakeRetriever
 from fastapi.testclient import TestClient
 from domains.demo_rag.graph import _cite
@@ -55,6 +57,66 @@ async def test_demo_rag_emits_citation(monkeypatch: pytest.MonkeyPatch) -> None:
     assert c0["chunk_id"] == "d1"
     assert c0["doc_id"] == "doc-1"
     assert "refund" in c0["text"]
+    assert c0["tenant_id"] == "dev"
+
+
+@pytest.mark.asyncio
+async def test_demo_rag_external_emits_citation(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AGENT_BASE_FAKE_RUNTIME", "0")
+    monkeypatch.setenv("KNOWLEDGE_BACKEND", "external")
+    monkeypatch.setenv("KB_EXTERNAL_BASE_URL", "http://mock-rag")
+    import os
+
+    os.environ["AGENT_BASE_FAKE_RUNTIME"] = "0"
+    os.environ["KNOWLEDGE_BACKEND"] = "external"
+    os.environ["KB_EXTERNAL_BASE_URL"] = "http://mock-rag"
+    from testing.app_factory import create_test_app as create_app
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v1/retrieve":
+            return httpx.Response(
+                200,
+                json={
+                    "hits": [
+                        {
+                            "chunk_id": "ext-1",
+                            "doc_id": "doc-ext",
+                            "text": "external refund policy",
+                            "tenant_id": "dev",
+                            "score": 0.88,
+                        }
+                    ]
+                },
+            )
+        if request.url.path == "/v1/health":
+            return httpx.Response(200, json={"status": "ok"})
+        return httpx.Response(404)
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(
+        transport=transport,
+        base_url="http://mock-rag",
+    ) as client:
+        app = create_app()
+        with TestClient(app) as c:
+            c.app.state.retriever = ExternalRagRetriever(
+                base_url="http://mock-rag",
+                client=client,
+            )
+            r = c.post(
+                "/chat/stream",
+                json={
+                    "query": "refund policy",
+                    "thread_id": "t-rag-ext-1",
+                    "route": "demo_rag",
+                },
+            )
+    assert r.status_code == 200
+    events = _parse_sse(r.text)
+    cite = next(e for e in events if e["type"] == "x.bridge.citation")
+    c0 = cite["data"]["citations"][0]
+    assert c0["chunk_id"] == "ext-1"
+    assert c0["doc_id"] == "doc-ext"
     assert c0["tenant_id"] == "dev"
 
 
