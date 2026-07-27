@@ -27,6 +27,9 @@ jobs:
       - name: Scan core for forbidden business imports
         run: python scripts/import_scan_core.py
 
+      - name: Scan domains/application for forbidden RAG engine imports
+        run: python scripts/import_scan_rag_engines.py
+
       - name: Check AI instruction paths
         shell: bash
         run: bash scripts/check_ai_instructions.sh
