@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any, AsyncIterator
 
 from fastapi import FastAPI
@@ -19,6 +20,7 @@ from agent_base_core.adapters.memory_event_log import MemoryEventLog
 from agent_base_core.adapters.memory_message_store import MemoryMessageStore
 from agent_base_core.adapters.memory_run_store import MemoryRunStore
 from agent_base_core.adapters.memory_config_provider import MemoryConfigProvider
+from agent_base_core.adapters.layered_prompt_registry import LayeredPromptRegistry
 from agent_base_core.adapters.memory_prompt_registry import MemoryPromptRegistry
 from agent_base_core.adapters.noop_data_source import NoopDataSource
 from agent_base_core.adapters.noop_hooks import NoopHooks
@@ -36,6 +38,7 @@ from agent_base_core.registry.tools import ToolRegistry
 from config.logging import configure_logging
 from config.settings import Settings, get_settings
 from admin.catalog import build_domain_catalog
+from adapters.domain_prompt_registry import DomainFilePromptRegistry
 from adapters.memory_usage_store import MemoryUsageStore
 from domains.bootstrap import DOMAIN_META_MAP, register_all
 
@@ -136,7 +139,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     message_store = MemoryMessageStore()
     run_store = MemoryRunStore()
     config_provider = MemoryConfigProvider()
-    prompt_registry = MemoryPromptRegistry()
+    platform_prompt_registry = MemoryPromptRegistry()
+    prompt_runtime = LayeredPromptRegistry(
+        platform_prompt_registry,
+        DomainFilePromptRegistry(Path(__file__).resolve().parent / "domains"),
+    )
     usage_store = MemoryUsageStore()
     approval_store = MemoryApprovalStore()
     from adapters.knowledge_backend import build_retriever
@@ -192,7 +199,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.approval_store = approval_store
     app.state.policy = policy
     app.state.config_provider = config_provider
-    app.state.prompt_registry = prompt_registry
+    app.state.prompt_registry = platform_prompt_registry
+    app.state.prompt_runtime = prompt_runtime
     app.state.usage_store = usage_store
     app.state.retriever = retriever
     app.state.data_source = data_source
