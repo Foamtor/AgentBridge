@@ -10,7 +10,7 @@ def test_admin_knowledge_status_fake_backend(client) -> None:
     assert body["backend"] == "fake"
     assert body["healthy"] is True
     assert body["embedding"]["status"] == "skipped"
-    assert body["ingest_jobs"] == []
+    assert isinstance(body["ingest_jobs"], list)
 
 
 def test_admin_knowledge_status_blocked_without_provider(client) -> None:

@@ -17,6 +17,7 @@ from routes.admin_config_write import router as admin_config_write_router
 from routes.admin_tools import router as admin_tools_router
 from routes.admin_knowledge import router as admin_knowledge_router
 from routes.admin_usage import router as admin_usage_router
+from routes.ingest import router as ingest_router
 from routes.prompts import router as prompts_router
 from routes.approvals import router as approvals_router
 from routes.chat import router as chat_router
@@ -66,6 +67,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_runs_router)
     app.include_router(admin_config_write_router)
     app.include_router(prompts_router)
+    app.include_router(ingest_router)
     app.include_router(admin_usage_router)
     app.include_router(admin_knowledge_router)
     app.include_router(threads_router)
