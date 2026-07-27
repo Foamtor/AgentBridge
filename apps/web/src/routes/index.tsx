@@ -3,6 +3,9 @@ import { ConfigPage } from "../features/admin/ConfigPage";
 import { DomainsPage } from "../features/admin/DomainsPage";
 import { ForbiddenPage } from "../features/admin/ForbiddenPage";
 import { OverviewPage } from "../features/admin/OverviewPage";
+import { KnowledgePage } from "../features/admin/KnowledgePage";
+import { PromptsPage } from "../features/admin/PromptsPage";
+import { UsagePage } from "../features/admin/UsagePage";
 import { RunsPage } from "../features/admin/RunsPage";
 import { ToolsPage } from "../features/admin/ToolsPage";
 import { AuthCallbackPage } from "../features/auth/callback";
@@ -18,6 +21,9 @@ export function AppRoutes() {
       <Route path="/config" element={<ConfigPage />} />
       <Route path="/tools" element={<ToolsPage />} />
       <Route path="/runs" element={<RunsPage />} />
+      <Route path="/prompts" element={<PromptsPage />} />
+      <Route path="/usage" element={<UsagePage />} />
+      <Route path="/knowledge" element={<KnowledgePage />} />
       <Route path="/forbidden" element={<ForbiddenPage />} />
       <Route path="/contracts" element={<ContractsPage />} />
       <Route path="/auth/callback" element={<AuthCallbackPage />} />

@@ -65,11 +65,16 @@ def _is_configured(value: Any) -> bool:
     return True
 
 
-def project_config(settings: Settings) -> list[dict[str, Any]]:
+def project_config(
+    settings: Settings, *, include_tier_a: bool = False
+) -> list[dict[str, Any]]:
+    from routes.admin_config_write import _TIER_A_MANIFEST
+
     items: list[dict[str, Any]] = []
-    for spec in _CONFIG_MANIFEST:
-        if spec.tier == "A":
-            continue
+    manifest = list(_CONFIG_MANIFEST)
+    if include_tier_a:
+        manifest.extend(_TIER_A_MANIFEST)
+    for spec in manifest:
         raw = getattr(settings, spec.field, None)
         item: dict[str, Any] = {
             "key": spec.key,
@@ -81,6 +86,8 @@ def project_config(settings: Settings) -> list[dict[str, Any]]:
             item["configured"] = _is_configured(raw)
         else:
             item["value"] = raw
+            if spec.tier == "A":
+                item["writable"] = True
         items.append(item)
     return items
 
@@ -89,4 +96,13 @@ def project_config(settings: Settings) -> list[dict[str, Any]]:
 async def get_config(request: Request) -> dict[str, Any]:
     ctx = admin_ctx(request)
     _require_config_read(ctx)
-    return {"items": project_config(request.app.state.settings)}
+    provider = getattr(request.app.state, "config_provider", None)
+    items = project_config(request.app.state.settings, include_tier_a=provider is not None)
+    if provider is not None:
+        for item in items:
+            if item["tier"] != "A":
+                continue
+            override = await provider.get(item["key"])
+            if override is not None:
+                item["value"] = override
+    return {"items": items}
