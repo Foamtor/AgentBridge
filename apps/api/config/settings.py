@@ -45,6 +45,12 @@ class Settings(BaseSettings):
     policy_bundle_version: str = Field(
         default="role_policy/v1", validation_alias="POLICY_BUNDLE_VERSION"
     )
+    knowledge_backend: str = Field(default="fake", validation_alias="KNOWLEDGE_BACKEND")
+    kb_dsn: str = Field(default="", validation_alias="KB_DSN")
+    embed_api_base: str = Field(default="", validation_alias="EMBED_API_BASE")
+    embed_model: str = Field(default="", validation_alias="EMBED_MODEL")
+    embed_dimensions: int = Field(default=0, validation_alias="EMBED_DIMENSIONS")
+    embed_api_key: str = Field(default="", validation_alias="EMBED_API_KEY")
 
 
 def get_settings() -> Settings:
