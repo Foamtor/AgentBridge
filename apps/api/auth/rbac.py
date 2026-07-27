@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import HTTPException
 
-from agent_base_core.protocol.context import RunContext
+from agentbridge_core.protocol.context import RunContext
 
 
 def require_permission(ctx: RunContext, perm: str) -> None:

@@ -37,7 +37,7 @@ DOCS = [
 async def _build_retriever():
     backend = (os.environ.get("KNOWLEDGE_BACKEND") or "fake").strip().lower()
     if backend == "fake":
-        from agent_base_core.adapters.fake_retriever import FakeRetriever
+        from agentbridge_core.adapters.fake_retriever import FakeRetriever
 
         return FakeRetriever(), True
     if backend == "langchain_pg":

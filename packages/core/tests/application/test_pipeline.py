@@ -1,16 +1,16 @@
 from types import SimpleNamespace
 
 import pytest
-from agent_base_core.adapters.inprocess_cancel import InProcessCancelRegistry
-from agent_base_core.adapters.inprocess_lock import InProcessThreadLock
-from agent_base_core.adapters.memory_audit_logger import MemoryAuditLogger
-from agent_base_core.adapters.noop_hooks import NoopHooks
-from agent_base_core.adapters.role_policy import RolePolicyEngine
-from agent_base_core.application.pipeline import RequestPipeline, ToolPolicyPlugin
-from agent_base_core.application.run_lifecycle import RunLifecycle
-from agent_base_core.protocol.context import RunContext
-from agent_base_core.registry.input_builders import InputBuilderRegistry
-from agent_base_core.registry.tool_meta import attach_tool_meta
+from agentbridge_core.adapters.inprocess_cancel import InProcessCancelRegistry
+from agentbridge_core.adapters.inprocess_lock import InProcessThreadLock
+from agentbridge_core.adapters.memory_audit_logger import MemoryAuditLogger
+from agentbridge_core.adapters.noop_hooks import NoopHooks
+from agentbridge_core.adapters.role_policy import RolePolicyEngine
+from agentbridge_core.application.pipeline import RequestPipeline, ToolPolicyPlugin
+from agentbridge_core.application.run_lifecycle import RunLifecycle
+from agentbridge_core.protocol.context import RunContext
+from agentbridge_core.registry.input_builders import InputBuilderRegistry
+from agentbridge_core.registry.tool_meta import attach_tool_meta
 
 from fakes import FakeCheckpointerFactory, FakeRuntime
 

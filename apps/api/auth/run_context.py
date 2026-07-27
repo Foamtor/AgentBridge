@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from agent_base_core.protocol.context import RunContext
+from agentbridge_core.protocol.context import RunContext
 
 
 def claims_to_run_context(

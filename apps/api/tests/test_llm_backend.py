@@ -6,8 +6,8 @@ import os
 from pathlib import Path
 
 import pytest
-from agent_base_core.adapters.fake_chat_model import FakeChatModel
-from agent_base_core.adapters.alias_llm_gateway import AliasLLMGateway
+from agentbridge_core.adapters.fake_chat_model import FakeChatModel
+from agentbridge_core.adapters.alias_llm_gateway import AliasLLMGateway
 from fastapi.testclient import TestClient
 
 
@@ -25,9 +25,9 @@ def test_gateway_backend_alias_swap_without_domain_change(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("LLM_BACKEND", "gateway")
-    monkeypatch.setenv("AGENT_BASE_FAKE_RUNTIME", "0")
+    monkeypatch.setenv("AGENTBRIDGE_FAKE_RUNTIME", "0")
     os.environ["LLM_BACKEND"] = "gateway"
-    os.environ["AGENT_BASE_FAKE_RUNTIME"] = "0"
+    os.environ["AGENTBRIDGE_FAKE_RUNTIME"] = "0"
     from testing.app_factory import create_test_app as create_app
 
     app = create_app()

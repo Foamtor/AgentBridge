@@ -129,7 +129,7 @@ export function DebugPage() {
   return (
     <main className="page">
       <header>
-        <h1>Agent-Base 调试台</h1>
+        <h1>AgentBridge 调试台</h1>
         <p className="lede">
           发送到 /chat/stream。route 可选 echo / demo_tools；扩展事件 x.* 在时间线中默认折叠。
         </p>

@@ -1,4 +1,4 @@
-const KEY = "agent_base_bearer";
+const KEY = "agentbridge_bearer";
 
 export function getToken(): string {
   return localStorage.getItem(KEY) ?? (import.meta.env.VITE_BEARER_TOKEN as string) ?? "";

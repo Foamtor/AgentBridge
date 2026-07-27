@@ -49,7 +49,7 @@ def test_thread_busy_409(client):
         async def astream(self, builder, **kwargs):
             import asyncio
 
-            from agent_base_core.protocol.fragments import OutboundFragment
+            from agentbridge_core.protocol.fragments import OutboundFragment
 
             yield OutboundFragment(type="text_delta", data={"content": "hold"})
             await asyncio.sleep(2)
@@ -80,7 +80,7 @@ def test_thread_busy_409(client):
 
 
 def test_real_echo_stream_has_text_and_done(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setenv("AGENT_BASE_FAKE_RUNTIME", "0")
+    monkeypatch.setenv("AGENTBRIDGE_FAKE_RUNTIME", "0")
     from testing.app_factory import create_test_app as create_app
 
     app = create_app()
@@ -100,7 +100,7 @@ def test_real_echo_stream_has_text_and_done(monkeypatch: pytest.MonkeyPatch):
 def test_runtime_error_single_error_no_rhost(client):
     class BoomRuntime:
         async def astream(self, builder, **kwargs):
-            from agent_base_core.protocol.fragments import OutboundFragment
+            from agentbridge_core.protocol.fragments import OutboundFragment
 
             yield OutboundFragment(type="text_delta", data={"content": "partial"})
             raise RuntimeError("boom")

@@ -1,4 +1,4 @@
-# agent-base-core
+# agentbridge-core
 
 编排核心库：一次对话怎么跑、事件怎么推、有哪些可替换的接口与适配器、业务如何注册。
 

@@ -1,4 +1,4 @@
-# Agent-Base 全栈本平台 Implementation Plan
+# AgentBridge 全栈本平台 Implementation Plan
 
 > **阅读提示：** 这是历史设计/实施记录。文中若仍有偏内部的说法，请以仓库根目录 README、docs/roadmap.md、docs/add-a-domain.md 的白话为准。\n\n> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -15,7 +15,7 @@
 - `public.py` 只转发已注入的 `RunLifecycle`，禁止在此 `new` 适配器
 - SSE/HTTP 以 `docs/contracts.md` 为准；对照 `docs/parity-with-product.md`
 - 目录以 `docs/superpowers/specs/2026-07-23-code-structure.md` 为准，不另开树
-- 路径一律写仓库相对全路径（如 `packages/core/src/agent_base_core/...`）
+- 路径一律写仓库相对全路径（如 `packages/core/src/agentbridge_core/...`）
 - CI：仓库根 `lint-imports` + `python scripts/import_scan_core.py` 必须绿
 - 本地 smoke **不要求** Authentik 必起；PG 可先 Memory checkpointer，compose PG 在 Task 11
 
@@ -60,8 +60,8 @@ asyncio_default_fixture_loop_scope = "function"
 ### Task 1: Protocol events 对齐 contracts
 
 **Files:**
-- Modify: `packages/core/src/agent_base_core/protocol/events.py`
-- Modify: `packages/core/src/agent_base_core/protocol/sse.py`
+- Modify: `packages/core/src/agentbridge_core/protocol/events.py`
+- Modify: `packages/core/src/agentbridge_core/protocol/sse.py`
 - Modify: `packages/core/tests/protocol/test_sse.py`
 - Modify: `packages/core/pyproject.toml`（补 pytest-asyncio + pytest ini）
 - Modify: `packages/core/tests/conftest.py`（可空文件占位）
@@ -78,8 +78,8 @@ asyncio_default_fixture_loop_scope = "function"
 
 ```python
 # packages/core/tests/protocol/test_sse.py
-from agent_base_core.protocol.events import build_event, EVENT_TYPES
-from agent_base_core.protocol.sse import format_sse_line
+from agentbridge_core.protocol.events import build_event, EVENT_TYPES
+from agentbridge_core.protocol.sse import format_sse_line
 
 def test_build_start_event_shape():
     evt = build_event(
@@ -123,7 +123,7 @@ Expected: PASS
 - [ ] **Step 6: Commit**
 
 ```bash
-git add packages/core/pyproject.toml packages/core/src/agent_base_core/protocol packages/core/tests
+git add packages/core/pyproject.toml packages/core/src/agentbridge_core/protocol packages/core/tests
 git commit -m "feat(core): add SSE event protocol aligned with contracts"
 ```
 
@@ -132,16 +132,16 @@ git commit -m "feat(core): add SSE event protocol aligned with contracts"
 ### Task 2: Ports + Registries + errors
 
 **Files:**
-- Modify: `packages/core/src/agent_base_core/ports/thread_lock.py`
-- Modify: `packages/core/src/agent_base_core/ports/event_sink.py`
-- Modify: `packages/core/src/agent_base_core/ports/checkpointer.py`
-- Modify: `packages/core/src/agent_base_core/ports/graph_runtime.py`
-- Modify: `packages/core/src/agent_base_core/ports/run_control.py`
-- Modify: `packages/core/src/agent_base_core/ports/hooks.py`
-- Modify: `packages/core/src/agent_base_core/registry/graphs.py`
-- Modify: `packages/core/src/agent_base_core/registry/tools.py`
-- Modify: `packages/core/src/agent_base_core/registry/input_builders.py`
-- Modify: `packages/core/src/agent_base_core/application/errors.py`
+- Modify: `packages/core/src/agentbridge_core/ports/thread_lock.py`
+- Modify: `packages/core/src/agentbridge_core/ports/event_sink.py`
+- Modify: `packages/core/src/agentbridge_core/ports/checkpointer.py`
+- Modify: `packages/core/src/agentbridge_core/ports/graph_runtime.py`
+- Modify: `packages/core/src/agentbridge_core/ports/run_control.py`
+- Modify: `packages/core/src/agentbridge_core/ports/hooks.py`
+- Modify: `packages/core/src/agentbridge_core/registry/graphs.py`
+- Modify: `packages/core/src/agentbridge_core/registry/tools.py`
+- Modify: `packages/core/src/agentbridge_core/registry/input_builders.py`
+- Modify: `packages/core/src/agentbridge_core/application/errors.py`
 - Modify: `packages/core/tests/registry/test_registries.py`
 
 **Interfaces:**
@@ -159,10 +159,10 @@ git commit -m "feat(core): add SSE event protocol aligned with contracts"
 ```python
 # packages/core/tests/registry/test_registries.py
 import pytest
-from agent_base_core.registry.graphs import GraphRegistry
-from agent_base_core.registry.tools import ToolRegistry
-from agent_base_core.registry.input_builders import InputBuilderRegistry
-from agent_base_core.application.errors import UnknownRoute
+from agentbridge_core.registry.graphs import GraphRegistry
+from agentbridge_core.registry.tools import ToolRegistry
+from agentbridge_core.registry.input_builders import InputBuilderRegistry
+from agentbridge_core.application.errors import UnknownRoute
 
 def test_graph_registry_get_unknown():
     with pytest.raises(UnknownRoute):
@@ -189,7 +189,7 @@ Run: `pytest packages/core/tests/registry/test_registries.py -v`
 - [ ] **Step 3: Commit**
 
 ```bash
-git add packages/core/src/agent_base_core/ports packages/core/src/agent_base_core/registry packages/core/src/agent_base_core/application/errors.py packages/core/tests/registry
+git add packages/core/src/agentbridge_core/ports packages/core/src/agentbridge_core/registry packages/core/src/agentbridge_core/application/errors.py packages/core/tests/registry
 git commit -m "feat(core): add ports, registries, and application errors"
 ```
 
@@ -198,9 +198,9 @@ git commit -m "feat(core): add ports, registries, and application errors"
 ### Task 3: In-process lock + cancel + NoopHooks
 
 **Files:**
-- Modify: `packages/core/src/agent_base_core/adapters/inprocess_lock.py`
-- Modify: `packages/core/src/agent_base_core/adapters/inprocess_cancel.py`
-- Modify: `packages/core/src/agent_base_core/adapters/noop_hooks.py`
+- Modify: `packages/core/src/agentbridge_core/adapters/inprocess_lock.py`
+- Modify: `packages/core/src/agentbridge_core/adapters/inprocess_cancel.py`
+- Modify: `packages/core/src/agentbridge_core/adapters/noop_hooks.py`
 - Modify: `packages/core/tests/adapters/test_inprocess_lock.py`
 
 **Interfaces:**
@@ -213,8 +213,8 @@ git commit -m "feat(core): add ports, registries, and application errors"
 ```python
 # packages/core/tests/adapters/test_inprocess_lock.py
 import pytest
-from agent_base_core.adapters.inprocess_lock import InProcessThreadLock
-from agent_base_core.adapters.inprocess_cancel import InProcessCancelRegistry
+from agentbridge_core.adapters.inprocess_lock import InProcessThreadLock
+from agentbridge_core.adapters.inprocess_cancel import InProcessCancelRegistry
 
 @pytest.mark.asyncio
 async def test_lock_busy():
@@ -241,7 +241,7 @@ Run: `pytest packages/core/tests/adapters/test_inprocess_lock.py -v`
 - [ ] **Step 3: Commit**
 
 ```bash
-git add packages/core/src/agent_base_core/adapters packages/core/tests/adapters
+git add packages/core/src/agentbridge_core/adapters packages/core/tests/adapters
 git commit -m "feat(core): add in-process thread lock and cancel registry"
 ```
 
@@ -250,9 +250,9 @@ git commit -m "feat(core): add in-process thread lock and cancel registry"
 ### Task 4: Memory checkpointer + SseEventSink + event_mapper（可测最小集）
 
 **Files:**
-- Modify: `packages/core/src/agent_base_core/adapters/memory_checkpointer.py`
-- Modify: `packages/core/src/agent_base_core/adapters/sse_event_sink.py`
-- Modify: `packages/core/src/agent_base_core/adapters/event_mapper.py`
+- Modify: `packages/core/src/agentbridge_core/adapters/memory_checkpointer.py`
+- Modify: `packages/core/src/agentbridge_core/adapters/sse_event_sink.py`
+- Modify: `packages/core/src/agentbridge_core/adapters/event_mapper.py`
 - Modify: `packages/core/tests/adapters/test_event_mapper.py`
 
 **Interfaces:**
@@ -267,8 +267,8 @@ git commit -m "feat(core): add in-process thread lock and cancel registry"
 ```python
 import asyncio
 import pytest
-from agent_base_core.adapters.sse_event_sink import SseEventSink
-from agent_base_core.adapters.event_mapper import map_text_delta
+from agentbridge_core.adapters.sse_event_sink import SseEventSink
+from agentbridge_core.adapters.event_mapper import map_text_delta
 
 @pytest.mark.asyncio
 async def test_sse_sink_emit_and_close():
@@ -298,9 +298,9 @@ git commit -m "feat(core): add memory checkpointer, sse sink, event mapper helpe
 ### Task 5: LangGraphRuntime + RunLifecycle + public 门面
 
 **Files:**
-- Modify: `packages/core/src/agent_base_core/adapters/langgraph_runtime.py`
-- Modify: `packages/core/src/agent_base_core/application/run_lifecycle.py`
-- Modify: `packages/core/src/agent_base_core/public.py`
+- Modify: `packages/core/src/agentbridge_core/adapters/langgraph_runtime.py`
+- Modify: `packages/core/src/agentbridge_core/application/run_lifecycle.py`
+- Modify: `packages/core/src/agentbridge_core/public.py`
 - Modify: `packages/core/tests/application/test_run_lifecycle.py`
 - Modify: `packages/core/tests/conftest.py`（fixtures）
 
@@ -324,14 +324,14 @@ git commit -m "feat(core): add memory checkpointer, sse sink, event mapper helpe
 # packages/core/tests/conftest.py
 import asyncio
 import pytest
-from agent_base_core.adapters.inprocess_lock import InProcessThreadLock
-from agent_base_core.adapters.inprocess_cancel import InProcessCancelRegistry
-from agent_base_core.adapters.noop_hooks import NoopHooks
-from agent_base_core.adapters.sse_event_sink import SseEventSink
-from agent_base_core.registry.graphs import GraphRegistry
-from agent_base_core.registry.tools import ToolRegistry
-from agent_base_core.registry.input_builders import InputBuilderRegistry
-from agent_base_core.protocol.events import build_event
+from agentbridge_core.adapters.inprocess_lock import InProcessThreadLock
+from agentbridge_core.adapters.inprocess_cancel import InProcessCancelRegistry
+from agentbridge_core.adapters.noop_hooks import NoopHooks
+from agentbridge_core.adapters.sse_event_sink import SseEventSink
+from agentbridge_core.registry.graphs import GraphRegistry
+from agentbridge_core.registry.tools import ToolRegistry
+from agentbridge_core.registry.input_builders import InputBuilderRegistry
+from agentbridge_core.protocol.events import build_event
 
 class FakeCheckpointerFactory:
     async def setup(self): ...
@@ -375,12 +375,12 @@ async def drain(q: asyncio.Queue) -> list[dict]:
 ```python
 # packages/core/tests/application/test_run_lifecycle.py
 import pytest
-from agent_base_core.application.run_lifecycle import RunLifecycle
-from agent_base_core.application.errors import ThreadBusy
-from agent_base_core.adapters.inprocess_lock import InProcessThreadLock
-from agent_base_core.adapters.inprocess_cancel import InProcessCancelRegistry
-from agent_base_core.adapters.noop_hooks import NoopHooks
-from agent_base_core.registry.input_builders import InputBuilderRegistry
+from agentbridge_core.application.run_lifecycle import RunLifecycle
+from agentbridge_core.application.errors import ThreadBusy
+from agentbridge_core.adapters.inprocess_lock import InProcessThreadLock
+from agentbridge_core.adapters.inprocess_cancel import InProcessCancelRegistry
+from agentbridge_core.adapters.noop_hooks import NoopHooks
+from agentbridge_core.registry.input_builders import InputBuilderRegistry
 from packages.core.tests.conftest import (  # prefer relative imports from conftest fixtures instead
     FakeCheckpointerFactory, FakeRuntime, drain,
 )
@@ -435,7 +435,7 @@ Run: `pytest packages/core/tests/application/test_run_lifecycle.py -v`
 - [ ] **Step 5: Commit**
 
 ```bash
-git add packages/core/src/agent_base_core/adapters/langgraph_runtime.py packages/core/src/agent_base_core/application/run_lifecycle.py packages/core/src/agent_base_core/public.py packages/core/tests
+git add packages/core/src/agentbridge_core/adapters/langgraph_runtime.py packages/core/src/agentbridge_core/application/run_lifecycle.py packages/core/src/agentbridge_core/public.py packages/core/tests
 git commit -m "feat(core): implement RunLifecycle stream/cancel with graph runtime"
 ```
 
@@ -511,7 +511,7 @@ git commit -m "feat(api): wire create_app, lifespan injection, health route"
 import pytest
 from fastapi.testclient import TestClient
 from main import create_app
-from agent_base_core.protocol.events import build_event
+from agentbridge_core.protocol.events import build_event
 
 class ApiFakeRuntime:
     async def astream(self, builder, **kwargs):
@@ -521,7 +521,7 @@ class ApiFakeRuntime:
 def client():
     app = create_app()
     # After lifespan, replace runtime or register graph on app.state —
-    # simplest: in lifespan test mode env AGENT_BASE_TEST=1 register stub.
+    # simplest: in lifespan test mode env AGENTBRIDGE_TEST=1 register stub.
     with TestClient(app) as c:
         graphs = c.app.state.run_lifecycle._graphs
         tools = c.app.state.run_lifecycle._tools
@@ -531,7 +531,7 @@ def client():
         yield c
 ```
 
-（若不愿碰私有属性：为 `RunLifecycle` 增加测试用 `replace_runtime` 或 lifespan 读 `AGENT_BASE_FAKE_RUNTIME=1`。选一种写进实现，测试只走公开路径更佳。）
+（若不愿碰私有属性：为 `RunLifecycle` 增加测试用 `replace_runtime` 或 lifespan 读 `AGENTBRIDGE_FAKE_RUNTIME=1`。选一种写进实现，测试只走公开路径更佳。）
 
 - [ ] **Step 2: stream 返回 SSE 含 start/done；二次同 thread 并发测 409**
 
@@ -561,7 +561,7 @@ git commit -m "feat(api): add chat stream and cancel endpoints with contract err
 
 - [ ] **Step 1: 实现 echo 四件套 + bootstrap 注册**
 
-- [ ] **Step 2: 集成测（可 `AGENT_BASE_FAKE_RUNTIME=0`）SSE 有 text 或 tool 事件 → done**
+- [ ] **Step 2: 集成测（可 `AGENTBRIDGE_FAKE_RUNTIME=0`）SSE 有 text 或 tool 事件 → done**
 
 - [ ] **Step 3: Commit**
 
@@ -595,7 +595,7 @@ git commit -m "feat(api): optional OIDC bearer auth"
 ### Task 10: LoggingHooks 示例 + scaffold 注释
 
 **Files:**
-- Create: `packages/core/src/agent_base_core/adapters/logging_hooks.py`（或 `apps/api` 下示例 hooks）
+- Create: `packages/core/src/agentbridge_core/adapters/logging_hooks.py`（或 `apps/api` 下示例 hooks）
 - Modify: `apps/api/domains/_scaffold/*`（State / recursion_limit 注释）
 - Modify: `docs/add-a-domain.md`
 
@@ -616,7 +616,7 @@ git commit -m "feat: add LoggingHooks example and domain scaffold guidance"
 **Files:**
 - Modify: `docker-compose.yml`（`postgres`, `redis`, `authentik` 服务；Authentik 可用 profile `auth`）
 - Modify: `start-dev.ps1`, `start-dev.sh`, `stop-dev.ps1`, `stop-dev.sh`
-- Modify: `packages/core/src/agent_base_core/adapters/postgres_checkpointer.py`
+- Modify: `packages/core/src/agentbridge_core/adapters/postgres_checkpointer.py`
 - Modify: `apps/api/lifespan.py`（`use_memory_checkpointer` 切换）
 - Modify: `.env.example`, `infra/authentik/README.md`
 

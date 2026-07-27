@@ -39,7 +39,7 @@ def create_app() -> FastAPI:
     redis_client = None
     if settings.lock_backend == "redis" or settings.rate_limit_backend == "redis":
         redis_client = _build_redis(settings)
-    app = FastAPI(title="agent-base-api", lifespan=lifespan)
+    app = FastAPI(title="agentbridge-api", lifespan=lifespan)
     app.state.bootstrap_redis = redis_client
     # Last added = outermost. Rate limit wraps auth so 429 can fire before JWT work.
     app.add_middleware(

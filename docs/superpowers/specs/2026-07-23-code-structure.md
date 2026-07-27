@@ -1,4 +1,4 @@
-# Agent-Base 完整代码结构设计
+# AgentBridge 完整代码结构设计
 
 > **阅读提示：** 这是历史设计/实施记录。文中若仍有偏内部的说法，请以仓库根目录 README、docs/roadmap.md、docs/add-a-domain.md 的白话为准。\n\n> 日期：2026-07-23  
 > 状态：结构定稿（目录骨架已落库；业务逻辑未实现）  
@@ -13,8 +13,8 @@
 | # | 原则 |
 |---|------|
 | 1 | 仓库是 **monorepo**：`packages/*` 可复用库，`apps/*` 可运行应用 |
-| 2 | Python 包用 **src layout**（`packages/core/src/agent_base_core`） |
-| 3 | 业务按 **domains 插件** 扩展；跨域能力进 `agent_base_core` |
+| 2 | Python 包用 **src layout**（`packages/core/src/agentbridge_core`） |
+| 3 | 业务按 **domains 插件** 扩展；跨域能力进 `agentbridge_core` |
 | 4 | 一个文件一类主责；组装只在 `apps/api/lifespan.py` |
 | 5 | 测试镜像源码树：`packages/core/tests/`、`apps/api/tests/` |
 
@@ -23,7 +23,7 @@
 ## 2. 完整目录树
 
 ```text
-Agent-Base/
+AgentBridge/
 ├── .cursor/
 │   └── rules/
 │       └── python-backend-structure.mdc
@@ -45,7 +45,7 @@ Agent-Base/
 │       ├── pyproject.toml
 │       ├── README.md
 │       ├── src/
-│       │   └── agent_base_core/
+│       │   └── agentbridge_core/
 │       │       ├── __init__.py             # 版本号；不 re-export 一切
 │       │       ├── public.py               # 对外薄门面（orchestration_stream 等）
 │       │       ├── application/
@@ -203,7 +203,7 @@ Agent-Base/
 
 ## 3. 模块 → 类 / 函数职责表
 
-### 3.1 `agent_base_core`（内核）
+### 3.1 `agentbridge_core`（内核）
 
 | 文件 | 主类型 / 符号 | 职责 |
 |------|----------------|------|
@@ -256,17 +256,17 @@ Agent-Base/
 
 ```text
 允许：
-  apps.api.routes          → agent_base_core.public / application.errors / protocol
-  apps.api.lifespan        → agent_base_core.adapters + application + registry + domains.bootstrap
-  apps.api.domains.*       → agent_base_core.registry (+ langchain/langgraph 按需)
-  agent_base_core.application → agent_base_core.ports + registry + protocol
-  agent_base_core.adapters    → agent_base_core.ports + protocol + 第三方
-  agent_base_core.adapters.*  → agent_base_core.adapters.*   # 同层允许，但仅白名单边（见 .importlinter independence）
+  apps.api.routes          → agentbridge_core.public / application.errors / protocol
+  apps.api.lifespan        → agentbridge_core.adapters + application + registry + domains.bootstrap
+  apps.api.domains.*       → agentbridge_core.registry (+ langchain/langgraph 按需)
+  agentbridge_core.application → agentbridge_core.ports + registry + protocol
+  agentbridge_core.adapters    → agentbridge_core.ports + protocol + 第三方
+  agentbridge_core.adapters.*  → agentbridge_core.adapters.*   # 同层允许，但仅白名单边（见 .importlinter independence）
 
 禁止：
-  agent_base_core.application → agent_base_core.adapters
-  agent_base_core.adapters    → agent_base_core.application
-  agent_base_core.*           → apps.api.domains.*
+  agentbridge_core.application → agentbridge_core.adapters
+  agentbridge_core.adapters    → agentbridge_core.application
+  agentbridge_core.*           → apps.api.domains.*
   apps.api.domains.echo       → apps.api.domains.<other>   # 域默认互不依赖
   adapters 网状互引（除已批准：langgraph_runtime → event_mapper）
 ```
@@ -276,7 +276,7 @@ Agent-Base/
 `import-linter` 执行约定（避免 src layout 找包失败）：
 
 - 在仓库根目录执行：`lint-imports`（需先 `pip install -e "packages/core[dev]"`）
-- 配置见根目录 `.importlinter`；`containers` 模式下 layers 写相对层名（`application` 而非 `agent_base_core.application`）
+- 配置见根目录 `.importlinter`；`containers` 模式下 layers 写相对层名（`application` 而非 `agentbridge_core.application`）
 
 ---
 
@@ -326,7 +326,7 @@ def register_all(graphs, tools) -> None:
 | 成熟惯例 | 本仓落点 |
 |----------|----------|
 | `src/<feature>/router.py` | `apps/api/routes/*` + `domains/<feature>` |
-| `service.py` | `agent_base_core.application.RunLifecycle`（跨域用例）+ 业务插件内 graph 节点 |
+| `service.py` | `agentbridge_core.application.RunLifecycle`（跨域用例）+ 业务插件内 graph 节点 |
 | `core/config` | `apps/api/config` |
 | 按域分包 | `domains/echo`、未来 `domains/xxx` |
 | 可复用库抽出 | `packages/core` |

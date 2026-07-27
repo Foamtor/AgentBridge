@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from agent_base_core.registry.tool_meta import attach_tool_meta
+from agentbridge_core.registry.tool_meta import attach_tool_meta
 from langchain_core.tools import tool
 
 

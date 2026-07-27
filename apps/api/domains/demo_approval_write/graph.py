@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from agent_base_core.protocol.fragments import OUTBOUND_EXTENSIONS_KEY
+from agentbridge_core.protocol.fragments import OUTBOUND_EXTENSIONS_KEY
 from langgraph.graph import END, START, StateGraph
 
 from domains.demo_approval_write.state import DemoApprovalWriteState

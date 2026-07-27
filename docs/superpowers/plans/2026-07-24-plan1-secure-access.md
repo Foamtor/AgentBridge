@@ -122,7 +122,7 @@ git commit -m "docs: add MIT license and AI instruction gates (M1)"
 ### Task 2: RunContext + checkpoint_thread_key
 
 **Files:**
-- Create: `packages/core/src/agent_base_core/protocol/context.py`
+- Create: `packages/core/src/agentbridge_core/protocol/context.py`
 - Create: `packages/core/tests/protocol/test_context.py`
 
 **Interfaces:**
@@ -135,7 +135,7 @@ git commit -m "docs: add MIT license and AI instruction gates (M1)"
 
 ```python
 # packages/core/tests/protocol/test_context.py
-from agent_base_core.protocol.context import (
+from agentbridge_core.protocol.context import (
     RUN_CONTEXT_KEY,
     RunContext,
     checkpoint_thread_key,
@@ -172,10 +172,10 @@ def test_checkpoint_thread_key():
 ### Task 3: PolicyEngine + tool_meta（list + invoke 语义）
 
 **Files:**
-- Create: `packages/core/src/agent_base_core/ports/policy.py`
-- Create: `packages/core/src/agent_base_core/registry/tool_meta.py`
-- Create: `packages/core/src/agent_base_core/adapters/role_policy.py`
-- Create: `packages/core/src/agent_base_core/adapters/noop_policy.py`
+- Create: `packages/core/src/agentbridge_core/ports/policy.py`
+- Create: `packages/core/src/agentbridge_core/registry/tool_meta.py`
+- Create: `packages/core/src/agentbridge_core/adapters/role_policy.py`
+- Create: `packages/core/src/agentbridge_core/adapters/noop_policy.py`
 - Create: `packages/core/tests/adapters/test_role_policy.py`
 
 **Interfaces:**
@@ -204,10 +204,10 @@ def test_checkpoint_thread_key():
 ### Task 5: RequestPipeline + ToolPolicyPlugin（仅 list 过滤）
 
 **Files:**
-- Create: `packages/core/src/agent_base_core/application/pipeline.py`
+- Create: `packages/core/src/agentbridge_core/application/pipeline.py`
 - Create: `packages/core/tests/application/test_pipeline.py`
-- Modify: `packages/core/src/agent_base_core/public.py`
-- Modify: `packages/core/src/agent_base_core/application/run_lifecycle.py` — 增加 `ctx`、`tools_override`（invoke 包装在 T6）
+- Modify: `packages/core/src/agentbridge_core/public.py`
+- Modify: `packages/core/src/agentbridge_core/application/run_lifecycle.py` — 增加 `ctx`、`tools_override`（invoke 包装在 T6）
 
 **Interfaces:**
 - `ToolPolicyPlugin(policy, audit, tools_registry)` — **三参数缺一不可**
@@ -221,16 +221,16 @@ def test_checkpoint_thread_key():
 from types import SimpleNamespace
 
 import pytest
-from agent_base_core.adapters.inprocess_cancel import InProcessCancelRegistry
-from agent_base_core.adapters.inprocess_lock import InProcessThreadLock
-from agent_base_core.adapters.memory_audit_logger import MemoryAuditLogger
-from agent_base_core.adapters.noop_hooks import NoopHooks
-from agent_base_core.adapters.role_policy import RolePolicyEngine
-from agent_base_core.application.pipeline import RequestPipeline, ToolPolicyPlugin
-from agent_base_core.application.run_lifecycle import RunLifecycle
-from agent_base_core.protocol.context import RunContext
-from agent_base_core.registry.input_builders import InputBuilderRegistry
-from agent_base_core.registry.tool_meta import attach_tool_meta
+from agentbridge_core.adapters.inprocess_cancel import InProcessCancelRegistry
+from agentbridge_core.adapters.inprocess_lock import InProcessThreadLock
+from agentbridge_core.adapters.memory_audit_logger import MemoryAuditLogger
+from agentbridge_core.adapters.noop_hooks import NoopHooks
+from agentbridge_core.adapters.role_policy import RolePolicyEngine
+from agentbridge_core.application.pipeline import RequestPipeline, ToolPolicyPlugin
+from agentbridge_core.application.run_lifecycle import RunLifecycle
+from agentbridge_core.protocol.context import RunContext
+from agentbridge_core.registry.input_builders import InputBuilderRegistry
+from agentbridge_core.registry.tool_meta import attach_tool_meta
 from conftest import FakeCheckpointerFactory, FakeRuntime
 
 
@@ -298,7 +298,7 @@ async def test_pipeline_filters_tools(graphs, tools, queue_and_sink, drain_event
 ### Task 6: invoke 双检 + RunContext 注入 + 租户化 checkpointer 键
 
 **Files:**
-- Create: `packages/core/src/agent_base_core/application/tool_guard.py`
+- Create: `packages/core/src/agentbridge_core/application/tool_guard.py`
 - Create: `packages/core/tests/application/test_tool_guard.py`
 - Modify: `run_lifecycle.py` — 创建 run_id 后 `ctx.model_copy(update={...})`；调用 `guard_tools`
 - Modify: `adapters/langgraph_runtime.py` — `config["configurable"]` 合并：
@@ -326,10 +326,10 @@ def guard_tools(
 # packages/core/tests/application/test_tool_guard.py
 from types import SimpleNamespace
 import pytest
-from agent_base_core.adapters.role_policy import RolePolicyEngine
-from agent_base_core.application.tool_guard import guard_tools
-from agent_base_core.protocol.context import RunContext
-from agent_base_core.registry.tool_meta import attach_tool_meta
+from agentbridge_core.adapters.role_policy import RolePolicyEngine
+from agentbridge_core.application.tool_guard import guard_tools
+from agentbridge_core.protocol.context import RunContext
+from agentbridge_core.registry.tool_meta import attach_tool_meta
 
 
 class _T:
@@ -478,7 +478,7 @@ async def project_turn(
 - Create: `apps/api/routes/threads.py`、`apps/api/routes/runs.py`
 - Modify: `main.py`
 - Create: `apps/api/tests/test_threads_and_events.py`
-- Create: `packages/core/src/agent_base_core/application/replay.py`
+- Create: `packages/core/src/agentbridge_core/application/replay.py`
 - Create: `scripts/replay_run.py`（读 env/DSN 或测试只测 `replay.py`）
 
 **Endpoints（对齐 contracts）：**

@@ -6,7 +6,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 
-from agent_base_core.application.replay import replay_run
+from agentbridge_core.application.replay import replay_run
 from auth.run_context import claims_to_run_context
 
 router = APIRouter(prefix="/runs", tags=["runs"])

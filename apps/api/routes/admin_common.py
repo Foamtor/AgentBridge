@@ -6,7 +6,7 @@ from datetime import datetime
 
 from fastapi import HTTPException, Request
 
-from agent_base_core.protocol.context import RunContext
+from agentbridge_core.protocol.context import RunContext
 from auth.run_context import claims_to_run_context
 
 

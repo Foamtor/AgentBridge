@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from agent_base_core.adapters.fake_retriever import FakeRetriever
+from agentbridge_core.adapters.fake_retriever import FakeRetriever
 from config.settings import Settings
 
 
@@ -60,7 +60,7 @@ async def build_retriever(settings: Settings) -> Any:
         )
     if backend == "langchain_pg":
         validate_langchain_pg_settings(settings)
-        from agent_base_core.adapters.langchain_pg_retriever import LangchainPgRetriever
+        from agentbridge_core.adapters.langchain_pg_retriever import LangchainPgRetriever
 
         return await LangchainPgRetriever.create(
             dsn=resolve_kb_dsn(settings),

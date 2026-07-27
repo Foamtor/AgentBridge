@@ -1,8 +1,8 @@
 import pytest
-from agent_base_core.application.errors import UnknownRoute
-from agent_base_core.registry.graphs import GraphRegistry
-from agent_base_core.registry.input_builders import InputBuilderRegistry
-from agent_base_core.registry.tools import ToolRegistry
+from agentbridge_core.application.errors import UnknownRoute
+from agentbridge_core.registry.graphs import GraphRegistry
+from agentbridge_core.registry.input_builders import InputBuilderRegistry
+from agentbridge_core.registry.tools import ToolRegistry
 
 
 def test_graph_registry_get_unknown():

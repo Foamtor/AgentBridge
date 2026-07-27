@@ -27,7 +27,7 @@
 
 ## 扩展事件怎么发
 
-1. **推荐：** 把事件列表写在图状态的 `OUTBOUND_EXTENSIONS_KEY` 里（来自 `agent_base_core.protocol.fragments`）。类型必须是合法的 `x.<业务名>.*`。运行时会在跑完后读出并推给客户端。
+1. **推荐：** 把事件列表写在图状态的 `OUTBOUND_EXTENSIONS_KEY` 里（来自 `agentbridge_core.protocol.fragments`）。类型必须是合法的 `x.<业务名>.*`。运行时会在跑完后读出并推给客户端。
 2. **不要：** 在业务插件里直接推 SSE，或拿着底层事件发送对象乱发。
 
 ## 运行钩子

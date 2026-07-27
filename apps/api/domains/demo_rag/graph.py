@@ -6,9 +6,9 @@ import json
 import logging
 from typing import Annotated, Any
 
-from agent_base_core.protocol.context import get_run_context
-from agent_base_core.protocol.fragments import OUTBOUND_EXTENSIONS_KEY
-from agent_base_core.protocol.tool_meta import attach_tool_meta
+from agentbridge_core.protocol.context import get_run_context
+from agentbridge_core.protocol.fragments import OUTBOUND_EXTENSIONS_KEY
+from agentbridge_core.protocol.tool_meta import attach_tool_meta
 from langchain_core.messages import AIMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import InjectedToolArg, tool

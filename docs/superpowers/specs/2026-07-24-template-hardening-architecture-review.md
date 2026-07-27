@@ -1,4 +1,4 @@
-# Agent-Base 模板硬化设计方案 — 架构评审报告
+# AgentBridge 模板硬化设计方案 — 架构评审报告
 
 > **阅读提示：** 这是历史设计/实施记录。文中若仍有偏内部的说法，请以仓库根目录 README、docs/roadmap.md、docs/add-a-domain.md 的白话为准。\n\n> 状态：**历史审阅归档**（实施前评审；一期代码已在 `feat/template-hardening` 落地）  
 > 审阅者：资深系统架构师（ports/adapters 分层 + 构造注入 + 注册表插件架构）
@@ -18,7 +18,7 @@
 
 ### 1.1 OutboundFragment 放在 `protocol/`：正确，需坚持
 
-**决策：** `packages/core/src/agent_base_core/protocol/fragments.py`
+**决策：** `packages/core/src/agentbridge_core/protocol/fragments.py`
 
 **评估：通过。** 这是本次方案最关键的架构锚点。
 
@@ -199,7 +199,7 @@ elif kind == "on_chain_end":
 
 ### 5.2 adapters → adapters 同层依赖的许可：务实，但需防滥用
 
-**决策：** 允许 `agent_base_core.adapters.* → adapters.*`（如 `langgraph_runtime → event_mapper`）；补 code-structure 一句。
+**决策：** 允许 `agentbridge_core.adapters.* → adapters.*`（如 `langgraph_runtime → event_mapper`）；补 code-structure 一句。
 
 **评估：有条件通过。**
 

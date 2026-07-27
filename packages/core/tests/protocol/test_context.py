@@ -1,4 +1,4 @@
-from agent_base_core.protocol.context import (
+from agentbridge_core.protocol.context import (
     RUN_CONTEXT_KEY,
     RunContext,
     checkpoint_thread_key,

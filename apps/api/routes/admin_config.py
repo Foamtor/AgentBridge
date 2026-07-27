@@ -7,7 +7,7 @@ from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException, Request
 
-from agent_base_core.protocol.context import RunContext
+from agentbridge_core.protocol.context import RunContext
 from routes.admin_common import admin_ctx
 from config.settings import Settings
 

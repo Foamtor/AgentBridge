@@ -81,7 +81,7 @@ def test_cross_tenant_run_and_messages_isolated(monkeypatch: pytest.MonkeyPatch)
     monkeypatch.setenv("AUTH_REQUIRED", "true")
     monkeypatch.setenv("AUTH_DEV_STUB", "false")
     monkeypatch.setenv("OIDC_JWT_SECRET", secret)
-    monkeypatch.setenv("AGENT_BASE_FAKE_RUNTIME", "1")
+    monkeypatch.setenv("AGENTBRIDGE_FAKE_RUNTIME", "1")
     import os
 
     from jose import jwt

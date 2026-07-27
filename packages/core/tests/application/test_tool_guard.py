@@ -6,11 +6,11 @@ from typing import Annotated
 
 import pytest
 
-from agent_base_core.adapters.memory_audit_logger import MemoryAuditLogger
-from agent_base_core.adapters.role_policy import RolePolicyEngine
-from agent_base_core.application.tool_guard import guard_tools
-from agent_base_core.protocol.context import RUN_CONTEXT_KEY, RunContext, get_run_context
-from agent_base_core.protocol.tool_meta import attach_tool_meta
+from agentbridge_core.adapters.memory_audit_logger import MemoryAuditLogger
+from agentbridge_core.adapters.role_policy import RolePolicyEngine
+from agentbridge_core.application.tool_guard import guard_tools
+from agentbridge_core.protocol.context import RUN_CONTEXT_KEY, RunContext, get_run_context
+from agentbridge_core.protocol.tool_meta import attach_tool_meta
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import InjectedToolArg, tool
 

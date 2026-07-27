@@ -1,6 +1,6 @@
 import pytest
 
-from agent_base_core.adapters.memory_audit_logger import MemoryAuditLogger
+from agentbridge_core.adapters.memory_audit_logger import MemoryAuditLogger
 
 
 @pytest.mark.asyncio

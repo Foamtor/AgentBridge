@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import httpx
 import pytest
 from adapters.external_rag_retriever import ExternalRagRetriever
-from agent_base_core.adapters.fake_retriever import FakeRetriever
+from agentbridge_core.adapters.fake_retriever import FakeRetriever
 from fastapi.testclient import TestClient
 from domains.demo_rag.graph import _cite
 
@@ -25,10 +25,10 @@ def _parse_sse(body: str) -> list[dict]:
 
 @pytest.mark.asyncio
 async def test_demo_rag_emits_citation(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("AGENT_BASE_FAKE_RUNTIME", "0")
+    monkeypatch.setenv("AGENTBRIDGE_FAKE_RUNTIME", "0")
     import os
 
-    os.environ["AGENT_BASE_FAKE_RUNTIME"] = "0"
+    os.environ["AGENTBRIDGE_FAKE_RUNTIME"] = "0"
     from testing.app_factory import create_test_app as create_app
 
     app = create_app()
@@ -62,12 +62,12 @@ async def test_demo_rag_emits_citation(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.mark.asyncio
 async def test_demo_rag_external_emits_citation(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("AGENT_BASE_FAKE_RUNTIME", "0")
+    monkeypatch.setenv("AGENTBRIDGE_FAKE_RUNTIME", "0")
     monkeypatch.setenv("KNOWLEDGE_BACKEND", "external")
     monkeypatch.setenv("KB_EXTERNAL_BASE_URL", "http://mock-rag")
     import os
 
-    os.environ["AGENT_BASE_FAKE_RUNTIME"] = "0"
+    os.environ["AGENTBRIDGE_FAKE_RUNTIME"] = "0"
     os.environ["KNOWLEDGE_BACKEND"] = "external"
     os.environ["KB_EXTERNAL_BASE_URL"] = "http://mock-rag"
     from testing.app_factory import create_test_app as create_app

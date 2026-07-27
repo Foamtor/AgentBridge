@@ -5,9 +5,9 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-from agent_base_core.adapters.sse_event_sink import SseEventSink
-from agent_base_core.registry.graphs import GraphRegistry
-from agent_base_core.registry.tools import ToolRegistry
+from agentbridge_core.adapters.sse_event_sink import SseEventSink
+from agentbridge_core.registry.graphs import GraphRegistry
+from agentbridge_core.registry.tools import ToolRegistry
 
 # Re-export for fixtures only; tests should ``from fakes import …``.
 from fakes import (  # noqa: F401

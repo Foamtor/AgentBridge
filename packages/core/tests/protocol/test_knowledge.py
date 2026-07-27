@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from agent_base_core.protocol.knowledge import (
+from agentbridge_core.protocol.knowledge import (
     doc_to_knowledge_hit,
     normalize_ingest_doc,
     require_tenant_id,

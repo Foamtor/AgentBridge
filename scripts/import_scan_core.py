@@ -10,7 +10,7 @@ FORBIDDEN_IMPORTS = ("ai_map_chat", "app_ai_chat", "knowlede")
 # Domain / node names must not appear in core *source* (tests may use x.demo_tools.*).
 FORBIDDEN_SUBSTRINGS = ("demo_tools", "echo_node")
 CORE_ROOT = Path(__file__).resolve().parents[1] / "packages" / "core"
-CORE_SRC = CORE_ROOT / "src" / "agent_base_core"
+CORE_SRC = CORE_ROOT / "src" / "agentbridge_core"
 
 
 def _imports_in_file(path: Path) -> list[tuple[int, str]]:

@@ -1,11 +1,11 @@
 import pytest
 
-from agent_base_core.protocol.events import (
+from agentbridge_core.protocol.events import (
     EVENT_TYPES,
     build_event,
     build_extension_event,
 )
-from agent_base_core.protocol.sse import format_sse_line
+from agentbridge_core.protocol.sse import format_sse_line
 
 
 def test_build_start_event_shape():

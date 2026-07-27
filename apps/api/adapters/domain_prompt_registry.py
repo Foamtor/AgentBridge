@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from agent_base_core.adapters.file_prompt_registry import FilePromptRegistry
+from agentbridge_core.adapters.file_prompt_registry import FilePromptRegistry
 
 
 class DomainFilePromptRegistry:

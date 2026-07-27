@@ -36,12 +36,12 @@
 
 | File | Responsibility |
 |------|----------------|
-| `packages/core/src/agent_base_core/protocol/knowledge.py` | `KnowledgeHit` TypedDict + `require_tenant_id` + `normalize_ingest_doc` + `doc_to_knowledge_hit` |
-| `packages/core/src/agent_base_core/ports/retriever.py` | Port signatures → `list[KnowledgeHit]`, `k: int = 5` |
-| `packages/core/src/agent_base_core/adapters/fake_retriever.py` | In-memory backend aligned to KnowledgeHit |
-| `packages/core/src/agent_base_core/adapters/langchain_pg_retriever.py` | PG+TEI backend (lazy imports); no DDL init |
+| `packages/core/src/agentbridge_core/protocol/knowledge.py` | `KnowledgeHit` TypedDict + `require_tenant_id` + `normalize_ingest_doc` + `doc_to_knowledge_hit` |
+| `packages/core/src/agentbridge_core/ports/retriever.py` | Port signatures → `list[KnowledgeHit]`, `k: int = 5` |
+| `packages/core/src/agentbridge_core/adapters/fake_retriever.py` | In-memory backend aligned to KnowledgeHit |
+| `packages/core/src/agentbridge_core/adapters/langchain_pg_retriever.py` | PG+TEI backend (lazy imports); no DDL init |
 | `packages/core/pyproject.toml` | optional-deps `rag` |
-| `apps/api/pyproject.toml` | extra `rag` → `agent-base-core[rag]` |
+| `apps/api/pyproject.toml` | extra `rag` → `agentbridge-core[rag]` |
 | `apps/api/config/settings.py` | `knowledge_backend`, `kb_dsn`, `embed_*` |
 | `apps/api/adapters/knowledge_backend.py` | `resolve_kb_dsn` / `validate_langchain_pg_settings` / `build_retriever` (called only from lifespan) |
 | `apps/api/lifespan.py` | `await build_retriever(settings)` + teardown `close()` |
@@ -58,8 +58,8 @@
 ### Task 1: KnowledgeHit + normalize helpers + Port
 
 **Files:**
-- Create: `packages/core/src/agent_base_core/protocol/knowledge.py`
-- Modify: `packages/core/src/agent_base_core/ports/retriever.py`
+- Create: `packages/core/src/agentbridge_core/protocol/knowledge.py`
+- Modify: `packages/core/src/agentbridge_core/ports/retriever.py`
 - Create: `packages/core/tests/protocol/test_knowledge.py`
 
 **Interfaces:**
@@ -77,7 +77,7 @@
 ```python
 # packages/core/tests/protocol/test_knowledge.py
 import pytest
-from agent_base_core.protocol.knowledge import (
+from agentbridge_core.protocol.knowledge import (
     require_tenant_id,
     normalize_ingest_doc,
     doc_to_knowledge_hit,
@@ -131,7 +131,7 @@ Expected: FAIL (module not found)
 - [ ] **Step 3: Write minimal implementation**
 
 ```python
-# packages/core/src/agent_base_core/protocol/knowledge.py
+# packages/core/src/agentbridge_core/protocol/knowledge.py
 """Unified knowledge hit contract (R-A)."""
 
 from __future__ import annotations
@@ -233,14 +233,14 @@ def doc_to_knowledge_hit(
 ```
 
 ```python
-# packages/core/src/agent_base_core/ports/retriever.py
+# packages/core/src/agentbridge_core/ports/retriever.py
 """Retriever protocol — tenant-scoped similarity search."""
 
 from __future__ import annotations
 
 from typing import Any, Protocol
 
-from agent_base_core.protocol.knowledge import KnowledgeHit
+from agentbridge_core.protocol.knowledge import KnowledgeHit
 
 
 class Retriever(Protocol):
@@ -268,7 +268,7 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add packages/core/src/agent_base_core/protocol/knowledge.py packages/core/src/agent_base_core/ports/retriever.py packages/core/tests/protocol/test_knowledge.py
+git add packages/core/src/agentbridge_core/protocol/knowledge.py packages/core/src/agentbridge_core/ports/retriever.py packages/core/tests/protocol/test_knowledge.py
 git commit -m "feat(core): add KnowledgeHit contract and Retriever Port defaults"
 ```
 
@@ -277,7 +277,7 @@ git commit -m "feat(core): add KnowledgeHit contract and Retriever Port defaults
 ### Task 2: Align FakeRetriever + tenant tests
 
 **Files:**
-- Modify: `packages/core/src/agent_base_core/adapters/fake_retriever.py`
+- Modify: `packages/core/src/agentbridge_core/adapters/fake_retriever.py`
 - Modify: `packages/core/tests/adapters/test_retriever_memory.py`
 
 **Interfaces:**
@@ -296,9 +296,9 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-from agent_base_core.adapters.fake_retriever import FakeRetriever
-from agent_base_core.adapters.timeout_memory_store import TimeoutMemoryStore
-from agent_base_core.protocol.context import RunContext
+from agentbridge_core.adapters.fake_retriever import FakeRetriever
+from agentbridge_core.adapters.timeout_memory_store import TimeoutMemoryStore
+from agentbridge_core.protocol.context import RunContext
 
 
 @pytest.mark.asyncio
@@ -355,14 +355,14 @@ Expected: FAIL on KnowledgeHit fields and/or blank tenant (until Fake updated)
 - [ ] **Step 3: Implement FakeRetriever**
 
 ```python
-# packages/core/src/agent_base_core/adapters/fake_retriever.py
+# packages/core/src/agentbridge_core/adapters/fake_retriever.py
 """In-memory Retriever with tenant namespaces (no pgvector required)."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from agent_base_core.protocol.knowledge import (
+from agentbridge_core.protocol.knowledge import (
     KnowledgeHit,
     doc_to_knowledge_hit,
     normalize_ingest_doc,
@@ -414,7 +414,7 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add packages/core/src/agent_base_core/adapters/fake_retriever.py packages/core/tests/adapters/test_retriever_memory.py
+git add packages/core/src/agentbridge_core/adapters/fake_retriever.py packages/core/tests/adapters/test_retriever_memory.py
 git commit -m "feat(core): align FakeRetriever with KnowledgeHit and tenant rules"
 ```
 
@@ -446,7 +446,7 @@ In `apps/api/pyproject.toml` under `[project.optional-dependencies]`, add:
 
 ```toml
 rag = [
-  "agent-base-core[rag]",
+  "agentbridge-core[rag]",
 ]
 ```
 
@@ -457,7 +457,7 @@ rag = [
 Run:
 
 ```bash
-python -c "from agent_base_core.adapters.fake_retriever import FakeRetriever; print('ok')"
+python -c "from agentbridge_core.adapters.fake_retriever import FakeRetriever; print('ok')"
 ```
 
 Expected: prints `ok` without requiring langchain-postgres.
@@ -474,7 +474,7 @@ git commit -m "build: add rag optional extra for langchain_pg"
 ### Task 4: LangchainPgRetriever (unit-tested with injected fake store)
 
 **Files:**
-- Create: `packages/core/src/agent_base_core/adapters/langchain_pg_retriever.py`
+- Create: `packages/core/src/agentbridge_core/adapters/langchain_pg_retriever.py`
 - Create: `packages/core/tests/adapters/test_langchain_pg_retriever.py`
 - Modify: `.importlinter` (add module to independence list **or** leave out of independence set if new leaf — prefer add to modules list as independent leaf)
 
@@ -498,7 +498,7 @@ import logging
 import pytest
 from langchain_core.documents import Document
 
-from agent_base_core.adapters.langchain_pg_retriever import LangchainPgRetriever
+from agentbridge_core.adapters.langchain_pg_retriever import LangchainPgRetriever
 
 
 class _FakeStore:
@@ -570,7 +570,7 @@ Expected: FAIL import error
 - [ ] **Step 3: Implement adapter**
 
 ```python
-# packages/core/src/agent_base_core/adapters/langchain_pg_retriever.py
+# packages/core/src/agentbridge_core/adapters/langchain_pg_retriever.py
 """PGVector retriever via langchain-postgres (optional rag extra)."""
 
 from __future__ import annotations
@@ -578,7 +578,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from agent_base_core.protocol.knowledge import (
+from agentbridge_core.protocol.knowledge import (
     KnowledgeHit,
     doc_to_knowledge_hit,
     normalize_ingest_doc,
@@ -720,8 +720,8 @@ class LangchainPgRetriever:
 If `PGVectorStore.create` / `DistanceStrategy` import paths differ in the pinned package version, adjust **only inside this file** to match the installed `langchain-postgres` docs — keep the public `LangchainPgRetriever` API stable.
 
 Update `.importlinter` independence `modules=` list: append  
-`agent_base_core.adapters.langchain_pg_retriever`  
-and `agent_base_core.adapters.fake_retriever` if not already listed (fake may already be absent — only add new module; do not refactor unrelated adapters).
+`agentbridge_core.adapters.langchain_pg_retriever`  
+and `agentbridge_core.adapters.fake_retriever` if not already listed (fake may already be absent — only add new module; do not refactor unrelated adapters).
 
 - [ ] **Step 4: Run unit tests**
 
@@ -731,7 +731,7 @@ Expected: PASS (no pgvector required)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add packages/core/src/agent_base_core/adapters/langchain_pg_retriever.py packages/core/tests/adapters/test_langchain_pg_retriever.py .importlinter
+git add packages/core/src/agentbridge_core/adapters/langchain_pg_retriever.py packages/core/tests/adapters/test_langchain_pg_retriever.py .importlinter
 git commit -m "feat(core): add LangchainPgRetriever with tenant filter and degrade-empty"
 ```
 
@@ -762,7 +762,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from agent_base_core.adapters.fake_retriever import FakeRetriever
+from agentbridge_core.adapters.fake_retriever import FakeRetriever
 from config.settings import Settings
 
 
@@ -801,7 +801,7 @@ async def build_retriever(settings: Settings) -> Any:
         return FakeRetriever()
     if backend == "langchain_pg":
         validate_langchain_pg_settings(settings)
-        from agent_base_core.adapters.langchain_pg_retriever import LangchainPgRetriever
+        from agentbridge_core.adapters.langchain_pg_retriever import LangchainPgRetriever
 
         return await LangchainPgRetriever.create(
             dsn=resolve_kb_dsn(settings),
@@ -1012,9 +1012,9 @@ git commit -m "feat(demo_rag): align citation payload with KnowledgeHit"
 - Modify: `.github/workflows/ci.yml` (architecture-gates job)
 
 **Interfaces:**
-- Consumes: AST scan of `apps/api/domains` **and** `packages/core/src/agent_base_core/application`
+- Consumes: AST scan of `apps/api/domains` **and** `packages/core/src/agentbridge_core/application`
 - Produces: CI failure if those trees import `langchain_postgres` / `langchain_openai` / `langchain_community`
-- Note: engine imports are allowed only under `agent_base_core.adapters` (lazy) and `apps/api` composition/lifespan
+- Note: engine imports are allowed only under `agentbridge_core.adapters` (lazy) and `apps/api` composition/lifespan
 
 - [ ] **Step 1: Write scanner**
 
@@ -1036,7 +1036,7 @@ FORBIDDEN_PREFIXES = (
 ROOT = Path(__file__).resolve().parents[1]
 SCAN_ROOTS = (
     ROOT / "apps" / "api" / "domains",
-    ROOT / "packages" / "core" / "src" / "agent_base_core" / "application",
+    ROOT / "packages" / "core" / "src" / "agentbridge_core" / "application",
 )
 
 
@@ -1195,7 +1195,7 @@ DOCS = [
 async def _build_retriever():
     backend = (os.environ.get("KNOWLEDGE_BACKEND") or "fake").strip().lower()
     if backend == "fake":
-        from agent_base_core.adapters.fake_retriever import FakeRetriever
+        from agentbridge_core.adapters.fake_retriever import FakeRetriever
 
         return FakeRetriever(), True
     if backend == "langchain_pg":

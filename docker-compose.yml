@@ -4,11 +4,11 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: change-me
-      POSTGRES_DB: agent_base
+      POSTGRES_DB: agentbridge
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d agent_base"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d agentbridge"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -28,7 +28,7 @@ services:
       AUTHENTIK_POSTGRESQL__HOST: postgres
       AUTHENTIK_POSTGRESQL__USER: postgres
       AUTHENTIK_POSTGRESQL__PASSWORD: change-me
-      AUTHENTIK_POSTGRESQL__NAME: agent_base
+      AUTHENTIK_POSTGRESQL__NAME: agentbridge
     ports:
       - "9000:9000"
     depends_on:

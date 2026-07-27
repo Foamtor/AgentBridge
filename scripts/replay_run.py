@@ -15,8 +15,8 @@ import sys
 
 
 async def _main(run_id: str, tenant_id: str) -> int:
-    from agent_base_core.adapters.memory_event_log import MemoryEventLog
-    from agent_base_core.application.replay import replay_run
+    from agentbridge_core.adapters.memory_event_log import MemoryEventLog
+    from agentbridge_core.application.replay import replay_run
 
     log = MemoryEventLog()
     events = await replay_run(log, run_id, tenant_id=tenant_id)

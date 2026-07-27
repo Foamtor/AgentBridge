@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from agent_base_core.application.graph_config import build_graph_config
-from agent_base_core.protocol.context import RUN_CONTEXT_KEY, RunContext, checkpoint_thread_key
+from agentbridge_core.application.graph_config import build_graph_config
+from agentbridge_core.protocol.context import RUN_CONTEXT_KEY, RunContext, checkpoint_thread_key
 
 
 def test_build_graph_config_includes_run_context_key() -> None:

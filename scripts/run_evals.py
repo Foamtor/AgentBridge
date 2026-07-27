@@ -7,8 +7,8 @@ import json
 import sys
 from pathlib import Path
 
-from agent_base_core.adapters.role_policy import RolePolicyEngine
-from agent_base_core.protocol.context import RunContext
+from agentbridge_core.adapters.role_policy import RolePolicyEngine
+from agentbridge_core.protocol.context import RunContext
 
 ROOT = Path(__file__).resolve().parents[1]
 GOLDEN_DIR = ROOT / "evals" / "golden"

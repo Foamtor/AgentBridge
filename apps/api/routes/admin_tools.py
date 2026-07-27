@@ -7,9 +7,9 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 
-from agent_base_core.application.tool_guard import guard_tools
-from agent_base_core.protocol.context import RunContext
-from agent_base_core.protocol.tool_meta import get_tool_meta
+from agentbridge_core.application.tool_guard import guard_tools
+from agentbridge_core.protocol.context import RunContext
+from agentbridge_core.protocol.tool_meta import get_tool_meta
 from auth.rbac import require_permission
 from routes.admin_common import admin_ctx, require_tools_read
 

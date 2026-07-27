@@ -18,7 +18,7 @@ export RATE_LIMIT_BACKEND=redis
 export REDIS_URL=redis://127.0.0.1:6379/0
 export RATE_LIMIT_PER_MINUTE=120
 export USE_MEMORY_CHECKPOINTER=false   # 生产建议用 Postgres 会话
-export PG_DSN=postgresql://postgres:change-me@127.0.0.1:5432/agent_base
+export PG_DSN=postgresql://postgres:change-me@127.0.0.1:5432/agentbridge
 
 pip install -e "apps/api[redis,datasource]"
 cd apps/api

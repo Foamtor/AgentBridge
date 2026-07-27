@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from fastapi import Request
 
-from agent_base_core.application.pipeline import RequestPipeline
-from agent_base_core.application.run_lifecycle import RunLifecycle
+from agentbridge_core.application.pipeline import RequestPipeline
+from agentbridge_core.application.run_lifecycle import RunLifecycle
 
 
 def get_run_lifecycle(request: Request) -> RunLifecycle:

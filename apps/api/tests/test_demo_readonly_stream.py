@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 
 import pytest
-from agent_base_core.adapters.fake_data_source import FakeDataSource
+from agentbridge_core.adapters.fake_data_source import FakeDataSource
 from fastapi.testclient import TestClient
 
 
@@ -23,7 +23,7 @@ def test_demo_readonly_stream_queries_with_tenant(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Real LangGraph + RolePolicy + InjectedToolArg must still reach DataSource."""
-    monkeypatch.setenv("AGENT_BASE_FAKE_RUNTIME", "0")
+    monkeypatch.setenv("AGENTBRIDGE_FAKE_RUNTIME", "0")
     from testing.app_factory import create_test_app as create_app
 
     app = create_app()

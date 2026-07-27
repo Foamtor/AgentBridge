@@ -78,7 +78,7 @@ class DataSource(Protocol):
 - `apps/api/config/settings.py`：
   - `enable_data_source: bool = False`（`ENABLE_DATA_SOURCE`）
   - `data_source_dsn: str = ""`（空则回退 `_resolve_postgres_dsn`）
-- `apps/api/tests/test_postgres_data_source.py` — skipif 无 `AGENT_BASE_TEST_PG_DSN`
+- `apps/api/tests/test_postgres_data_source.py` — skipif 无 `AGENTBRIDGE_TEST_PG_DSN`
 
 **Wiring rule:**
 ```python
@@ -134,8 +134,8 @@ from typing import Annotated, Any
 from langchain_core.tools import InjectedToolArg, tool
 from langchain_core.runnables import RunnableConfig
 
-from agent_base_core.protocol.context import get_run_context
-from agent_base_core.registry.tool_meta import attach_tool_meta
+from agentbridge_core.protocol.context import get_run_context
+from agentbridge_core.registry.tool_meta import attach_tool_meta
 
 
 @tool

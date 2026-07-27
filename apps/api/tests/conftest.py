@@ -11,12 +11,12 @@ from testing.app_factory import create_test_app, ensure_api_on_path
 ensure_api_on_path()
 
 # Ensure Settings picks up fake runtime before create_app/lifespan.
-os.environ.setdefault("AGENT_BASE_FAKE_RUNTIME", "1")
+os.environ.setdefault("AGENTBRIDGE_FAKE_RUNTIME", "1")
 
 
 @pytest.fixture
 def client(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setenv("AGENT_BASE_FAKE_RUNTIME", "1")
+    monkeypatch.setenv("AGENTBRIDGE_FAKE_RUNTIME", "1")
     app = create_test_app()
     with TestClient(app) as c:
         yield c

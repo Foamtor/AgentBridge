@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 
-from agent_base_core.protocol.fragments import OutboundFragment
+from agentbridge_core.protocol.fragments import OutboundFragment
 
 
 class FakeCheckpointerFactory:
