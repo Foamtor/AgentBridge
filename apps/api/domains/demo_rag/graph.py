@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Annotated, Any
 
 from agent_base_core.protocol.context import get_run_context
@@ -15,6 +16,8 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.prebuilt import ToolNode
 
 from domains.demo_rag.state import DemoRagState
+
+logger = logging.getLogger(__name__)
 
 
 @tool
@@ -79,6 +82,22 @@ def _tool_docs(content: Any) -> list[dict[str, Any]]:
     return []
 
 
+def _normalize_citation(doc: dict[str, Any]) -> dict[str, Any] | None:
+    item: dict[str, Any] = {
+        "chunk_id": doc.get("chunk_id") or doc.get("id"),
+        "doc_id": doc.get("doc_id") or doc.get("chunk_id") or doc.get("id"),
+        "text": doc.get("text"),
+        "tenant_id": doc.get("tenant_id"),
+    }
+    required = ("chunk_id", "doc_id", "text", "tenant_id")
+    if any(not item.get(k) for k in required):
+        logger.warning("skip invalid citation item: missing required fields")
+        return None
+    if "score" in doc:
+        item["score"] = doc["score"]
+    return item
+
+
 def _cite(state: DemoRagState) -> dict[str, Any]:
     citations: list[dict[str, Any]] = []
     for m in state.get("messages") or []:
@@ -87,17 +106,9 @@ def _cite(state: DemoRagState) -> dict[str, Any]:
             continue
         content = getattr(m, "content", None)
         for doc in _tool_docs(content):
-            item: dict[str, Any] = {
-                "chunk_id": doc.get("chunk_id") or doc.get("id"),
-                "doc_id": doc.get("doc_id")
-                or doc.get("chunk_id")
-                or doc.get("id"),
-                "text": doc.get("text"),
-                "tenant_id": doc.get("tenant_id"),
-            }
-            if "score" in doc:
-                item["score"] = doc["score"]
-            citations.append(item)
+            item = _normalize_citation(doc)
+            if item is not None:
+                citations.append(item)
     return {
         OUTBOUND_EXTENSIONS_KEY: [
             {
