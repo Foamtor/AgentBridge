@@ -7,6 +7,7 @@ type ConfigItem = {
   tier: string;
   description: string;
   configured?: boolean;
+  writable?: boolean;
 };
 
 export function ConfigPage() {
@@ -47,6 +48,7 @@ export function ConfigPage() {
                     ? "已配置"
                     : "未配置"
                   : String(item.value ?? "—")}
+                {item.writable ? <span className="muted"> · 可编辑</span> : null}
               </td>
               <td className="muted">{item.description}</td>
             </tr>

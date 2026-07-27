@@ -21,9 +21,16 @@ def test_config_manifest_covers_settings_fields() -> None:
         assert spec.field in settings_fields, spec.field
 
 
-def test_project_config_excludes_tier_a() -> None:
+def test_project_config_excludes_tier_a_by_default() -> None:
     items = project_config(Settings())
     assert all(item["tier"] != "A" for item in items)
     keys = {item["key"] for item in items}
     assert "LLM_BACKEND" in keys
     assert "EMBED_API_KEY" in keys
+    assert "RATE_LIMIT_PER_MINUTE" not in keys
+
+
+def test_project_config_includes_tier_a_when_requested() -> None:
+    items = project_config(Settings(), include_tier_a=True)
+    keys = {item["key"] for item in items}
+    assert "RATE_LIMIT_PER_MINUTE" in keys
