@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any
 
 from agent_base_core.ports.event_log import EventLog
@@ -64,5 +65,6 @@ async def project_turn(
             "tenant_id": tenant_id,
             "thread_id": thread_id,
             "status": terminal,
+            "ended_at": datetime.now(timezone.utc).isoformat(),
         }
     )

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+DOMAIN_META = {"description": "RAG 知识问答示例插件"}
+
 from agent_base_core.registry.graphs import GraphRegistry
 from agent_base_core.registry.input_builders import InputBuilderRegistry
 from agent_base_core.registry.tools import ToolRegistry

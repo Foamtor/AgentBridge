@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+DOMAIN_META = {"description": "最小 Echo 示例插件"}
+
 from domains.echo.graph import build_echo_graph
 from domains.echo.tools import echo
 

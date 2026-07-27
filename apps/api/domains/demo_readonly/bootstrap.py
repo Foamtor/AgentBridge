@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+DOMAIN_META = {"description": "只读订单列表示例插件"}
+
 from domains.demo_readonly.graph import build_demo_readonly_graph
 from domains.demo_readonly.tools import list_orders
 

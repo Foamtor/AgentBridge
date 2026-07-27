@@ -11,7 +11,10 @@ class MemoryRunStore:
 
     async def upsert(self, run: dict[str, Any]) -> None:
         run_id = str(run["run_id"])
-        self._runs[run_id] = dict(run)
+        existing = self._runs.get(run_id, {})
+        merged = dict(existing)
+        merged.update(run)
+        self._runs[run_id] = merged
 
     async def get(self, run_id: str, *, tenant_id: str) -> dict[str, Any] | None:
         raw = self._runs.get(run_id)

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
+from datetime import datetime, timezone
 from typing import Any
 
 from agent_base_core.application.graph_config import build_graph_config
@@ -31,6 +32,10 @@ from agent_base_core.registry.tools import ToolRegistry
 from contextlib import nullcontext
 
 logger = logging.getLogger(__name__)
+
+
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 
 class EventLogAppendError(Exception):
@@ -313,6 +318,17 @@ class RunLifecycle:
                 tenant_id=tenant_id,
                 agent_id=agent_id,
             )
+            if self._run_store is not None:
+                await self._run_store.upsert(
+                    {
+                        "run_id": run_id,
+                        "tenant_id": tenant_id,
+                        "thread_id": thread_id,
+                        "route": route,
+                        "started_at": _utc_now_iso(),
+                        "status": "pending",
+                    }
+                )
 
             checkpointer = await self._checkpointers.get()
 
