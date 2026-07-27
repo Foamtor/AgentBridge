@@ -184,6 +184,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.message_store = message_store
     app.state.run_store = run_store
     app.state.approval_store = approval_store
+    app.state.policy = policy
     app.state.retriever = retriever
     app.state.data_source = data_source
     app.state.llm_gateway = llm_gateway
