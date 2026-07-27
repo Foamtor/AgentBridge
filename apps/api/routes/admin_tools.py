@@ -11,7 +11,7 @@ from agent_base_core.application.tool_guard import guard_tools
 from agent_base_core.protocol.context import RunContext
 from agent_base_core.protocol.tool_meta import get_tool_meta
 from auth.rbac import require_permission
-from routes.admin_common import admin_ctx
+from routes.admin_common import admin_ctx, require_tools_read
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -25,16 +25,25 @@ def _tool_description(tool: Any) -> str:
     return str(desc) if desc else ""
 
 
+def _tool_resource(tool: Any) -> dict[str, Any]:
+    meta = get_tool_meta(tool)
+    return {
+        "name": _tool_name(tool),
+        "required_roles": meta["required_roles"],
+        "required_permissions": meta["required_permissions"],
+    }
+
+
 def _iter_tools(tools_registry: Any) -> list[tuple[str, Any]]:
     out: list[tuple[str, Any]] = []
     for route in tools_registry.keys():
         try:
-            raw = tools_registry.get(route)
+            raw_tools = tools_registry.get(route)
         except Exception:  # noqa: BLE001
             continue
-        if not isinstance(raw, list):
-            raw = list(raw) if raw else []
-        for tool in raw:
+        if not isinstance(raw_tools, list):
+            raw_tools = list(raw_tools) if raw_tools else []
+        for tool in raw_tools:
             out.append((route, tool))
     return out
 
@@ -52,11 +61,11 @@ def _matrix_roles(settings: Any) -> list[str]:
 
 
 def _build_matrix(
-  policy: Any,
-  *,
-  route: str,
-  tool: Any,
-  roles: list[str],
+    policy: Any,
+    *,
+    route: str,
+    tool: Any,
+    roles: list[str],
 ) -> dict[str, str]:
     row: dict[str, str] = {}
     for role in roles:
@@ -69,7 +78,7 @@ def _build_matrix(
 @router.get("/tools")
 async def list_tools(request: Request) -> dict[str, Any]:
     ctx = admin_ctx(request)
-    require_permission(ctx, "admin:tools")
+    require_tools_read(ctx)
     settings = request.app.state.settings
     policy = request.app.state.policy
     roles = _matrix_roles(settings)
@@ -143,13 +152,24 @@ async def invoke_tool(
         )
     route, tool = found
     policy = request.app.state.policy
-    audit = getattr(request.app.state, "audit", None)
-    guarded = guard_tools([tool], policy=policy, ctx=ctx, audit=audit)
-    if not guarded:
+    resource = _tool_resource(tool)
+    if policy.decide(ctx=ctx, action="invoke_tool", resource=resource) != "allow":
+        audit = getattr(request.app.state, "audit", None)
+        if audit is not None:
+            await audit.log(
+                user_id=ctx.user_id or "",
+                tenant_id=ctx.tenant_id or "default",
+                action="admin.tool_invoke",
+                resource=f"tool:{name}",
+                result="denied",
+                detail={"route": route, "reason": "policy_deny"},
+            )
         raise HTTPException(
             status_code=403,
             detail={"code": "forbidden", "message": "tool invoke denied by policy"},
         )
+    audit = getattr(request.app.state, "audit", None)
+    guarded = guard_tools([tool], policy=policy, ctx=ctx, audit=audit)
     arguments = dict((body or {}).get("arguments") or {})
     try:
         result = await _invoke_tool(guarded[0], arguments)
@@ -160,6 +180,20 @@ async def invoke_tool(
             status_code=400,
             detail={"code": "tool_invoke_failed", "message": str(exc)},
         ) from exc
+    if result == "forbidden":
+        if audit is not None:
+            await audit.log(
+                user_id=ctx.user_id or "",
+                tenant_id=ctx.tenant_id or "default",
+                action="admin.tool_invoke",
+                resource=f"tool:{name}",
+                result="denied",
+                detail={"route": route, "reason": "policy_deny"},
+            )
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "forbidden", "message": "tool invoke denied by policy"},
+        )
     if audit is not None:
         await audit.log(
             user_id=ctx.user_id or "",

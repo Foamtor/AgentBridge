@@ -6,6 +6,15 @@ from datetime import datetime, timezone
 from typing import Any
 
 
+def _parse_iso(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
 class MemoryUsageStore:
     def __init__(self) -> None:
         self._records: list[dict[str, Any]] = []
@@ -31,6 +40,18 @@ class MemoryUsageStore:
             }
         )
 
+    def _in_window(
+        self, rec: dict[str, Any], since: str | None, until: str | None
+    ) -> bool:
+        since_dt = _parse_iso(since)
+        until_dt = _parse_iso(until)
+        recorded = _parse_iso(str(rec.get("recorded_at") or ""))
+        if since_dt and (recorded is None or recorded < since_dt):
+            return False
+        if until_dt and (recorded is None or recorded > until_dt):
+            return False
+        return True
+
     def aggregate(
         self,
         *,
@@ -38,24 +59,18 @@ class MemoryUsageStore:
         since: str | None = None,
         until: str | None = None,
     ) -> dict[str, Any]:
-        key_map = {
-            "tenant": "tenant_id",
-            "route": "route",
-            "model": "model",
-        }
-        field = key_map[group_by]
         buckets: dict[tuple[Any, ...], dict[str, Any]] = {}
         total_in = 0
         total_out = 0
         for rec in self._records:
-            bucket_key = (rec["tenant_id"], rec["route"], rec["model"])
-            if field == "tenant_id":
-                group_val = rec["tenant_id"]
-            elif field == "route":
-                group_val = rec["route"]
+            if not self._in_window(rec, since, until):
+                continue
+            if group_by == "tenant":
+                key = (rec["tenant_id"],)
+            elif group_by == "route":
+                key = (rec["tenant_id"], rec["route"], rec["model"])
             else:
-                group_val = rec["model"]
-            key = (group_val, rec["tenant_id"], rec["route"], rec["model"])
+                key = (rec["tenant_id"], rec["route"], rec["model"])
             if key not in buckets:
                 buckets[key] = {
                     "tenant_id": rec["tenant_id"],
@@ -78,16 +93,19 @@ class MemoryUsageStore:
                 }
                 for i in items
             ]
-        elif group_by == "route":
-            items = [
-                {
-                    "tenant_id": i["tenant_id"],
-                    "route": i["route"],
-                    "input_tokens": i["input_tokens"],
-                    "output_tokens": i["output_tokens"],
-                }
-                for i in items
-            ]
+        elif group_by == "model":
+            merged: dict[str, dict[str, Any]] = {}
+            for i in items:
+                model = str(i["model"])
+                if model not in merged:
+                    merged[model] = {
+                        "model": model,
+                        "input_tokens": 0,
+                        "output_tokens": 0,
+                    }
+                merged[model]["input_tokens"] += i["input_tokens"]
+                merged[model]["output_tokens"] += i["output_tokens"]
+            items = list(merged.values())
         return {
             "window": {"since": since, "until": until},
             "group_by": group_by,

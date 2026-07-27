@@ -20,3 +20,29 @@ def test_admin_runs_empty_when_no_match(client) -> None:
     r = client.get("/admin/runs?status=error&route=missing-route-xyz")
     assert r.status_code == 200
     assert r.json()["items"] == []
+
+
+def test_admin_runs_cursor_pages_without_overlap(client) -> None:
+    for idx in range(3):
+        client.post(
+            "/chat/stream",
+            json={
+                "query": f"hello-{idx}",
+                "thread_id": f"t-runs-page-{idx}",
+                "route": "echo",
+            },
+        )
+    first = client.get("/admin/runs?status=done&route=echo&limit=2")
+    assert first.status_code == 200
+    body1 = first.json()
+    assert len(body1["items"]) == 2
+    assert body1["next_cursor"]
+
+    second = client.get(
+        f"/admin/runs?status=done&route=echo&limit=2&cursor={body1['next_cursor']}"
+    )
+    assert second.status_code == 200
+    body2 = second.json()
+    ids1 = {item["run_id"] for item in body1["items"]}
+    ids2 = {item["run_id"] for item in body2["items"]}
+    assert ids1.isdisjoint(ids2)

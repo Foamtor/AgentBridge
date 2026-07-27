@@ -30,15 +30,18 @@ class SlidingWindowLimiter:
         self._window = window_seconds
         self._hits: dict[str, deque[float]] = defaultdict(deque)
 
-    def allow(self, key: str, *, now: float | None = None) -> bool:
-        if self._limit <= 0:
+    def allow(
+        self, key: str, *, now: float | None = None, limit: int | None = None
+    ) -> bool:
+        effective = self._limit if limit is None else limit
+        if effective <= 0:
             return True
         t = time.monotonic() if now is None else now
         q = self._hits[key]
         cutoff = t - self._window
         while q and q[0] < cutoff:
             q.popleft()
-        if len(q) >= self._limit:
+        if len(q) >= effective:
             return False
         q.append(t)
         return True
@@ -54,14 +57,15 @@ class RedisSlidingWindowLimiter:
         self._limit = limit
         self._window = window_seconds
 
-    async def allow(self, key: str) -> bool:
-        if self._limit <= 0:
+    async def allow(self, key: str, *, limit: int | None = None) -> bool:
+        effective = self._limit if limit is None else limit
+        if effective <= 0:
             return True
         rkey = f"ab:rl:{key}"
         count = await self._redis.eval(
             _INCR_EXPIRE_LUA, 1, rkey, str(self._window)
         )
-        return int(count) <= self._limit
+        return int(count) <= effective
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
@@ -84,7 +88,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         )
 
     async def dispatch(self, request: Request, call_next) -> Response:
-        if self._limit <= 0:
+        settings = getattr(request.app.state, "settings", None)
+        limit = settings.rate_limit_per_minute if settings is not None else self._limit
+        if limit <= 0:
             return await call_next(request)
         path = request.url.path
         if path in {"/health", "/ready", "/metrics"} or path.startswith(
@@ -94,9 +100,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         client = request.client.host if request.client else "unknown"
         try:
             if self._async is not None:
-                allowed = await self._async.allow(client)
+                allowed = await self._async.allow(client, limit=limit)
             else:
-                allowed = self._sync.allow(client)
+                allowed = self._sync.allow(client, limit=limit)
         except Exception:  # noqa: BLE001 — Redis/backend failure
             logger.exception("rate limit backend error")
             return JSONResponse(

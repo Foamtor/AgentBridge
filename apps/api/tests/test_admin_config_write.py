@@ -16,3 +16,7 @@ def test_put_config_tier_a_updates_value(client) -> None:
     assert body["key"] == "RATE_LIMIT_PER_MINUTE"
     assert body["value"] == 42
     assert body["tier"] == "A"
+    cfg = client.get("/admin/config")
+    item = next(x for x in cfg.json()["items"] if x["key"] == "RATE_LIMIT_PER_MINUTE")
+    assert item["value"] == 42
+    assert client.app.state.settings.rate_limit_per_minute == 42
