@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Protocol
 
+from agent_base_core.protocol.knowledge import KnowledgeHit
+
 
 class Retriever(Protocol):
     async def similarity_search(
@@ -11,8 +13,8 @@ class Retriever(Protocol):
         query: str,
         *,
         tenant_id: str,
-        k: int = 4,
-    ) -> list[dict[str, Any]]: ...
+        k: int = 5,
+    ) -> list[KnowledgeHit]: ...
 
     async def ingest(
         self,
