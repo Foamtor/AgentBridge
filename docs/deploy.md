@@ -11,6 +11,19 @@
 | 单机生产 | 本进程内存 | 本进程或 Redis | Postgres | 主承诺 |
 | 多机 | Redis（或数据库锁） | Redis | 集中式 Postgres | 需显式配置 |
 
+## 两档 Quick Start
+
+| 档 | 适用 | 数据库 | 时间 |
+|----|------|--------|------|
+| **Fake**（零依赖） | 快速体验对话 / 工具 | 无（内存） | ~5 min |
+| **完整 RAG** | 知识问答 + 入库 | PG + pgvector | ~30 min |
+
+Fake 档：直接装 pip + 启动 uvicorn。  
+完整 RAG 档：`docker compose --profile rag up -d` 起 pgvector 实例，再装 `[rag]` extra，配置 `KNOWLEDGE_BACKEND=langchain_pg`，跑迁移脚本。  
+详见 README Quick Start。
+
+---
+
 ## 本地（内存会话）
 
 ```bash
@@ -74,3 +87,20 @@ pip install -e "packages/core[postgres]"
 | `ENABLE_DATA_SOURCE` | `false` | 与 `USE_MEMORY_CHECKPOINTER` 独立 |
 
 探针：`GET /health`（活着）、`GET /ready`（依赖；未启用的项标成 skipped）、`GET /metrics`（Prometheus 文本）。
+
+## 知识后端（R-A · M11）
+
+> 设计：[platform-ra-design](./superpowers/specs/2026-07-27-platform-ra-design.md)；计划：[platform-ra](./superpowers/plans/2026-07-27-platform-ra.md)。  
+> **默认仍是 Fake**；下列变量在 `KNOWLEDGE_BACKEND=langchain_pg` 时生效。
+
+| 变量 | 说明 |
+|------|------|
+| `KNOWLEDGE_BACKEND` | `fake`（默认）\| `langchain_pg`（R-A）\| `external` / `product`（R-C） |
+| `KB_DSN` | 知识库 PG（可省略则用 `PG_DSN`）；需 pgvector |
+| `EMBED_API_BASE` / `EMBED_MODEL` / `EMBED_API_KEY` | Embedding（OpenAI 兼容；本机 TEI） |
+| `EMBED_DIMENSIONS` | 向量维数，须与模型及 `003_knowledge_pgvector.sql` 一致 |
+| `KB_EXTERNAL_BASE_URL` | 仅 `external`（R-C） |
+
+安装：`pip install -e "apps/api[rag]"`。  
+Postgres：`docker compose --profile rag up -d`（`pgvector/pgvector:pg16`）。  
+使用说明：[knowledge-base.md](./knowledge-base.md)。
