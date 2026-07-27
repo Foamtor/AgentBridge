@@ -13,8 +13,27 @@ def test_admin_domains_ok_with_star(client: TestClient) -> None:
     # auth off → permissions=["*"]
     r = client.get("/admin/domains")
     assert r.status_code == 200
-    names = {d["name"] for d in r.json()}
+    body = r.json()
+    assert isinstance(body, dict)
+    assert "domains" in body
+    names = {d["name"] for d in body["domains"]}
     assert "echo" in names
+
+
+def test_admin_domains_returns_object_shape(client: TestClient) -> None:
+    r = client.get("/admin/domains")
+    assert r.status_code == 200
+    body = r.json()
+    assert isinstance(body, dict)
+    assert "domains" in body
+    assert isinstance(body["domains"], list)
+    if body["domains"]:
+        entry = body["domains"][0]
+        assert "name" in entry
+        assert "description" in entry
+        assert "tools" in entry
+        assert "required_permissions" in entry
+        assert "graph_registered" in entry
 
 
 def test_admin_domains_forbidden_without_perm(monkeypatch: pytest.MonkeyPatch) -> None:

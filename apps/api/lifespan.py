@@ -33,7 +33,8 @@ from agent_base_core.registry.input_builders import InputBuilderRegistry
 from agent_base_core.registry.tools import ToolRegistry
 from config.logging import configure_logging
 from config.settings import Settings, get_settings
-from domains.bootstrap import register_all
+from admin.catalog import build_domain_catalog
+from domains.bootstrap import DOMAIN_META_MAP, register_all
 
 
 def _resolve_postgres_dsn(settings: Settings) -> str:
@@ -188,6 +189,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.llm_gateway = llm_gateway
     app.state.metrics = metrics
     app.state.tools = tools
+    app.state.graphs = graphs
+    app.state.domain_catalog = build_domain_catalog(
+        route_names=tools.keys(),
+        tools_registry=tools,
+        graph_names=set(graphs.keys()),
+        meta_map=DOMAIN_META_MAP,
+    )
     # Expose checkpointer factory for /ready (memory always "ready" after setup).
     app.state.checkpointers = checkpointers
     app.state.redis = redis_client

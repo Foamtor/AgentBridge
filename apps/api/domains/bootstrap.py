@@ -12,6 +12,16 @@ from domains.demo_readonly import bootstrap as demo_readonly
 from domains.demo_tools import bootstrap as demo_tools
 from domains.echo import bootstrap as echo
 
+DOMAIN_META_MAP: dict[str, dict[str, str]] = {
+    "echo": echo.DOMAIN_META,
+    "demo_tools": demo_tools.DOMAIN_META,
+    "demo_readonly": demo_readonly.DOMAIN_META,
+    "demo_llm": demo_llm.DOMAIN_META,
+    "demo_rag": demo_rag.DOMAIN_META,
+    "demo_approval_write": demo_approval_write.DOMAIN_META,
+    "demo_multi_agent": demo_multi_agent.DOMAIN_META,
+}
+
 
 def register_all(
     graphs: Any,

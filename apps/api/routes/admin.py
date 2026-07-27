@@ -56,11 +56,11 @@ def _sanitize_record(rec: dict[str, Any]) -> dict[str, Any]:
 
 
 @router.get("/domains")
-async def list_domains(request: Request) -> list[dict[str, Any]]:
+async def list_domains(request: Request) -> dict[str, Any]:
     ctx = _ctx(request)
     require_permission(ctx, "admin:domains")
-    names = request.app.state.tools.keys()
-    return [{"name": n, "kind": "domain"} for n in names]
+    catalog = getattr(request.app.state, "domain_catalog", None) or []
+    return {"domains": catalog}
 
 
 @router.get("/audit/export")

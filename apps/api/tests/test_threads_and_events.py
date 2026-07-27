@@ -54,6 +54,21 @@ def test_threads_messages_and_events_after_stream(client) -> None:
     assert types[-1] == "done"
 
 
+def test_run_projection_contains_route_and_started_at(client) -> None:
+    r = client.post(
+        "/chat/stream",
+        json={"query": "hello", "thread_id": "t-c0-proj", "route": "echo"},
+    )
+    assert r.status_code == 200
+    run_id = _parse_sse(r.text)[0]["run_id"]
+    run = client.get(f"/runs/{run_id}")
+    assert run.status_code == 200
+    body = run.json()
+    assert body["route"] == "echo"
+    assert body["started_at"]
+    assert body.get("ended_at")
+
+
 def test_run_not_found_404(client) -> None:
     r = client.get("/runs/r-missing")
     assert r.status_code == 404
