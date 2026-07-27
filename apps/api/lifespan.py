@@ -12,7 +12,6 @@ from agent_base_core.adapters.inprocess_cancel import InProcessCancelRegistry
 from agent_base_core.adapters.inprocess_lock import InProcessThreadLock
 from agent_base_core.adapters.langgraph_runtime import LangGraphRuntime
 from agent_base_core.adapters.logging_hooks import LoggingHooks
-from agent_base_core.adapters.fake_retriever import FakeRetriever
 from agent_base_core.adapters.memory_approval_store import MemoryApprovalStore
 from agent_base_core.adapters.memory_audit_logger import MemoryAuditLogger
 from agent_base_core.adapters.memory_checkpointer import MemoryCheckpointerFactory
@@ -133,7 +132,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     message_store = MemoryMessageStore()
     run_store = MemoryRunStore()
     approval_store = MemoryApprovalStore()
-    retriever = FakeRetriever()
+    from adapters.knowledge_backend import build_retriever
+
+    retriever = await build_retriever(settings)
     data_source = _build_data_source(settings)
     llm_gateway = _build_llm_gateway(settings)
     from adapters.prometheus_metrics import PrometheusMetrics
@@ -193,6 +194,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
         yield
     finally:
+        close_retriever = getattr(retriever, "close", None)
+        if close_retriever is not None:
+            result = close_retriever()
+            if hasattr(result, "__await__"):
+                await result
         await data_source.close()
         await checkpointers.teardown()
         if redis_client is not None:
