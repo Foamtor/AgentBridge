@@ -4,6 +4,13 @@ from __future__ import annotations
 
 from typing import Any
 
+from agent_base_core.protocol.knowledge import (
+    KnowledgeHit,
+    doc_to_knowledge_hit,
+    normalize_ingest_doc,
+    require_tenant_id,
+)
+
 
 class FakeRetriever:
     def __init__(self) -> None:
@@ -12,20 +19,29 @@ class FakeRetriever:
     async def ingest(
         self, docs: list[dict[str, Any]], *, tenant_id: str
     ) -> int:
-        bucket = self._docs.setdefault(tenant_id, [])
-        for d in docs:
-            bucket.append(dict(d))
-        return len(docs)
+        tid = require_tenant_id(tenant_id)
+        normalized = [normalize_ingest_doc(d, tenant_id=tid) for d in docs]
+        bucket = self._docs.setdefault(tid, [])
+        for d in normalized:
+            bucket.append(d)
+        return len(normalized)
 
     async def similarity_search(
-        self, query: str, *, tenant_id: str, k: int = 4
-    ) -> list[dict[str, Any]]:
+        self, query: str, *, tenant_id: str, k: int = 5
+    ) -> list[KnowledgeHit]:
+        tid = require_tenant_id(tenant_id)
         q = query.lower()
         scored: list[tuple[int, dict[str, Any]]] = []
-        for doc in self._docs.get(tenant_id, []):
+        for doc in self._docs.get(tid, []):
             text = str(doc.get("text") or "")
             score = sum(1 for w in q.split() if w and w in text.lower())
             if score:
-                scored.append((score, dict(doc)))
+                scored.append((score, doc))
         scored.sort(key=lambda x: x[0], reverse=True)
-        return [d for _, d in scored[:k]]
+        out: list[KnowledgeHit] = []
+        for score, doc in scored[:k]:
+            hit = doc_to_knowledge_hit(doc, tenant_id=tid, score=float(score))
+            if hit["tenant_id"] != tid:
+                continue
+            out.append(hit)
+        return out
