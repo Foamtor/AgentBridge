@@ -8,7 +8,7 @@ from typing import Any
 from fastapi import APIRouter, Request
 
 from auth.rbac import require_permission
-from routes.admin_common import admin_ctx
+from routes.admin_common import admin_ctx, parse_iso
 from routes.ready import (
     _check_checkpointer,
     _check_data_source,
@@ -16,15 +16,6 @@ from routes.ready import (
 )
 
 router = APIRouter(prefix="/admin", tags=["admin"])
-
-
-def _parse_iso(value: str | None) -> datetime | None:
-    if not value:
-        return None
-    try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError:
-        return None
 
 
 def _count_domains(catalog: list[dict[str, Any]]) -> dict[str, int]:
@@ -38,7 +29,7 @@ def _runs_24h_stats(runs: list[dict[str, Any]]) -> dict[str, int]:
     total = 0
     errors = 0
     for run in runs:
-        started = _parse_iso(str(run.get("started_at") or ""))
+        started = parse_iso(str(run.get("started_at") or ""))
         if started is None or started < since:
             continue
         total += 1
