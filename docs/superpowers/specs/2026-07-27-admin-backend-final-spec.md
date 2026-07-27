@@ -1,6 +1,6 @@
 # AgentBridge 管理后端最终形态 Spec（开源可发布级）
 
-> **状态：** 设计定稿 v2.1（C0–C4 + 代码复核对齐，待实现对齐）  
+> **状态：** 设计定稿 v2.1（C0–C4 已在 `feat/admin-console-c0-c4` 落地；C4 知识 status 待底座 provider 注入）  
 > **日期：** 2026-07-27（修订 2026-07-27）  
 > **读者：** 平台管理员 · 集成开发者 · 开源贡献者  
 > **归属：** 设计三类之 **② 管理后台**（见 [design-tracks.md](../../design-tracks.md)）  
@@ -530,43 +530,53 @@ Prompt 优先级见 §5.2。
 
 ### 8.1 C0 验收
 
-- [ ] §6.2 Run 投影字段已落地（`route`、`started_at` 等）  
-- [ ] §6.3 各域 `DOMAIN_META` + `domain_catalog` 已落地  
-- [ ] `GET /admin/domains` 返回 `{ "domains": [...] }`（非裸数组）  
-- [ ] `GET /admin/overview`：backend 探测与 `infra_ready` 分离；24h 统计有效  
-- [ ] `GET /admin/config` 按 §5.3 manifest 投影；档 A 为空；密钥不明文  
-- [ ] 控制台可看到插件、infra ready、配置只读  
-- [ ] 总览展示近 24h Run 总数与错误数（**无 Token 字段**）  
-- [ ] 调试页可发起请求并看到 SSE 事件  
-- [ ] 可跳转查看 run/threads 回放  
-- [ ] 无 `admin:*` 不可访问管理页关键 API  
-- [ ] 不出现业务前端信息架构  
-- [ ] `PUT /admin/config/*` 不可用（404/501）
+- [x] §6.2 Run 投影字段已落地（`route`、`started_at` 等）  
+- [x] §6.3 各域 `DOMAIN_META` + `domain_catalog` 已落地  
+- [x] `GET /admin/domains` 返回 `{ "domains": [...] }`（非裸数组）  
+- [x] `GET /admin/overview`：backend 探测与 `infra_ready` 分离；24h 统计有效  
+- [x] `GET /admin/config` 按 §5.3 manifest 投影；档 A 在 C0 为空；密钥不明文  
+- [x] 控制台可看到插件、infra ready、配置只读  
+- [x] 总览展示近 24h Run 总数与错误数（**无 Token 字段**）  
+- [x] 调试页可发起请求并看到 SSE 事件  
+- [x] 可跳转查看 run/threads 回放  
+- [x] 无 `admin:*` 不可访问管理页关键 API  
+- [x] 不出现业务前端信息架构  
+- [x] C0 不提供 tier B/C 热写（`PUT` 仅 tier A，见 C2）
 
 ### 8.3 C1 验收
 
-- [ ] `GET /admin/tools` 返回完整工具目录与权限矩阵
-- [ ] `POST /admin/tools/{name}/invoke` 默认 403；开启开关后可试调且落审计
-- [ ] `GET /admin/runs` 列表可分页筛选；可进入 `GET /runs/{id}/events` 回放
-- [ ] 侧栏 `/runs`、`/tools` 页可加载
+- [x] `GET /admin/tools` 返回完整工具目录与权限矩阵
+- [x] `POST /admin/tools/{name}/invoke` 默认 403；开启开关后可试调且落审计
+- [x] `GET /admin/runs` 列表可分页筛选；可进入 `GET /runs/{id}/events` 回放
+- [x] 侧栏 `/runs`、`/tools` 页可加载
 
 ### 8.4 C2 验收
 
-- [ ] `ConfigProvider` 落地后，档 A 可 `PUT /admin/config/{key}` 且写审计
-- [ ] tier B/C 热写返回 400
-- [ ] `/prompts/*` CRUD 可用；平台覆盖优先于插件文件（§5.2）
-- [ ] 配置只读页对档 A 显示「可编辑」标识
+- [x] `ConfigProvider` 落地后，档 A 可 `PUT /admin/config/{key}` 且写审计（开发默认 `MemoryConfigProvider`）
+- [x] tier B/C 热写返回 400
+- [x] `/prompts/*` CRUD 可用；平台覆盖优先于插件文件（§5.2）
+- [x] 配置只读页对档 A 显示「可编辑」标识
 
 ### 8.5 C3 验收
 
-- [ ] `GET /admin/usage/tokens` 支持 `tenant` / `route` / `model` 分组
-- [ ] 无 Gateway 数据时 UI 显示「暂无用量数据」，不展示假图表
+- [x] `GET /admin/usage/tokens` 支持 `tenant` / `route` / `model` 分组
+- [x] 无 Gateway 数据时 UI 显示「暂无用量数据」，不展示假图表
 
 ### 8.6 C4 验收
 
-- [ ] 知识面板消费底座 `GET /admin/knowledge/status`
-- [ ] 展示 backend 类型、健康探测、入库任务列表（有则显示）
-- [ ] 控制台不提供入库写入口
+- [x] 知识面板消费 `GET /admin/knowledge/status` 路由
+- [x] 无 `knowledge_status_provider` 时返回 `503` + `blocked_by_base_r_b_status_api`；UI 显示阻塞提示
+- [ ] 展示 backend 类型、健康探测、入库任务列表（依赖底座 R-B provider 注入）
+- [x] 控制台不提供入库写入口
+
+### 8.7 状态枚举统一（实现必须对齐）
+
+| 字段 | 允许值 | 说明 |
+|------|--------|------|
+| `infra_ready.status` | `ready` \| `not_ready` | 仅用于基础设施就绪（对齐 `/ready` 语义） |
+| `llm_backend.status` | `ok` \| `degraded` \| `skipped` \| `fail` | 管理端独立探测；不复用 `/ready` 词汇 |
+| `knowledge_backend.status` | `ok` \| `degraded` \| `skipped` \| `fail` | `fake` 常见为 `skipped`；`langchain_pg` 可探测失败为 `degraded` |
+| `runs[].status` | `pending` \| `awaiting_approval` \| `done` \| `error` \| `cancelled` | 来自 RunStore 投影；前后端渲染与筛选用这一组 |
 
 ### 8.2 性能与稳定（最低）
 

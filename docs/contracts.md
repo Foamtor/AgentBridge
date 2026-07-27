@@ -16,12 +16,13 @@
 | GET | `/ready` | 依赖就绪 | 已有 |
 | GET | `/threads` | 对话列表 | 已有 |
 | GET | `/threads/{id}/messages` | 消息历史 | 已有 |
-| GET | `/runs`、`/runs/{id}` | Run 状态 | 已有 |
+| GET | `/runs/{id}` | 单 Run 状态（含 `route` / `started_at` / `ended_at` 投影） | 已有 |
+| GET | `/runs` | Run 列表 | **未实现**（管理侧列表用 `GET /admin/runs`，见 §1.3） |
 | GET | `/runs/{id}/events` | 事件回放 | 已有 |
 | GET | `/metrics` | Prometheus | 已有 |
 | GET/POST | `/approvals/*` | 人工审批 | 已有 |
-| POST | `/ingest` | 文档摄取 | 视部署是否提供 |
-| GET/POST | `/admin/*` | 管理接口 | 已有（如 domains / audit export） |
+| POST | `/ingest` | 文档摄取 | **规划 M11**（尚未实现；见 Plan6） |
+| GET/POST | `/admin/*`、`/prompts/*` | 管理接口 | **已有 C0–C4**（见 §1.3） |
 
 ### 1.1 `POST /chat/stream`
 
@@ -86,6 +87,24 @@
 | `run_id` | 否 | 省略则取消该 thread 当前 run |
 
 成功：`200` + `{"ok": true}`；无进行中 run：`404` + `code: run_not_found`。
+
+### 1.3 管理面 HTTP（C0–C4，真源见 [admin-backend-final-spec](./superpowers/specs/2026-07-27-admin-backend-final-spec.md) §4）
+
+| 方法 | 路径 | 说明 | 状态 |
+|------|------|------|------|
+| GET | `/admin/overview` | 总览（24h Run/错误、backend 探测、infra_ready） | 已有 |
+| GET | `/admin/domains` | 插件清单 `{ "domains": [...] }` | 已有 |
+| GET | `/admin/config` | 配置只读投影（档 B/C；C2+ 含档 A） | 已有 |
+| PUT | `/admin/config/{key}` | 档 A 热写（需 ConfigProvider） | 已有 C2+ |
+| GET | `/admin/tools` | 工具目录 + 权限矩阵 | 已有 C1 |
+| POST | `/admin/tools/{name}/invoke` | 工具试调（默认关，`ADMIN_TOOL_INVOKE_ENABLED`） | 已有 C1 |
+| GET | `/admin/runs` | Run 列表（筛选/分页） | 已有 C1 |
+| GET | `/prompts`、`GET/PUT /prompts/{name}`、`POST .../publish` | Prompt 管理 | 已有 C2 |
+| GET | `/admin/usage/tokens` | Token 用量（`group_by=tenant\|route\|model`） | 已有 C3 |
+| GET | `/admin/knowledge/status` | 知识后端状态 | 已有 C4（无 provider 时 503） |
+| GET | `/admin/audit/export` | 审计导出 | 已有 |
+
+单 Run 详情与事件回放仍用 `GET /runs/{id}`、`GET /runs/{id}/events`；**不提供**业务侧 `GET /runs` 列表。
 
 ---
 
@@ -322,7 +341,7 @@
 - `x.bridge.citation`  
 - 多 Agent：**单流**，`data.agent_id` / `parent_run_id`（§4.8）
 
-### 3.4 管理面鉴权（规划）
+### 3.4 管理面鉴权（已有）
 
 `/admin/*`、写 `/prompts`、写 `/ingest` 需 admin 类 permission；`/approvals/*` 需 `approval:decide`（或配置等价物）。见完整方案 §4.7。
 
