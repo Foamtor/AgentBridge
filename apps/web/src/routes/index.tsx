@@ -3,6 +3,8 @@ import { ConfigPage } from "../features/admin/ConfigPage";
 import { DomainsPage } from "../features/admin/DomainsPage";
 import { ForbiddenPage } from "../features/admin/ForbiddenPage";
 import { OverviewPage } from "../features/admin/OverviewPage";
+import { RunsPage } from "../features/admin/RunsPage";
+import { ToolsPage } from "../features/admin/ToolsPage";
 import { AuthCallbackPage } from "../features/auth/callback";
 import { ContractsPage } from "../features/contracts/ContractsPage";
 import { DebugPage } from "../features/debug/DebugPage";
@@ -14,6 +16,8 @@ export function AppRoutes() {
       <Route path="/debug" element={<DebugPage />} />
       <Route path="/domains" element={<DomainsPage />} />
       <Route path="/config" element={<ConfigPage />} />
+      <Route path="/tools" element={<ToolsPage />} />
+      <Route path="/runs" element={<RunsPage />} />
       <Route path="/forbidden" element={<ForbiddenPage />} />
       <Route path="/contracts" element={<ContractsPage />} />
       <Route path="/auth/callback" element={<AuthCallbackPage />} />

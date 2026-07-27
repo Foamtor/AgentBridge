@@ -6,6 +6,8 @@ const NAV = [
   { to: "/debug", label: "调试" },
   { to: "/domains", label: "插件" },
   { to: "/config", label: "配置" },
+  { to: "/tools", label: "Tools" },
+  { to: "/runs", label: "Runs" },
 ];
 
 export function App() {

@@ -45,6 +45,12 @@ class Settings(BaseSettings):
     policy_bundle_version: str = Field(
         default="role_policy/v1", validation_alias="POLICY_BUNDLE_VERSION"
     )
+    policy_matrix_roles: str = Field(
+        default="admin,viewer", validation_alias="POLICY_MATRIX_ROLES"
+    )
+    admin_tool_invoke_enabled: bool = Field(
+        default=False, validation_alias="ADMIN_TOOL_INVOKE_ENABLED"
+    )
     knowledge_backend: str = Field(default="fake", validation_alias="KNOWLEDGE_BACKEND")
     kb_dsn: str = Field(default="", validation_alias="KB_DSN")
     embed_api_base: str = Field(default="", validation_alias="EMBED_API_BASE")
