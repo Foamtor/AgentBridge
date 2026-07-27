@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Annotated, Any
 
 from agent_base_core.protocol.context import get_run_context
@@ -26,8 +27,11 @@ async def search_knowledge(
     retriever = ctx.metadata.get("retriever")
     if retriever is None:
         return []
+    tenant_id = ctx.tenant_id
+    if tenant_id is None or not str(tenant_id).strip():
+        raise ValueError("tenant_id is required and must be non-blank")
     return await retriever.similarity_search(
-        query, tenant_id=ctx.tenant_id or "default", k=3
+        query, tenant_id=str(tenant_id).strip(), k=3
     )
 
 
@@ -62,22 +66,38 @@ def _prepare(state: DemoRagState) -> dict[str, Any]:
     }
 
 
+def _tool_docs(content: Any) -> list[dict[str, Any]]:
+    if isinstance(content, list):
+        return [d for d in content if isinstance(d, dict)]
+    if isinstance(content, str) and content.strip():
+        try:
+            parsed = json.loads(content)
+        except json.JSONDecodeError:
+            return []
+        if isinstance(parsed, list):
+            return [d for d in parsed if isinstance(d, dict)]
+    return []
+
+
 def _cite(state: DemoRagState) -> dict[str, Any]:
     citations: list[dict[str, Any]] = []
     for m in state.get("messages") or []:
         name = getattr(m, "name", None)
-        if name == "search_knowledge":
-            content = getattr(m, "content", None)
-            if isinstance(content, list):
-                for doc in content:
-                    if isinstance(doc, dict):
-                        citations.append(
-                            {
-                                "id": doc.get("id"),
-                                "text": doc.get("text"),
-                                "tenant_id": doc.get("tenant_id"),
-                            }
-                        )
+        if name != "search_knowledge":
+            continue
+        content = getattr(m, "content", None)
+        for doc in _tool_docs(content):
+            item: dict[str, Any] = {
+                "chunk_id": doc.get("chunk_id") or doc.get("id"),
+                "doc_id": doc.get("doc_id")
+                or doc.get("chunk_id")
+                or doc.get("id"),
+                "text": doc.get("text"),
+                "tenant_id": doc.get("tenant_id"),
+            }
+            if "score" in doc:
+                item["score"] = doc["score"]
+            citations.append(item)
     return {
         OUTBOUND_EXTENSIONS_KEY: [
             {
