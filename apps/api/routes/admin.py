@@ -9,7 +9,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
 from auth.rbac import require_permission
-from auth.run_context import claims_to_run_context
+from routes.admin_common import admin_ctx
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -30,13 +30,7 @@ _REDACT_DETAIL_KEYS = frozenset(
 
 
 def _ctx(request: Request):
-    settings = request.app.state.settings
-    claims = getattr(request.state, "auth_claims", None)
-    return claims_to_run_context(
-        claims,
-        auth_required=settings.auth_required,
-        policy_bundle_version=settings.policy_bundle_version,
-    )
+    return admin_ctx(request)
 
 
 def _sanitize_record(rec: dict[str, Any]) -> dict[str, Any]:

@@ -1,3 +1,6 @@
+import { useEffect, useState } from "react";
+import { adminFetch } from "../admin/adminFetch";
+
 type Props = {
   threadId: string;
   route: string;
@@ -7,7 +10,7 @@ type Props = {
   onToken: (v: string) => void;
 };
 
-const ROUTES = [
+const FALLBACK_ROUTES = [
   { value: "echo", label: "echo（最小回声）" },
   { value: "demo_tools", label: "demo_tools（无 LLM / tool + x.*）" },
 ];
@@ -20,6 +23,26 @@ export function SessionBar({
   onRoute,
   onToken,
 }: Props) {
+  const [routes, setRoutes] = useState(FALLBACK_ROUTES);
+
+  useEffect(() => {
+    void adminFetch<{ domains: Array<{ name: string; description: string }> }>(
+      "/admin/domains",
+    )
+      .then((body) => {
+        if (!body.domains.length) return;
+        setRoutes(
+          body.domains.map((d) => ({
+            value: d.name,
+            label: d.description ? `${d.name}（${d.description}）` : d.name,
+          })),
+        );
+      })
+      .catch(() => {
+        /* keep fallback list when admin API unavailable */
+      });
+  }, []);
+
   return (
     <div className="session-bar">
       <label>
@@ -29,12 +52,12 @@ export function SessionBar({
       <label>
         route
         <select value={route} onChange={(e) => onRoute(e.target.value)}>
-          {ROUTES.map((r) => (
+          {routes.map((r) => (
             <option key={r.value} value={r.value}>
               {r.label}
             </option>
           ))}
-          {!ROUTES.some((r) => r.value === route) ? (
+          {!routes.some((r) => r.value === route) ? (
             <option value={route}>{route}</option>
           ) : null}
         </select>
