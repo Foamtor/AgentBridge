@@ -17,7 +17,8 @@
 2. 改 `state.py`（状态结构）、`tools.py`、`graph.py`（`build_<名字>_graph`）
 3. 在该目录的 `bootstrap.py` 里注册：tools / graphs / input_builders
 4. 在 `apps/api/domains/bootstrap.py` 的 `register_all` 里调用上面的 `register`
-5. 重启 API，用调试台或 `POST /chat/stream`，`route` 填你的名字做验证
+5. 工具若挂 `required_permissions`：调用方不够权限的不要进 LLM 可见列表；执行时仍会再鉴权
+6. 重启 API，用调试台或 `POST /chat/stream`，`route` 填你的名字做验证
 
 可参考的示例：
 

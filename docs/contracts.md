@@ -21,7 +21,7 @@
 | GET | `/runs/{id}/events` | 事件回放 | 已有 |
 | GET | `/metrics` | Prometheus | 已有 |
 | GET/POST | `/approvals/*` | 人工审批 | 已有 |
-| POST | `/ingest` | 文档摄取 | **规划 M11**（尚未实现；见 Plan6） |
+| POST | `/ingest` | 文档摄取（需 `knowledge:write`；后端不支持时 501） | **已有** |
 | GET/POST | `/admin/*`、`/prompts/*` | 管理接口 | **已有 C0–C4**（见 §1.3） |
 
 ### 1.1 `POST /chat/stream`
@@ -343,7 +343,13 @@
 
 ### 3.4 管理面鉴权（已有）
 
-`/admin/*`、写 `/prompts`、写 `/ingest` 需 admin 类 permission；`/approvals/*` 需 `approval:decide`（或配置等价物）。见完整方案 §4.7。
+| 路径 | 现行要求（以代码为准） |
+|------|------------------------|
+| `/admin/*`、写 `/prompts` | admin 类 permission（如 `admin:*` / `admin:read` 等，见路由实现） |
+| `POST /ingest` | `knowledge:write`（或 `*`）；后端不支持入库时 501 |
+| `/approvals/*` | `approval:decide`（或配置等价物） |
+
+说明：完整方案 §4.7 曾将 `/ingest` 与 admin 写接口并列；**现行实现**按上表 `knowledge:write` 校验。产品若要收紧为 `admin:*`，改代码与本节同步。
 
 ---
 

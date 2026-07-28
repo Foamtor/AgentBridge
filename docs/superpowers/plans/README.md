@@ -1,7 +1,10 @@
 # AgentBridge 实施计划索引
 
-> 这是**历史实施记录**（当时怎么分期干活）。阅读时若遇到旧词，请对照根目录 README 的「先搞懂几个词」。  
-> 产品总说明：[../../00-AgentBridge完整方案.md](../../00-AgentBridge完整方案.md)  
+> **归档说明：** 本目录是**历史分期怎么干活**的记录，不是新人入门文档。  
+> 新人请先看：[文档目录](../../INDEX.md) → [guide 快速开始](../../guide/02-quickstart.md)。  
+> 产品约定以 [完整方案](../../00-AgentBridge完整方案.md) 为准；与下文冲突时以完整方案为准。
+
+> 阅读时若遇到旧词，请对照根目录 README。  
 > 路线图：[../../roadmap.md](../../roadmap.md)  
 > 依赖关系：[DEPENDENCIES.md](./DEPENDENCIES.md)
 
@@ -16,9 +19,11 @@
 | 5 | 协作与扩展 | [plan5](./2026-07-24-plan5-collaboration-scale.md) | M8–M10 | → 多机/v2.0 |
 | **6** | **① 多知识后端** | [plan6](./2026-07-27-plan6-rag-production.md) · **[R-A 详单](./2026-07-27-platform-ra.md)** | **M11** | → **v2.1** |
 | **7** | **② AI 控制台 C0** | [plan7](./2026-07-27-plan7-ai-console-c0.md) | **M12** | 与 6 可并行 |
+| — | 文档 P1 门面 | [docs-p1](./2026-07-28-docs-p1-gate.md) | 人类 guide | 文档 |
+| — | 全面审阅记录 | [full-review](./2026-07-28-full-review.md) | 代码+文档抽查 | 文档 |
 
-> 三类总纲：[../../design-tracks.md](../../design-tracks.md)  
-> 设计稿：多知识后端、[AI 控制台](../specs/2026-07-27-ai-admin-console-design.md)、[业务插件轨道](../specs/2026-07-27-business-plugins-track.md)
+> 三类划分说明见入门文：[为什么用它 · 三块东西](../../guide/01-why.md)  
+> 设计稿：[底座最终形态](../specs/2026-07-27-platform-final-spec.md)、[AI 控制台](../specs/2026-07-27-ai-admin-console-design.md)、[管理后端](../specs/2026-07-27-admin-backend-final-spec.md)
 
 ## 谁依赖谁
 
@@ -41,4 +46,4 @@ M0 → Plan1(M2a) → Plan2 ─┐
 | **Plan6** | **Plan1–5；M7 Retriever（硬）** | external/product 可分期；MinerU 软 |
 | **Plan7** | **Plan1–5（admin/调试台）** | **不硬依赖 Plan6** |
 
-**下一步：** 按 [design-tracks.md](../../design-tracks.md) 推进 Plan6 / Plan7；业务插件见插件轨道。
+**下一步：** 按路线图与完整方案推进；新人入口见 [文档目录](../../INDEX.md)。

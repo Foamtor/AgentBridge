@@ -262,7 +262,8 @@ Port 读写的 `tenant_id` **只来自 RunContext**，调用方不可覆盖为�
 |-----|------|
 | `/chat/*`、`/threads/*`、`/runs/*`（读本人或本租户） | 业务 Bearer；强制 `tenant_id` 隔离 |
 | `/approvals/*` | 业务 Bearer + permission 如 `approval:decide`（可配置） |
-| `/admin/*`、`/prompts/*`（写）、`/ingest`（写） | 业务 Bearer + `admin:*` 或独立 admin audience（二选一，部署文档写死） |
+| `/admin/*`、`/prompts/*`（写） | 业务 Bearer + `admin:*` 或独立 admin audience（二选一，部署文档写死） |
+| `/ingest`（写） | 业务 Bearer + **`knowledge:write`**（现行代码）；若部署要收紧为 `admin:*`，改实现并同步 contracts |
 | `/metrics`、`/ready`、`/health` | `/health` 常公开；`/ready`/`/metrics` 建议内网或独立鉴权 |
 
 禁止「有任意合法 JWT 即可改策略包」。

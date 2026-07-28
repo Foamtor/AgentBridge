@@ -1,9 +1,10 @@
 # 知识库与 RAG 使用说明
 
-> **归属：** 底座①（多知识后端）。总纲见 [design-tracks.md](./design-tracks.md)。  
-> **R-A 设计：** [superpowers/specs/2026-07-27-platform-ra-design.md](./superpowers/specs/2026-07-27-platform-ra-design.md)  
+> **归属：** 底座①（多知识后端）。  
+> **R-A 设计（历史切片，部分表述已过时）：** [superpowers/specs/2026-07-27-platform-ra-design.md](./superpowers/specs/2026-07-27-platform-ra-design.md) — 其中「无 HTTP `/ingest`」已被后续实现取代，**以本文与代码为准**  
 > **R-A 实施计划：** [superpowers/plans/2026-07-27-platform-ra.md](./superpowers/plans/2026-07-27-platform-ra.md)  
-> **多后端地图：** [superpowers/specs/2026-07-27-rag-production-design.md](./superpowers/specs/2026-07-27-rag-production-design.md)
+> **相关分期计划：** [superpowers/plans/2026-07-27-plan6-rag-production.md](./superpowers/plans/2026-07-27-plan6-rag-production.md)  
+> 冲突时以 [完整方案](./00-AgentBridge完整方案.md) 与代码为准。
 
 ---
 
@@ -14,22 +15,24 @@
 | 客户情况 | 配置 |
 |----------|------|
 | 本地 / CI | `KNOWLEDGE_BACKEND=fake`（默认） |
-| 真检索（R-A） | `langchain_pg` + 本机 TEI + pgvector |
-| 客户自有 RAG | `external`（**R-C**，未实现） |
-| 自研重引擎 | `product`（**R-C+**，未实现） |
+| 真检索（平台库） | `langchain_pg` + 本机 TEI + pgvector |
+| 客户自有 RAG | `external` + `KB_EXTERNAL_BASE_URL`（HTTP 检索适配器，由 lifespan 组装） |
+| 自研重引擎 | `product`（规划中，勿当已交付） |
 
 **租户：** 每次检索/种子入库必须带非空 `tenant_id`；空值会报错，不会默默变成 `default`。
 
 ---
 
-## 当前能力（R-A）
+## 当前能力
 
 | 能力 | 说明 |
 |------|------|
 | Fake | 内存检索；CI 默认 |
 | `langchain_pg` | PG + pgvector + HTTP Embedding（OpenAI 兼容 / TEI） |
+| `external` | 外部 HTTP 检索（由 lifespan 组装；ingest 可能 501） |
 | 示例插件 | `demo_rag` → SSE `x.bridge.citation`（字段对齐 `KnowledgeHit`） |
-| 种子脚本 | `scripts/ingest_demo_rag.py`（**无** HTTP `/ingest`，入库 API 属 R-B） |
+| HTTP `/ingest` | 已提供（需 `knowledge:write`）；后端不支持时返回 501 |
+| 种子脚本 | `scripts/ingest_demo_rag.py`（进程内入库，便于本地灌 demo） |
 
 安装真后端依赖：
 
@@ -71,7 +74,7 @@ EMBED_DIMENSIONS=1024
 不是。真源是 **`similarity_search`** / **`ingest`**。
 
 **Q：HTTP `/ingest` 呢？**  
-R-B。R-A 只用进程内 `Retriever.ingest` / 种子脚本。
+已有 `POST /ingest`（需写权限）。`external` 等后端若不支持入库会 501；也可用种子脚本做本地灌数。
 
 **Q：客户已有 RAG？**  
-用 `external`（R-C）；协议见 [external-rag-protocol](./superpowers/specs/2026-07-27-external-rag-protocol.md)。
+用 `KNOWLEDGE_BACKEND=external` + `KB_EXTERNAL_BASE_URL`。对接字段以代码适配器与 `.env.example` 为准；历史协议稿若缺失，以完整方案与实现为准。
