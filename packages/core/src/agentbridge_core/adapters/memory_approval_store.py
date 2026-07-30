@@ -19,6 +19,9 @@ class MemoryApprovalStore:
         row = copy.deepcopy(record)
         row["approval_id"] = approval_id
         row.setdefault("status", "pending")
+        row["last_sequence"] = int(
+            record.get("last_sequence") or record.get("sequence") or 0
+        )
         async with self._lock:
             self._by_id[approval_id] = row
         return approval_id
@@ -92,23 +95,42 @@ class MemoryApprovalStore:
             }:
                 return None
             raw["status"] = "executing"
+            raw["execution_token"] = uuid.uuid4().hex
             raw["execution_started_at"] = now
             raw["execution_lease_expires_at"] = now + timedelta(seconds=lease_seconds)
             self._by_id[approval_id] = raw
             return copy.deepcopy(raw)
 
     async def mark_succeeded(
-        self, approval_id: str, *, tenant_id: str, result: dict[str, Any]
+        self,
+        approval_id: str,
+        *,
+        tenant_id: str,
+        execution_token: str,
+        result: dict[str, Any],
     ) -> dict[str, Any] | None:
         return await self._finish_execution(
-            approval_id, tenant_id=tenant_id, status="succeeded", result=copy.deepcopy(result)
+            approval_id,
+            tenant_id=tenant_id,
+            execution_token=execution_token,
+            status="succeeded",
+            result=copy.deepcopy(result),
         )
 
     async def mark_retryable_failed(
-        self, approval_id: str, *, tenant_id: str, error: str
+        self,
+        approval_id: str,
+        *,
+        tenant_id: str,
+        execution_token: str,
+        error: str,
     ) -> dict[str, Any] | None:
         return await self._finish_execution(
-            approval_id, tenant_id=tenant_id, status="retryable_failed", error=error
+            approval_id,
+            tenant_id=tenant_id,
+            execution_token=execution_token,
+            status="retryable_failed",
+            error=error,
         )
 
     async def mark_execution_denied(
@@ -116,7 +138,10 @@ class MemoryApprovalStore:
     ) -> dict[str, Any] | None:
         async with self._lock:
             raw = self._record_for(approval_id, tenant_id)
-            if raw is None or raw.get("status") != "approved_pending_execution":
+            if raw is None or raw.get("status") not in {
+                "approved_pending_execution",
+                "retryable_failed",
+            }:
                 return None
             raw["status"] = "denied"
             raw["reason"] = reason
@@ -149,8 +174,34 @@ class MemoryApprovalStore:
                 return None
             raw["status"] = "retryable_failed"
             raw["error"] = "execution_lease_expired"
+            raw["execution_token"] = None
             self._by_id[approval_id] = raw
             return copy.deepcopy(raw)
+
+    async def next_sequence(self, approval_id: str, *, tenant_id: str) -> int:
+        async with self._lock:
+            raw = self._record_for(approval_id, tenant_id)
+            if raw is None:
+                raise KeyError(approval_id)
+            raw["last_sequence"] = int(raw.get("last_sequence", 0)) + 1
+            self._by_id[approval_id] = raw
+            return raw["last_sequence"]
+
+    async def list_expired_pending(
+        self, *, now: datetime, limit: int = 100
+    ) -> list[dict[str, Any]]:
+        async with self._lock:
+            rows = [
+                copy.deepcopy(raw)
+                for raw in self._by_id.values()
+                if raw.get("status") == "pending"
+                and isinstance(raw.get("approval_expires_at"), datetime)
+                and raw["approval_expires_at"] <= now
+            ]
+            rows.sort(
+                key=lambda row: (row["approval_expires_at"], row["approval_id"])
+            )
+            return rows[: max(limit, 0)]
 
     def _record_for(self, approval_id: str, tenant_id: str) -> dict[str, Any] | None:
         raw = self._by_id.get(approval_id)
@@ -169,13 +220,18 @@ class MemoryApprovalStore:
         approval_id: str,
         *,
         tenant_id: str,
+        execution_token: str,
         status: str,
         result: dict[str, Any] | None = None,
         error: str | None = None,
     ) -> dict[str, Any] | None:
         async with self._lock:
             raw = self._record_for(approval_id, tenant_id)
-            if raw is None or raw.get("status") != "executing":
+            if (
+                raw is None
+                or raw.get("status") != "executing"
+                or raw.get("execution_token") != execution_token
+            ):
                 return None
             raw["status"] = status
             if result is not None:

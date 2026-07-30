@@ -32,8 +32,11 @@ class PostgresApprovalStore:
         sql = """
             INSERT INTO approval_records (
                 approval_id, tenant_id, route, run_id, thread_id, storage_key,
-                sequence, status, action, requester_context
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb)
+                sequence, status, action, requester_context, last_sequence,
+                approval_expires_at
+            ) VALUES (
+                $1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb, $11, $12
+            )
         """
         pool = await self._ensure_pool()
         async with pool.acquire() as connection:
@@ -49,6 +52,8 @@ class PostgresApprovalStore:
                 record.get("status", "pending"),
                 _json_value(record.get("action")),
                 _json_value(record.get("requester_context")),
+                int(record.get("last_sequence") or record.get("sequence") or 0),
+                record.get("approval_expires_at"),
             )
         return approval_id
 
@@ -112,11 +117,13 @@ class PostgresApprovalStore:
         now: datetime,
         lease_seconds: float,
     ) -> dict[str, Any] | None:
+        execution_token = uuid.uuid4().hex
         return await self._fetchrow(
             """
             UPDATE approval_records
-            SET status = 'executing', execution_started_at = $3,
-                execution_lease_expires_at = $4, updated_at = NOW()
+            SET status = 'executing', execution_token = $5,
+                execution_started_at = $3, execution_lease_expires_at = $4,
+                updated_at = NOW()
             WHERE approval_id = $1 AND tenant_id = $2
               AND status IN ('approved_pending_execution', 'retryable_failed')
             RETURNING *
@@ -125,20 +132,39 @@ class PostgresApprovalStore:
             tenant_id,
             now,
             now + timedelta(seconds=lease_seconds),
+            execution_token,
         )
 
     async def mark_succeeded(
-        self, approval_id: str, *, tenant_id: str, result: dict[str, Any]
+        self,
+        approval_id: str,
+        *,
+        tenant_id: str,
+        execution_token: str,
+        result: dict[str, Any],
     ) -> dict[str, Any] | None:
         return await self._finish_execution(
-            approval_id, tenant_id=tenant_id, status="succeeded", result=result
+            approval_id,
+            tenant_id=tenant_id,
+            execution_token=execution_token,
+            status="succeeded",
+            result=result,
         )
 
     async def mark_retryable_failed(
-        self, approval_id: str, *, tenant_id: str, error: str
+        self,
+        approval_id: str,
+        *,
+        tenant_id: str,
+        execution_token: str,
+        error: str,
     ) -> dict[str, Any] | None:
         return await self._finish_execution(
-            approval_id, tenant_id=tenant_id, status="retryable_failed", error=error
+            approval_id,
+            tenant_id=tenant_id,
+            execution_token=execution_token,
+            status="retryable_failed",
+            error=error,
         )
 
     async def mark_execution_denied(
@@ -149,7 +175,7 @@ class PostgresApprovalStore:
             UPDATE approval_records
             SET status = 'denied', reason = $3, updated_at = NOW()
             WHERE approval_id = $1 AND tenant_id = $2
-              AND status = 'approved_pending_execution'
+              AND status IN ('approved_pending_execution', 'retryable_failed')
             RETURNING *
             """,
             approval_id,
@@ -179,7 +205,7 @@ class PostgresApprovalStore:
             """
             UPDATE approval_records
             SET status = 'retryable_failed', error = 'execution_lease_expired',
-                updated_at = NOW()
+                execution_token = NULL, updated_at = NOW()
             WHERE approval_id = $1 AND tenant_id = $2 AND status = 'executing'
               AND execution_lease_expires_at <= $3
             RETURNING *
@@ -189,11 +215,47 @@ class PostgresApprovalStore:
             now,
         )
 
+    async def next_sequence(self, approval_id: str, *, tenant_id: str) -> int:
+        pool = await self._ensure_pool()
+        async with pool.acquire() as connection:
+            value = await connection.fetchval(
+                """
+                UPDATE approval_records
+                SET last_sequence = last_sequence + 1, updated_at = NOW()
+                WHERE approval_id = $1 AND tenant_id = $2
+                RETURNING last_sequence
+                """,
+                approval_id,
+                tenant_id,
+            )
+        if value is None:
+            raise KeyError(approval_id)
+        return int(value)
+
+    async def list_expired_pending(
+        self, *, now: datetime, limit: int = 100
+    ) -> list[dict[str, Any]]:
+        pool = await self._ensure_pool()
+        async with pool.acquire() as connection:
+            rows = await connection.fetch(
+                """
+                SELECT *
+                FROM approval_records
+                WHERE status = 'pending' AND approval_expires_at <= $1
+                ORDER BY approval_expires_at, approval_id
+                LIMIT $2
+                """,
+                now,
+                max(limit, 0),
+            )
+        return [_record_from_row(row) for row in rows]
+
     async def _finish_execution(
         self,
         approval_id: str,
         *,
         tenant_id: str,
+        execution_token: str,
         status: str,
         result: dict[str, Any] | None = None,
         error: str | None = None,
@@ -201,12 +263,14 @@ class PostgresApprovalStore:
         return await self._fetchrow(
             """
             UPDATE approval_records
-            SET status = $3, result = $4::jsonb, error = $5, updated_at = NOW()
-            WHERE approval_id = $1 AND tenant_id = $2 AND status = 'executing'
+            SET status = $4, result = $5::jsonb, error = $6, updated_at = NOW()
+            WHERE approval_id = $1 AND tenant_id = $2
+              AND status = 'executing' AND execution_token = $3
             RETURNING *
             """,
             approval_id,
             tenant_id,
+            execution_token,
             status,
             _json_value(result),
             error,

@@ -46,6 +46,7 @@ class ApprovalStore(Protocol):
         approval_id: str,
         *,
         tenant_id: str,
+        execution_token: str,
         result: dict[str, Any],
     ) -> dict[str, Any] | None: ...
 
@@ -54,6 +55,7 @@ class ApprovalStore(Protocol):
         approval_id: str,
         *,
         tenant_id: str,
+        execution_token: str,
         error: str,
     ) -> dict[str, Any] | None: ...
 
@@ -80,3 +82,9 @@ class ApprovalStore(Protocol):
         tenant_id: str,
         now: datetime,
     ) -> dict[str, Any] | None: ...
+
+    async def next_sequence(self, approval_id: str, *, tenant_id: str) -> int: ...
+
+    async def list_expired_pending(
+        self, *, now: datetime, limit: int = 100
+    ) -> list[dict[str, Any]]: ...
