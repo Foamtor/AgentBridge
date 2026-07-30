@@ -63,6 +63,25 @@ class Settings(BaseSettings):
         default=False, validation_alias="ADMIN_TOOL_INVOKE_ENABLED"
     )
     knowledge_backend: str = Field(default="fake", validation_alias="KNOWLEDGE_BACKEND")
+    rag_agent_pg_dsn: str = Field(
+        default="", validation_alias="RAG_AGENT_PG_DSN"
+    )
+    rag_agent_demo_tenant: str = Field(
+        default="rag-agent-demo", validation_alias="RAG_AGENT_DEMO_TENANT"
+    )
+    rag_agent_embed_api_base: str = Field(
+        default="http://127.0.0.1:8080/v1",
+        validation_alias="RAG_AGENT_EMBED_API_BASE",
+    )
+    rag_agent_embed_api_key: str = Field(
+        default="EMPTY", validation_alias="RAG_AGENT_EMBED_API_KEY"
+    )
+    rag_agent_embed_model: str = Field(
+        default="BAAI/bge-m3", validation_alias="RAG_AGENT_EMBED_MODEL"
+    )
+    rag_agent_embed_dimensions: int = Field(
+        default=512, validation_alias="RAG_AGENT_EMBED_DIMENSIONS"
+    )
     kb_dsn: str = Field(default="", validation_alias="KB_DSN")
     embed_api_base: str = Field(default="", validation_alias="EMBED_API_BASE")
     embed_model: str = Field(default="", validation_alias="EMBED_MODEL")
