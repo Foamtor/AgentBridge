@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
+from contextlib import nullcontext
 from datetime import datetime, timezone
 from typing import Any
 
@@ -29,7 +30,6 @@ from agentbridge_core.protocol.fragments import OutboundFragment
 from agentbridge_core.registry.graphs import GraphRegistry
 from agentbridge_core.registry.input_builders import InputBuilderRegistry
 from agentbridge_core.registry.tools import ToolRegistry
-from contextlib import nullcontext
 
 logger = logging.getLogger(__name__)
 
@@ -165,7 +165,7 @@ class RunLifecycle:
                 await self._event_log.append(
                     evt["run_id"], evt, tenant_id=tenant_id
                 )
-            except Exception as exc:  # noqa: BLE001 — fail closed on any append error
+            except Exception as exc:
                 raise EventLogAppendError(str(exc)) from exc
         await sink.emit(evt)
 
@@ -230,7 +230,7 @@ class RunLifecycle:
                 span_cm = self._span_factory(
                     run_id=run_id, route=route, tenant_id=tenant_id
                 )
-            except Exception:  # noqa: BLE001 — span must never block runs
+            except Exception:
                 logger.exception(
                     "span_factory failed thread_id=%s run_id=%s", thread_id, run_id
                 )
@@ -428,7 +428,7 @@ class RunLifecycle:
                 terminal_sent = True
                 terminal_status = "error"
                 return
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.exception("run failed thread_id=%s run_id=%s", thread_id, run_id)
                 sequence += 1
                 error_code = (
@@ -516,7 +516,7 @@ class RunLifecycle:
             else:
                 pre_start_failure = sequence == 0
                 raise
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if not terminal_sent and sequence > 0:
                 logger.exception(
                     "run failed after start thread_id=%s run_id=%s", thread_id, run_id
@@ -557,7 +557,7 @@ class RunLifecycle:
                         query=query,
                         terminal=terminal_status,
                     )
-                except Exception:  # noqa: BLE001 — never block cleanup
+                except Exception:
                     logger.exception(
                         "project_turn failed thread_id=%s run_id=%s", thread_id, run_id
                     )
@@ -565,7 +565,7 @@ class RunLifecycle:
                 await self._hooks.on_run_end(
                     {"thread_id": thread_id, "run_id": run_id, "route": route}
                 )
-            except Exception:  # noqa: BLE001
+            except Exception:
                 logger.exception(
                     "on_run_end failed thread_id=%s run_id=%s", thread_id, run_id
                 )
@@ -574,7 +574,7 @@ class RunLifecycle:
                     self._metrics.inc(
                         "agentbridge_runs_total", labels={"route": route}
                     )
-                except Exception:  # noqa: BLE001
+                except Exception:
                     logger.exception(
                         "metrics.inc failed thread_id=%s run_id=%s", thread_id, run_id
                     )
@@ -669,7 +669,7 @@ class RunLifecycle:
                 sink=None,
                 reason="timeout",
             )
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.exception("approval timeout handler failed id=%s", approval_id)
 
     async def finalize_approval(
@@ -878,6 +878,7 @@ class RunLifecycle:
                 return rec
 
             deny_reason: str | None = None
+            resource: dict[str, Any] = {"name": str(action.get("type") or "approval_action")}
             if approver_ctx is None or (
                 "*" not in approver_ctx.permissions
                 and "approval:decide" not in approver_ctx.permissions
@@ -898,6 +899,22 @@ class RunLifecycle:
                         ctx=requester_ctx, action="invoke_tool", resource=resource
                     ) != "allow":
                         deny_reason = "requester_policy_denied"
+            if self._audit is not None:
+                await self._audit.log(
+                    user_id=str(
+                        (rec.get("requester_context") or {}).get("user_id") or ""
+                    ),
+                    tenant_id=tenant_id,
+                    action="approval_requester_recheck",
+                    resource=str(resource.get("name") or action.get("type") or ""),
+                    detail={
+                        "approval_id": approval_id,
+                        "route": route,
+                        "decision": "deny" if deny_reason else "allow",
+                        "reason": deny_reason,
+                    },
+                    result="denied" if deny_reason else "allowed",
+                )
             if deny_reason is not None:
                 updated = await self._approval_store.mark_execution_denied(
                     approval_id, tenant_id=tenant_id, reason=deny_reason
@@ -935,13 +952,31 @@ class RunLifecycle:
                 tenant_id=tenant_id,
                 result={"fragments": [{"type": item.type, "data": item.data} for item in fragments]},
             )
-            sequence += 1
-            await self._emit(out_sink, build_extension_event("x.bridge.approval_resolved", run_id=run_id, sequence=sequence, trace_id=trace_id, data={"approval_id": approval_id, "decision": "approve", "reason": "approve", "skipped": False}), tenant_id=tenant_id)
-            for fragment in fragments:
+            try:
                 sequence += 1
-                await self._emit(out_sink, self._envelope_from_fragment(fragment, run_id=run_id, sequence=sequence, trace_id=trace_id), tenant_id=tenant_id)
-            sequence += 1
-            await self._emit(out_sink, build_event("done", run_id=run_id, sequence=sequence, trace_id=trace_id, data={"skipped": False, "approval_decision": "approve"}), tenant_id=tenant_id)
+                await self._emit(out_sink, build_extension_event("x.bridge.approval_resolved", run_id=run_id, sequence=sequence, trace_id=trace_id, data={"approval_id": approval_id, "decision": "approve", "reason": "approve", "skipped": False}), tenant_id=tenant_id)
+                for fragment in fragments:
+                    sequence += 1
+                    await self._emit(out_sink, self._envelope_from_fragment(fragment, run_id=run_id, sequence=sequence, trace_id=trace_id), tenant_id=tenant_id)
+                sequence += 1
+                await self._emit(out_sink, build_event("done", run_id=run_id, sequence=sequence, trace_id=trace_id, data={"skipped": False, "approval_decision": "approve"}), tenant_id=tenant_id)
+            except EventLogAppendError as exc:
+                updated = await self._approval_store.mark_result_delivery_failed(
+                    approval_id, tenant_id=tenant_id, error=str(exc)
+                )
+                await out_sink.emit(
+                    build_event(
+                        "error",
+                        run_id=run_id,
+                        sequence=sequence + 1,
+                        trace_id=trace_id,
+                        data={
+                            "code": "approval_result_delivery_failed",
+                            "message": str(exc),
+                            "business_completed": True,
+                        },
+                    )
+                )
             return updated or rec
         finally:
             if acquired:

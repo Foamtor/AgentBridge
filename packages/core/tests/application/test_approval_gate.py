@@ -9,16 +9,16 @@ from agentbridge_core.adapters.approval_aware_runtime import ApprovalAwareRuntim
 from agentbridge_core.adapters.inprocess_cancel import InProcessCancelRegistry
 from agentbridge_core.adapters.inprocess_lock import InProcessThreadLock
 from agentbridge_core.adapters.memory_approval_store import MemoryApprovalStore
+from agentbridge_core.adapters.memory_audit_logger import MemoryAuditLogger
 from agentbridge_core.adapters.memory_event_log import MemoryEventLog
 from agentbridge_core.adapters.memory_message_store import MemoryMessageStore
 from agentbridge_core.adapters.memory_run_store import MemoryRunStore
 from agentbridge_core.adapters.noop_hooks import NoopHooks
 from agentbridge_core.adapters.role_policy import RolePolicyEngine
 from agentbridge_core.application.run_lifecycle import RunLifecycle
-from agentbridge_core.protocol.fragments import OutboundFragment
 from agentbridge_core.protocol.context import RunContext, checkpoint_thread_key
+from agentbridge_core.protocol.fragments import OutboundFragment
 from agentbridge_core.registry.input_builders import InputBuilderRegistry
-
 from fakes import FakeCheckpointerFactory
 
 
@@ -41,6 +41,7 @@ def _lc(**kwargs):
         approval_executor=kwargs.get("approval_executor"),
         approval_execution_lease_seconds=kwargs.get("approval_execution_lease_seconds", 60.0),
         policy=kwargs.get("policy"),
+        audit=kwargs.get("audit"),
     )
 
 
@@ -173,7 +174,7 @@ async def test_timeout_denies(graphs, tools, queue_and_sink, drain_events) -> No
 @pytest.mark.asyncio
 async def test_approved_action_executes_once(graphs, tools, queue_and_sink, drain_events) -> None:
     class ActionRuntime:
-        async def astream(self, builder, **kwargs):  # noqa: ANN001
+        async def astream(self, builder, **kwargs):
             yield OutboundFragment(
                 type="x.bridge.approval_required",
                 data={
@@ -186,10 +187,10 @@ async def test_approved_action_executes_once(graphs, tools, queue_and_sink, drai
         def __init__(self) -> None:
             self.calls: list[tuple[str, dict, str]] = []
 
-        def resource_for(self, *, route: str, action: dict) -> dict:  # noqa: ANN001
+        def resource_for(self, *, route: str, action: dict) -> dict:
             return {"name": action["type"]}
 
-        async def execute(self, *, route: str, action: dict, requester_ctx, approval_id: str):  # noqa: ANN001,E501
+        async def execute(self, *, route: str, action: dict, requester_ctx, approval_id: str):
             self.calls.append((route, action, approval_id))
             return [
                 OutboundFragment(
@@ -198,6 +199,7 @@ async def test_approved_action_executes_once(graphs, tools, queue_and_sink, drai
             ]
 
     approvals = MemoryApprovalStore()
+    audit = MemoryAuditLogger()
     executor = Executor()
     q, sink = queue_and_sink
     lc = _lc(
@@ -207,6 +209,7 @@ async def test_approved_action_executes_once(graphs, tools, queue_and_sink, drai
         approval_store=approvals,
         approval_executor=executor,
         policy=RolePolicyEngine(),
+        audit=audit,
     )
     await lc.start_stream(
         query="write",
@@ -242,6 +245,11 @@ async def test_approved_action_executes_once(graphs, tools, queue_and_sink, drai
         ("echo", {"type": "example.write_v1", "payload": {"x": 1}}, approval_id)
     ]
     assert any(event["type"] == "x.example.created" for event in cap.events)
+    assert any(
+        record["action"] == "approval_requester_recheck"
+        and record["result"] == "allowed"
+        for record in audit.records
+    )
 
 
 @pytest.mark.asyncio
@@ -249,7 +257,7 @@ async def test_invalid_approval_action_has_stable_error_code(
     graphs, tools, queue_and_sink, drain_events
 ) -> None:
     class InvalidActionRuntime:
-        async def astream(self, builder, **kwargs):  # noqa: ANN001
+        async def astream(self, builder, **kwargs):
             yield OutboundFragment(
                 type="x.bridge.approval_required",
                 data={"action": {"type": "example.write_v1", "payload": "invalid"}},
@@ -279,14 +287,14 @@ async def test_unregistered_approved_action_is_persisted_as_denied(
     graphs, tools, queue_and_sink, drain_events
 ) -> None:
     class ActionRuntime:
-        async def astream(self, builder, **kwargs):  # noqa: ANN001
+        async def astream(self, builder, **kwargs):
             yield OutboundFragment(
                 type="x.bridge.approval_required",
                 data={"action": {"type": "missing.v1", "payload": {}}},
             )
 
     class MissingExecutor:
-        def resource_for(self, *, route, action):  # noqa: ANN001
+        def resource_for(self, *, route, action):
             raise ValueError("no approval action for route")
 
     approvals = MemoryApprovalStore()
