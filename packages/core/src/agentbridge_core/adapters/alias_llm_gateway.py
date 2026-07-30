@@ -37,8 +37,16 @@ class AliasLLMGateway:
         *,
         ctx: RunContext,
         model: str | None = None,
+        tools: list[Any] | None = None,
+        tool_choice: str | None = None,
     ) -> Any:
-        return await self._delegate(model).chat(messages, ctx=ctx, model=model)
+        return await self._delegate(model).chat(
+            messages,
+            ctx=ctx,
+            model=model,
+            tools=tools,
+            tool_choice=tool_choice,
+        )
 
     async def stream(
         self,

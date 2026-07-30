@@ -15,6 +15,8 @@ class LLMGateway(Protocol):
         *,
         ctx: RunContext,
         model: str | None = None,
+        tools: list[Any] | None = None,
+        tool_choice: str | None = None,
     ) -> Any: ...
 
     def stream(
