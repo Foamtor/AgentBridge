@@ -41,7 +41,12 @@ async def work_order_statistics(
     """Count current-tenant work orders by status, priority, or assignee."""
     if dimension not in {"status", "priority", "assignee_id"}:
         raise ValueError("unsupported statistics dimension")
-    rows = await list_work_orders.ainvoke({}, config=config)
+    source, ctx = _source(config)
+    if source is None:
+        return {}
+    rows = await source.query(
+        "SELECT * FROM work_orders WHERE tenant_id = $1", ctx.tenant_id
+    )
     counts: dict[str, int] = {}
     for row in rows:
         key = str(row.get(dimension) or "unknown")
@@ -59,7 +64,10 @@ async def search_work_order_knowledge(
     retriever = ctx.metadata.get("retriever")
     if retriever is None:
         return []
-    return await retriever.similarity_search(query, tenant_id=ctx.tenant_id, k=3)
+    try:
+        return await retriever.similarity_search(query, tenant_id=ctx.tenant_id, k=3)
+    except Exception as exc:
+        raise RuntimeError("knowledge retrieval failed") from exc
 
 
 @tool
@@ -71,7 +79,7 @@ async def prepare_work_order_draft(
     config: Annotated[RunnableConfig, InjectedToolArg],
 ) -> dict[str, Any]:
     """Validate and return the immutable draft used by approval."""
-    ctx = get_run_context(config)
+    source, ctx = _source(config)
     draft = CreateWorkOrderDraft(
         draft_id=f"draft-{ctx.run_id or 'work-order'}",
         title=title,
@@ -79,6 +87,15 @@ async def prepare_work_order_draft(
         assignee_id=assignee_id,
         ledger_summary=ledger_summary,
     )
+    if source is None:
+        raise ValueError("assignee is inactive or unavailable")
+    assignees = await source.query(
+        "SELECT * FROM assignees WHERE id = $1 AND tenant_id = $2",
+        draft.assignee_id,
+        ctx.tenant_id,
+    )
+    if not assignees or not assignees[0].get("active"):
+        raise ValueError("assignee is inactive or unavailable")
     return draft.model_dump()
 
 
