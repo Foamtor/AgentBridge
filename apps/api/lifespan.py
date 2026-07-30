@@ -216,7 +216,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 now=datetime.now(timezone.utc)
             )
 
-    approval_expiry_task = asyncio.create_task(_approval_expiry_loop())
     pipeline = RequestPipeline(
         lifecycle=lifecycle,
         plugins=[
@@ -262,6 +261,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Expose checkpointer factory for /ready (memory always "ready" after setup).
     app.state.checkpointers = checkpointers
     app.state.redis = redis_client
+    approval_expiry_task = asyncio.create_task(_approval_expiry_loop())
     try:
         yield
     finally:
