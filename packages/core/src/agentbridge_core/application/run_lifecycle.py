@@ -62,6 +62,8 @@ class RunLifecycle:
         span_factory: Any | None = None,
         approval_store: Any | None = None,
         safety_hooks: Any | None = None,
+        approval_executor: Any | None = None,
+        approval_execution_lease_seconds: float = 60.0,
     ) -> None:
         self._locks = locks
         self._checkpointers = checkpointers
@@ -80,6 +82,8 @@ class RunLifecycle:
         self._span_factory = span_factory
         self._approval_store = approval_store
         self._safety_hooks = safety_hooks
+        self._approval_executor = approval_executor
+        self._approval_execution_lease_seconds = approval_execution_lease_seconds
 
     def replace_runtime(self, runtime: GraphRuntime) -> None:
         """Test/host hook to swap GraphRuntime without private attribute access."""
@@ -403,6 +407,7 @@ class RunLifecycle:
                             route=route,
                             query=query,
                             sequence=sequence,
+                            requester_ctx=run_ctx,
                         )
                         awaiting_approval = True
                         lock_held = False
@@ -588,9 +593,18 @@ class RunLifecycle:
         route: str,
         query: str,
         sequence: int,
+        requester_ctx: RunContext,
     ) -> str:
         assert self._approval_store is not None
         data = dict(frag.data or {})
+        action = data.get("action")
+        if action is not None and (
+            not isinstance(action, dict)
+            or not isinstance(action.get("type"), str)
+            or not action["type"].strip()
+            or not isinstance(action.get("payload"), dict)
+        ):
+            raise ValueError("invalid_approval_action")
         timeout_seconds = float(data.get("timeout_seconds") or 30.0)
         approval_id = await self._approval_store.create(
             {
@@ -603,6 +617,8 @@ class RunLifecycle:
                 "route": route,
                 "query": query,
                 "tool": data.get("tool"),
+                "action": action,
+                "requester_context": _approval_requester_snapshot(requester_ctx),
                 "timeout_seconds": timeout_seconds,
                 "status": "pending",
             }
@@ -659,6 +675,7 @@ class RunLifecycle:
         decision: str,
         sink: EventSink | None,
         reason: str | None = None,
+        approver_ctx: RunContext | None = None,
     ) -> dict[str, Any]:
         """Resolve pending approval (approve/deny/timeout); re-acquire storage_key.
 
@@ -670,6 +687,16 @@ class RunLifecycle:
         rec = await self._approval_store.get(approval_id, tenant_id=tenant_id)
         if rec is None:
             raise RunNotFound(approval_id)
+        if rec.get("action") is not None:
+            return await self._finalize_action_approval(
+                rec=rec,
+                approval_id=approval_id,
+                tenant_id=tenant_id,
+                decision=decision,
+                sink=sink,
+                reason=reason,
+                approver_ctx=approver_ctx,
+            )
         if rec.get("status") != "pending":
             return rec
         storage_key = str(rec["storage_key"])
@@ -770,6 +797,158 @@ class RunLifecycle:
         finally:
             if acquired:
                 await self._locks.release(storage_key, run_id)
+
+    async def _finalize_action_approval(
+        self,
+        *,
+        rec: dict[str, Any],
+        approval_id: str,
+        tenant_id: str,
+        decision: str,
+        sink: EventSink | None,
+        reason: str | None,
+        approver_ctx: RunContext | None,
+    ) -> dict[str, Any]:
+        """Resolve and execute a persisted action without rebuilding its payload."""
+        assert self._approval_store is not None
+        storage_key = str(rec["storage_key"])
+        run_id = str(rec["run_id"])
+        trace_id = str(rec.get("trace_id") or run_id)
+        sequence = int(rec.get("sequence") or 0)
+        route = str(rec.get("route") or "")
+        action = dict(rec["action"])
+
+        class _NullSink:
+            async def emit(self, evt: dict[str, Any]) -> None:
+                return None
+
+            async def close(self) -> None:
+                return None
+
+        out_sink: EventSink = sink if sink is not None else _NullSink()  # type: ignore[assignment]
+        acquired = await self._locks.try_acquire(storage_key, run_id)
+        if not acquired and reason != "timeout":
+            raise ThreadBusy(str(rec["thread_id"]))
+        try:
+            status = rec.get("status")
+            if status == "executing":
+                recovered = await self._approval_store.recover_expired_execution(
+                    approval_id, tenant_id=tenant_id, now=datetime.now(timezone.utc)
+                )
+                if recovered is None:
+                    return rec
+                rec = recovered
+                status = rec.get("status")
+            if status == "pending":
+                updated = await self._approval_store.decide(
+                    approval_id, tenant_id=tenant_id, decision=decision, reason=reason
+                )
+                if updated is None:
+                    return rec
+                rec = updated
+                if decision != "approve":
+                    sequence += 1
+                    await self._emit(out_sink, build_extension_event("x.bridge.approval_resolved", run_id=run_id, sequence=sequence, trace_id=trace_id, data={"approval_id": approval_id, "decision": decision, "reason": reason or decision, "skipped": True}), tenant_id=tenant_id)
+                    sequence += 1
+                    await self._emit(out_sink, build_event("done", run_id=run_id, sequence=sequence, trace_id=trace_id, data={"skipped": True, "approval_decision": decision}), tenant_id=tenant_id)
+                    return rec
+            elif status not in {"approved_pending_execution", "retryable_failed"}:
+                return rec
+
+            sequence += 1
+            if decision != "approve":
+                await self._emit(
+                    out_sink,
+                    build_extension_event(
+                        "x.bridge.approval_resolved",
+                        run_id=run_id,
+                        sequence=sequence,
+                        trace_id=trace_id,
+                        data={"approval_id": approval_id, "decision": decision, "reason": reason or decision, "skipped": True},
+                    ),
+                    tenant_id=tenant_id,
+                )
+                sequence += 1
+                await self._emit(out_sink, build_event("done", run_id=run_id, sequence=sequence, trace_id=trace_id, data={"skipped": True, "approval_decision": decision}), tenant_id=tenant_id)
+                return rec
+
+            deny_reason: str | None = None
+            if approver_ctx is None or (
+                "*" not in approver_ctx.permissions
+                and "approval:decide" not in approver_ctx.permissions
+            ):
+                deny_reason = "approver_permission_denied"
+            elif self._approval_executor is None:
+                deny_reason = "approval_handler_not_found"
+            else:
+                requester_ctx = RunContext.model_validate(rec.get("requester_context") or {})
+                resource = self._approval_executor.resource_for(route=route, action=action)
+                if self._policy is not None and self._policy.decide(
+                    ctx=requester_ctx, action="invoke_tool", resource=resource
+                ) != "allow":
+                    deny_reason = "requester_policy_denied"
+            if deny_reason is not None:
+                updated = await self._approval_store.mark_execution_denied(
+                    approval_id, tenant_id=tenant_id, reason=deny_reason
+                )
+                sequence += 1
+                await self._emit(out_sink, build_extension_event("x.bridge.approval_resolved", run_id=run_id, sequence=sequence, trace_id=trace_id, data={"approval_id": approval_id, "decision": "approve", "reason": deny_reason, "skipped": True}), tenant_id=tenant_id)
+                sequence += 1
+                await self._emit(out_sink, build_event("done", run_id=run_id, sequence=sequence, trace_id=trace_id, data={"skipped": True, "approval_decision": "approve"}), tenant_id=tenant_id)
+                return updated or rec
+
+            claimed = await self._approval_store.claim_execution(
+                approval_id,
+                tenant_id=tenant_id,
+                now=datetime.now(timezone.utc),
+                lease_seconds=self._approval_execution_lease_seconds,
+            )
+            if claimed is None:
+                return await self._approval_store.get(approval_id, tenant_id=tenant_id) or rec
+            try:
+                fragments = await self._approval_executor.execute(
+                    route=route,
+                    action=action,
+                    requester_ctx=RunContext.model_validate(rec.get("requester_context") or {}),
+                    approval_id=approval_id,
+                )
+            except Exception as exc:  # noqa: BLE001
+                await self._approval_store.mark_retryable_failed(approval_id, tenant_id=tenant_id, error=str(exc))
+                sequence += 1
+                await self._emit(out_sink, build_event("error", run_id=run_id, sequence=sequence, trace_id=trace_id, data={"code": "approval_execution_failed", "message": str(exc)}), tenant_id=tenant_id)
+                sequence += 1
+                await self._emit(out_sink, build_event("done", run_id=run_id, sequence=sequence, trace_id=trace_id, data={"approval_decision": "approve", "status": "error"}, status="error"), tenant_id=tenant_id)
+                return await self._approval_store.get(approval_id, tenant_id=tenant_id) or rec
+            updated = await self._approval_store.mark_succeeded(
+                approval_id,
+                tenant_id=tenant_id,
+                result={"fragments": [{"type": item.type, "data": item.data} for item in fragments]},
+            )
+            sequence += 1
+            await self._emit(out_sink, build_extension_event("x.bridge.approval_resolved", run_id=run_id, sequence=sequence, trace_id=trace_id, data={"approval_id": approval_id, "decision": "approve", "reason": "approve", "skipped": False}), tenant_id=tenant_id)
+            for fragment in fragments:
+                sequence += 1
+                await self._emit(out_sink, self._envelope_from_fragment(fragment, run_id=run_id, sequence=sequence, trace_id=trace_id), tenant_id=tenant_id)
+            sequence += 1
+            await self._emit(out_sink, build_event("done", run_id=run_id, sequence=sequence, trace_id=trace_id, data={"skipped": False, "approval_decision": "approve"}), tenant_id=tenant_id)
+            return updated or rec
+        finally:
+            if acquired:
+                await self._locks.release(storage_key, run_id)
+
+
+def _approval_requester_snapshot(ctx: RunContext) -> dict[str, Any]:
+    """Persist only authorization-relevant requester fields, never metadata."""
+    return {
+        "user_id": ctx.user_id,
+        "tenant_id": ctx.tenant_id,
+        "roles": list(ctx.roles),
+        "permissions": list(ctx.permissions),
+        "max_tokens": ctx.max_tokens,
+        "max_tool_calls": ctx.max_tool_calls,
+        "deadline_ms": ctx.deadline_ms,
+        "policy_bundle_version": ctx.policy_bundle_version,
+    }
 
     async def cancel(
         self,
