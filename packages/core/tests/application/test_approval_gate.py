@@ -242,3 +242,92 @@ async def test_approved_action_executes_once(graphs, tools, queue_and_sink, drai
         ("echo", {"type": "example.write_v1", "payload": {"x": 1}}, approval_id)
     ]
     assert any(event["type"] == "x.example.created" for event in cap.events)
+
+
+@pytest.mark.asyncio
+async def test_invalid_approval_action_has_stable_error_code(
+    graphs, tools, queue_and_sink, drain_events
+) -> None:
+    class InvalidActionRuntime:
+        async def astream(self, builder, **kwargs):  # noqa: ANN001
+            yield OutboundFragment(
+                type="x.bridge.approval_required",
+                data={"action": {"type": "example.write_v1", "payload": "invalid"}},
+            )
+
+    q, sink = queue_and_sink
+    lifecycle = _lc(
+        graphs=graphs,
+        tools=tools,
+        runtime=InvalidActionRuntime(),
+        approval_store=MemoryApprovalStore(),
+    )
+    await lifecycle.start_stream(
+        query="write",
+        thread_id="t-invalid-action",
+        route="echo",
+        sink=sink,
+        ctx=RunContext(tenant_id="acme"),
+    )
+
+    error = next(event for event in await drain_events(q) if event["type"] == "error")
+    assert error["data"]["code"] == "invalid_approval_action"
+
+
+@pytest.mark.asyncio
+async def test_unregistered_approved_action_is_persisted_as_denied(
+    graphs, tools, queue_and_sink, drain_events
+) -> None:
+    class ActionRuntime:
+        async def astream(self, builder, **kwargs):  # noqa: ANN001
+            yield OutboundFragment(
+                type="x.bridge.approval_required",
+                data={"action": {"type": "missing.v1", "payload": {}}},
+            )
+
+    class MissingExecutor:
+        def resource_for(self, *, route, action):  # noqa: ANN001
+            raise ValueError("no approval action for route")
+
+    approvals = MemoryApprovalStore()
+    q, sink = queue_and_sink
+    lifecycle = _lc(
+        graphs=graphs,
+        tools=tools,
+        runtime=ActionRuntime(),
+        approval_store=approvals,
+        approval_executor=MissingExecutor(),
+        policy=RolePolicyEngine(),
+    )
+    await lifecycle.start_stream(
+        query="write", thread_id="t-missing-action", route="echo", sink=sink,
+        ctx=RunContext(tenant_id="acme", user_id="requester"),
+    )
+    required = next(
+        event for event in await drain_events(q) if event["type"] == "x.bridge.approval_required"
+    )
+
+    class CapturingSink:
+        def __init__(self) -> None:
+            self.events: list[dict] = []
+
+        async def emit(self, event: dict) -> None:
+            self.events.append(event)
+
+        async def close(self) -> None:
+            return None
+
+    cap = CapturingSink()
+    approval_id = required["data"]["approval_id"]
+    result = await lifecycle.finalize_approval(
+        approval_id=approval_id,
+        tenant_id="acme",
+        decision="approve",
+        sink=cap,  # type: ignore[arg-type]
+        approver_ctx=RunContext(tenant_id="acme", permissions=["approval:decide"]),
+    )
+    assert result["status"] == "denied"
+    assert result["reason"] == "approval_handler_not_found"
+    assert [event["type"] for event in cap.events] == [
+        "x.bridge.approval_resolved", "done"
+    ]

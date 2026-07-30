@@ -431,6 +431,11 @@ class RunLifecycle:
             except Exception as exc:  # noqa: BLE001
                 logger.exception("run failed thread_id=%s run_id=%s", thread_id, run_id)
                 sequence += 1
+                error_code = (
+                    "invalid_approval_action"
+                    if str(exc) == "invalid_approval_action"
+                    else "run_failed"
+                )
                 await self._emit(
                     sink,
                     build_event(
@@ -438,7 +443,7 @@ class RunLifecycle:
                         run_id=run_id,
                         sequence=sequence,
                         trace_id=trace_id,
-                        data={"message": str(exc), "code": "run_failed"},
+                        data={"message": str(exc), "code": error_code},
                     ),
                     tenant_id=tenant_id,
                 )
@@ -882,11 +887,17 @@ class RunLifecycle:
                 deny_reason = "approval_handler_not_found"
             else:
                 requester_ctx = RunContext.model_validate(rec.get("requester_context") or {})
-                resource = self._approval_executor.resource_for(route=route, action=action)
-                if self._policy is not None and self._policy.decide(
-                    ctx=requester_ctx, action="invoke_tool", resource=resource
-                ) != "allow":
-                    deny_reason = "requester_policy_denied"
+                try:
+                    resource = self._approval_executor.resource_for(
+                        route=route, action=action
+                    )
+                except ValueError:
+                    deny_reason = "approval_handler_not_found"
+                else:
+                    if self._policy is not None and self._policy.decide(
+                        ctx=requester_ctx, action="invoke_tool", resource=resource
+                    ) != "allow":
+                        deny_reason = "requester_policy_denied"
             if deny_reason is not None:
                 updated = await self._approval_store.mark_execution_denied(
                     approval_id, tenant_id=tenant_id, reason=deny_reason
@@ -936,6 +947,18 @@ class RunLifecycle:
             if acquired:
                 await self._locks.release(storage_key, run_id)
 
+    async def cancel(
+        self,
+        *,
+        thread_id: str,
+        run_id: str | None = None,
+        tenant_id: str | None = None,
+    ) -> None:
+        key = checkpoint_thread_key(tenant_id or "default", thread_id)
+        ok = await self._cancels.request_cancel(key, run_id)
+        if not ok:
+            raise RunNotFound(thread_id)
+
 
 def _approval_requester_snapshot(ctx: RunContext) -> dict[str, Any]:
     """Persist only authorization-relevant requester fields, never metadata."""
@@ -950,14 +973,3 @@ def _approval_requester_snapshot(ctx: RunContext) -> dict[str, Any]:
         "policy_bundle_version": ctx.policy_bundle_version,
     }
 
-    async def cancel(
-        self,
-        *,
-        thread_id: str,
-        run_id: str | None = None,
-        tenant_id: str | None = None,
-    ) -> None:
-        key = checkpoint_thread_key(tenant_id or "default", thread_id)
-        ok = await self._cancels.request_cancel(key, run_id)
-        if not ok:
-            raise RunNotFound(thread_id)
