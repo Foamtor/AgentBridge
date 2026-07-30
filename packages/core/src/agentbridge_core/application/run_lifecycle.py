@@ -12,7 +12,13 @@ from typing import Any
 from agentbridge_core.application.graph_config import build_graph_config
 from agentbridge_core.application.project_turn import project_turn
 from agentbridge_core.application.tool_guard import guard_tools
-from agentbridge_core.errors import RunNotFound, ThreadBusy, UnknownRoute
+from agentbridge_core.errors import (
+    ApprovalStateConflict,
+    KnowledgeBackendUnavailable,
+    RunNotFound,
+    ThreadBusy,
+    UnknownRoute,
+)
 from agentbridge_core.ports.checkpointer import CheckpointerFactory
 from agentbridge_core.ports.event_sink import EventSink
 from agentbridge_core.ports.graph_runtime import GraphRuntime
@@ -36,6 +42,19 @@ logger = logging.getLogger(__name__)
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _public_run_error(exc: Exception) -> tuple[str, str]:
+    if str(exc) == "invalid_approval_action":
+        return "invalid_approval_action", "invalid approval action"
+    if isinstance(exc, KnowledgeBackendUnavailable):
+        return "knowledge_backend_unavailable", "knowledge backend unavailable"
+    if str(exc) == "llm_tool_binding_unsupported":
+        return (
+            "llm_tool_binding_unsupported",
+            "configured model does not support tool binding",
+        )
+    return "run_failed", "run failed"
 
 
 class EventLogAppendError(Exception):
@@ -194,6 +213,47 @@ class RunLifecycle:
         except EventLogAppendError:
             logger.exception(
                 "event log append failed for error frame run_id=%s", run_id
+            )
+
+    async def _next_approval_sequence(
+        self, approval_id: str, tenant_id: str
+    ) -> int:
+        assert self._approval_store is not None
+        return await self._approval_store.next_sequence(
+            approval_id, tenant_id=tenant_id
+        )
+
+    async def _project_action_terminal(
+        self,
+        *,
+        rec: dict[str, Any],
+        terminal: str,
+        result_delivery_error: str | None = None,
+    ) -> None:
+        if (
+            self._event_log is not None
+            and self._message_store is not None
+            and self._run_store is not None
+        ):
+            await project_turn(
+                event_log=self._event_log,
+                message_store=self._message_store,
+                run_store=self._run_store,
+                tenant_id=str(rec["tenant_id"]),
+                thread_id=str(rec["thread_id"]),
+                run_id=str(rec["run_id"]),
+                query=str(rec.get("query") or ""),
+                terminal=terminal,
+            )
+        if result_delivery_error is not None and self._run_store is not None:
+            await self._run_store.upsert(
+                {
+                    "run_id": str(rec["run_id"]),
+                    "tenant_id": str(rec["tenant_id"]),
+                    "thread_id": str(rec["thread_id"]),
+                    "status": terminal,
+                    "result_delivery_error": result_delivery_error,
+                }
             )
 
     async def start_stream(
@@ -415,14 +475,14 @@ class RunLifecycle:
                     await self._emit(
                         sink, evt, tenant_id=tenant_id, agent_id=agent_id
                     )
-            except EventLogAppendError as exc:
+            except EventLogAppendError:
                 sequence += 1
                 await self._emit_append_failed_error(
                     sink,
                     run_id=run_id,
                     sequence=sequence,
                     trace_id=trace_id,
-                    message=str(exc),
+                    message="event log append failed",
                     tenant_id=tenant_id,
                 )
                 terminal_sent = True
@@ -431,11 +491,7 @@ class RunLifecycle:
             except Exception as exc:
                 logger.exception("run failed thread_id=%s run_id=%s", thread_id, run_id)
                 sequence += 1
-                error_code = (
-                    "invalid_approval_action"
-                    if str(exc) == "invalid_approval_action"
-                    else "run_failed"
-                )
+                error_code, error_message = _public_run_error(exc)
                 await self._emit(
                     sink,
                     build_event(
@@ -443,7 +499,7 @@ class RunLifecycle:
                         run_id=run_id,
                         sequence=sequence,
                         trace_id=trace_id,
-                        data={"message": str(exc), "code": error_code},
+                        data={"message": error_message, "code": error_code},
                     ),
                     tenant_id=tenant_id,
                 )
@@ -500,7 +556,7 @@ class RunLifecycle:
         except UnknownRoute:
             pre_start_failure = True
             raise
-        except EventLogAppendError as exc:
+        except EventLogAppendError:
             if not terminal_sent and sequence > 0:
                 sequence += 1
                 await self._emit_append_failed_error(
@@ -508,7 +564,7 @@ class RunLifecycle:
                     run_id=run_id,
                     sequence=sequence,
                     trace_id=trace_id,
-                    message=str(exc),
+                    message="event log append failed",
                     tenant_id=tenant_id,
                 )
                 terminal_sent = True
@@ -522,6 +578,7 @@ class RunLifecycle:
                     "run failed after start thread_id=%s run_id=%s", thread_id, run_id
                 )
                 sequence += 1
+                error_code, error_message = _public_run_error(exc)
                 await self._emit(
                     sink,
                     build_event(
@@ -529,7 +586,7 @@ class RunLifecycle:
                         run_id=run_id,
                         sequence=sequence,
                         trace_id=trace_id,
-                        data={"message": str(exc), "code": "run_failed"},
+                        data={"message": error_message, "code": error_code},
                     ),
                     tenant_id=tenant_id,
                 )
@@ -819,9 +876,12 @@ class RunLifecycle:
         storage_key = str(rec["storage_key"])
         run_id = str(rec["run_id"])
         trace_id = str(rec.get("trace_id") or run_id)
-        sequence = int(rec.get("sequence") or 0)
         route = str(rec.get("route") or "")
         action = dict(rec["action"])
+        if rec.get("status") == "executing" and decision != "approve":
+            raise ApprovalStateConflict(
+                "cannot deny an approval while execution is active"
+            )
 
         class _NullSink:
             async def emit(self, evt: dict[str, Any]) -> None:
@@ -833,15 +893,35 @@ class RunLifecycle:
         out_sink: EventSink = sink if sink is not None else _NullSink()  # type: ignore[assignment]
         acquired = await self._locks.try_acquire(storage_key, run_id)
         if not acquired and reason != "timeout":
+            latest = await self._approval_store.get(
+                approval_id, tenant_id=tenant_id
+            )
+            if (
+                latest
+                and latest.get("status") == "executing"
+                and decision != "approve"
+            ):
+                raise ApprovalStateConflict(
+                    "cannot deny an approval while execution is active"
+                )
             raise ThreadBusy(str(rec["thread_id"]))
         try:
             status = rec.get("status")
             if status == "executing":
+                if decision != "approve":
+                    raise ApprovalStateConflict(
+                        "cannot deny an approval while execution is active"
+                    )
                 recovered = await self._approval_store.recover_expired_execution(
                     approval_id, tenant_id=tenant_id, now=datetime.now(timezone.utc)
                 )
                 if recovered is None:
-                    return rec
+                    return (
+                        await self._approval_store.get(
+                            approval_id, tenant_id=tenant_id
+                        )
+                        or rec
+                    )
                 rec = recovered
                 status = rec.get("status")
             if status == "pending":
@@ -849,19 +929,74 @@ class RunLifecycle:
                     approval_id, tenant_id=tenant_id, decision=decision, reason=reason
                 )
                 if updated is None:
-                    return rec
+                    return (
+                        await self._approval_store.get(
+                            approval_id, tenant_id=tenant_id
+                        )
+                        or rec
+                    )
                 rec = updated
                 if decision != "approve":
-                    sequence += 1
-                    await self._emit(out_sink, build_extension_event("x.bridge.approval_resolved", run_id=run_id, sequence=sequence, trace_id=trace_id, data={"approval_id": approval_id, "decision": decision, "reason": reason or decision, "skipped": True}), tenant_id=tenant_id)
-                    sequence += 1
-                    await self._emit(out_sink, build_event("done", run_id=run_id, sequence=sequence, trace_id=trace_id, data={"skipped": True, "approval_decision": decision}), tenant_id=tenant_id)
+                    sequence = await self._next_approval_sequence(
+                        approval_id, tenant_id
+                    )
+                    await self._emit(
+                        out_sink,
+                        build_extension_event(
+                            "x.bridge.approval_resolved",
+                            run_id=run_id,
+                            sequence=sequence,
+                            trace_id=trace_id,
+                            data={
+                                "approval_id": approval_id,
+                                "decision": decision,
+                                "reason": reason or decision,
+                                "skipped": True,
+                            },
+                        ),
+                        tenant_id=tenant_id,
+                    )
+                    sequence = await self._next_approval_sequence(
+                        approval_id, tenant_id
+                    )
+                    await self._emit(
+                        out_sink,
+                        build_event(
+                            "done",
+                            run_id=run_id,
+                            sequence=sequence,
+                            trace_id=trace_id,
+                            data={
+                                "skipped": True,
+                                "approval_decision": decision,
+                            },
+                        ),
+                        tenant_id=tenant_id,
+                    )
+                    await self._project_action_terminal(
+                        rec=rec, terminal="done"
+                    )
                     return rec
             elif status not in {"approved_pending_execution", "retryable_failed"}:
                 return rec
 
-            sequence += 1
             if decision != "approve":
+                updated = await self._approval_store.mark_execution_denied(
+                    approval_id,
+                    tenant_id=tenant_id,
+                    reason=reason or decision,
+                )
+                if updated is None:
+                    return (
+                        await self._approval_store.get(
+                            approval_id, tenant_id=tenant_id
+                        )
+                        or rec
+                    )
+                rec = updated
+                sequence = await self._next_approval_sequence(
+                    approval_id, tenant_id
+                )
                 await self._emit(
                     out_sink,
                     build_extension_event(
@@ -869,16 +1004,39 @@ class RunLifecycle:
                         run_id=run_id,
                         sequence=sequence,
                         trace_id=trace_id,
-                        data={"approval_id": approval_id, "decision": decision, "reason": reason or decision, "skipped": True},
+                        data={
+                            "approval_id": approval_id,
+                            "decision": decision,
+                            "reason": reason or decision,
+                            "skipped": True,
+                        },
                     ),
                     tenant_id=tenant_id,
                 )
-                sequence += 1
-                await self._emit(out_sink, build_event("done", run_id=run_id, sequence=sequence, trace_id=trace_id, data={"skipped": True, "approval_decision": decision}), tenant_id=tenant_id)
+                sequence = await self._next_approval_sequence(
+                    approval_id, tenant_id
+                )
+                await self._emit(
+                    out_sink,
+                    build_event(
+                        "done",
+                        run_id=run_id,
+                        sequence=sequence,
+                        trace_id=trace_id,
+                        data={
+                            "skipped": True,
+                            "approval_decision": decision,
+                        },
+                    ),
+                    tenant_id=tenant_id,
+                )
+                await self._project_action_terminal(rec=rec, terminal="done")
                 return rec
 
             deny_reason: str | None = None
-            resource: dict[str, Any] = {"name": str(action.get("type") or "approval_action")}
+            resource: dict[str, Any] = {
+                "name": str(action.get("type") or "approval_action")
+            }
             if approver_ctx is None or (
                 "*" not in approver_ctx.permissions
                 and "approval:decide" not in approver_ctx.permissions
@@ -887,7 +1045,9 @@ class RunLifecycle:
             elif self._approval_executor is None:
                 deny_reason = "approval_handler_not_found"
             else:
-                requester_ctx = RunContext.model_validate(rec.get("requester_context") or {})
+                requester_ctx = RunContext.model_validate(
+                    rec.get("requester_context") or {}
+                )
                 try:
                     resource = self._approval_executor.resource_for(
                         route=route, action=action
@@ -919,11 +1079,53 @@ class RunLifecycle:
                 updated = await self._approval_store.mark_execution_denied(
                     approval_id, tenant_id=tenant_id, reason=deny_reason
                 )
-                sequence += 1
-                await self._emit(out_sink, build_extension_event("x.bridge.approval_resolved", run_id=run_id, sequence=sequence, trace_id=trace_id, data={"approval_id": approval_id, "decision": "approve", "reason": deny_reason, "skipped": True}), tenant_id=tenant_id)
-                sequence += 1
-                await self._emit(out_sink, build_event("done", run_id=run_id, sequence=sequence, trace_id=trace_id, data={"skipped": True, "approval_decision": "approve"}), tenant_id=tenant_id)
-                return updated or rec
+                if updated is None:
+                    return (
+                        await self._approval_store.get(
+                            approval_id, tenant_id=tenant_id
+                        )
+                        or rec
+                    )
+                sequence = await self._next_approval_sequence(
+                    approval_id, tenant_id
+                )
+                await self._emit(
+                    out_sink,
+                    build_extension_event(
+                        "x.bridge.approval_resolved",
+                        run_id=run_id,
+                        sequence=sequence,
+                        trace_id=trace_id,
+                        data={
+                            "approval_id": approval_id,
+                            "decision": "approve",
+                            "reason": deny_reason,
+                            "skipped": True,
+                        },
+                    ),
+                    tenant_id=tenant_id,
+                )
+                sequence = await self._next_approval_sequence(
+                    approval_id, tenant_id
+                )
+                await self._emit(
+                    out_sink,
+                    build_event(
+                        "done",
+                        run_id=run_id,
+                        sequence=sequence,
+                        trace_id=trace_id,
+                        data={
+                            "skipped": True,
+                            "approval_decision": "approve",
+                        },
+                    ),
+                    tenant_id=tenant_id,
+                )
+                await self._project_action_terminal(
+                    rec=updated, terminal="done"
+                )
+                return updated
 
             claimed = await self._approval_store.claim_execution(
                 approval_id,
@@ -932,59 +1134,202 @@ class RunLifecycle:
                 lease_seconds=self._approval_execution_lease_seconds,
             )
             if claimed is None:
-                return await self._approval_store.get(approval_id, tenant_id=tenant_id) or rec
+                return (
+                    await self._approval_store.get(
+                        approval_id, tenant_id=tenant_id
+                    )
+                    or rec
+                )
             execution_token = claimed["execution_token"]
             try:
                 fragments = await self._approval_executor.execute(
                     route=route,
                     action=action,
-                    requester_ctx=RunContext.model_validate(rec.get("requester_context") or {}),
+                    requester_ctx=RunContext.model_validate(
+                        rec.get("requester_context") or {}
+                    ),
                     approval_id=approval_id,
                 )
-            except Exception as exc:  # noqa: BLE001
-                await self._approval_store.mark_retryable_failed(
+            except Exception as exc:
+                logger.exception(
+                    "approved action execution failed approval_id=%s run_id=%s",
+                    approval_id,
+                    run_id,
+                )
+                updated = await self._approval_store.mark_retryable_failed(
                     approval_id,
                     tenant_id=tenant_id,
                     execution_token=execution_token,
                     error=str(exc),
                 )
-                sequence += 1
-                await self._emit(out_sink, build_event("error", run_id=run_id, sequence=sequence, trace_id=trace_id, data={"code": "approval_execution_failed", "message": str(exc)}), tenant_id=tenant_id)
-                sequence += 1
-                await self._emit(out_sink, build_event("done", run_id=run_id, sequence=sequence, trace_id=trace_id, data={"approval_decision": "approve", "status": "error"}, status="error"), tenant_id=tenant_id)
-                return await self._approval_store.get(approval_id, tenant_id=tenant_id) or rec
+                if updated is None:
+                    return (
+                        await self._approval_store.get(
+                            approval_id, tenant_id=tenant_id
+                        )
+                        or rec
+                    )
+                if self._run_store is not None:
+                    await self._run_store.upsert(
+                        {
+                            "run_id": run_id,
+                            "tenant_id": tenant_id,
+                            "thread_id": str(rec["thread_id"]),
+                            "status": "error",
+                            "error": "approved action execution failed",
+                        }
+                    )
+                sequence = await self._next_approval_sequence(
+                    approval_id, tenant_id
+                )
+                await self._emit(
+                    out_sink,
+                    build_event(
+                        "error",
+                        run_id=run_id,
+                        sequence=sequence,
+                        trace_id=trace_id,
+                        data={
+                            "code": "approval_execution_failed",
+                            "message": "approved action execution failed",
+                        },
+                    ),
+                    tenant_id=tenant_id,
+                )
+                sequence = await self._next_approval_sequence(
+                    approval_id, tenant_id
+                )
+                await self._emit(
+                    out_sink,
+                    build_event(
+                        "done",
+                        run_id=run_id,
+                        sequence=sequence,
+                        trace_id=trace_id,
+                        data={
+                            "approval_decision": "approve",
+                            "status": "error",
+                        },
+                        status="error",
+                    ),
+                    tenant_id=tenant_id,
+                )
+                return updated
+            normalized_result = {
+                "fragments": [
+                    {"type": item.type, "data": item.data}
+                    for item in fragments
+                ]
+            }
             updated = await self._approval_store.mark_succeeded(
                 approval_id,
                 tenant_id=tenant_id,
                 execution_token=execution_token,
-                result={"fragments": [{"type": item.type, "data": item.data} for item in fragments]},
+                result=normalized_result,
             )
-            try:
-                sequence += 1
-                await self._emit(out_sink, build_extension_event("x.bridge.approval_resolved", run_id=run_id, sequence=sequence, trace_id=trace_id, data={"approval_id": approval_id, "decision": "approve", "reason": "approve", "skipped": False}), tenant_id=tenant_id)
-                for fragment in fragments:
-                    sequence += 1
-                    await self._emit(out_sink, self._envelope_from_fragment(fragment, run_id=run_id, sequence=sequence, trace_id=trace_id), tenant_id=tenant_id)
-                sequence += 1
-                await self._emit(out_sink, build_event("done", run_id=run_id, sequence=sequence, trace_id=trace_id, data={"skipped": False, "approval_decision": "approve"}), tenant_id=tenant_id)
-            except EventLogAppendError as exc:
-                updated = await self._approval_store.mark_result_delivery_failed(
-                    approval_id, tenant_id=tenant_id, error=str(exc)
+            if updated is None:
+                return (
+                    await self._approval_store.get(
+                        approval_id, tenant_id=tenant_id
+                    )
+                    or rec
                 )
-                await out_sink.emit(
-                    build_event(
-                        "error",
+            try:
+                sequence = await self._next_approval_sequence(
+                    approval_id, tenant_id
+                )
+                await self._emit(
+                    out_sink,
+                    build_extension_event(
+                        "x.bridge.approval_resolved",
                         run_id=run_id,
-                        sequence=sequence + 1,
+                        sequence=sequence,
                         trace_id=trace_id,
                         data={
-                            "code": "approval_result_delivery_failed",
-                            "message": str(exc),
-                            "business_completed": True,
+                            "approval_id": approval_id,
+                            "decision": "approve",
+                            "reason": "approve",
+                            "skipped": False,
                         },
+                    ),
+                    tenant_id=tenant_id,
+                )
+                for fragment in fragments:
+                    sequence = await self._next_approval_sequence(
+                        approval_id, tenant_id
+                    )
+                    await self._emit(
+                        out_sink,
+                        self._envelope_from_fragment(
+                            fragment,
+                            run_id=run_id,
+                            sequence=sequence,
+                            trace_id=trace_id,
+                        ),
+                        tenant_id=tenant_id,
+                    )
+                sequence = await self._next_approval_sequence(
+                    approval_id, tenant_id
+                )
+                await self._emit(
+                    out_sink,
+                    build_event(
+                        "done",
+                        run_id=run_id,
+                        sequence=sequence,
+                        trace_id=trace_id,
+                        data={
+                            "skipped": False,
+                            "approval_decision": "approve",
+                        },
+                    ),
+                    tenant_id=tenant_id,
+                )
+            except Exception as exc:
+                logger.exception(
+                    "approved action result delivery failed approval_id=%s run_id=%s",
+                    approval_id,
+                    run_id,
+                )
+                delivery_failed = (
+                    await self._approval_store.mark_result_delivery_failed(
+                        approval_id, tenant_id=tenant_id, error=str(exc)
                     )
                 )
-            return updated or rec
+                sequence = await self._next_approval_sequence(
+                    approval_id, tenant_id
+                )
+                try:
+                    await out_sink.emit(
+                        build_event(
+                            "error",
+                            run_id=run_id,
+                            sequence=sequence,
+                            trace_id=trace_id,
+                            data={
+                                "code": "approval_result_delivery_failed",
+                                "message": (
+                                    "approved action result delivery failed"
+                                ),
+                                "business_completed": True,
+                            },
+                        )
+                    )
+                except Exception:
+                    logger.exception(
+                        "failed to deliver approval result error approval_id=%s",
+                        approval_id,
+                    )
+                await self._project_action_terminal(
+                    rec=delivery_failed or updated,
+                    terminal="done",
+                    result_delivery_error=(
+                        "approved action result delivery failed"
+                    ),
+                )
+                return delivery_failed or updated
+            await self._project_action_terminal(rec=updated, terminal="done")
+            return updated
         finally:
             if acquired:
                 await self._locks.release(storage_key, run_id)
