@@ -182,8 +182,26 @@ async def test_lifespan_cancels_approval_expiry_scanner(
 ) -> None:
     monkeypatch.setenv("AGENTBRIDGE_FAKE_RUNTIME", "1")
     monkeypatch.setenv("APPROVAL_EXPIRY_SCAN_INTERVAL_SECONDS", "0.01")
+    from adapters import knowledge_backend
     from testing.app_factory import create_test_app
 
+    class CloseTrackingRetriever:
+        def __init__(self) -> None:
+            self.close_calls = 0
+
+        async def close(self) -> None:
+            self.close_calls += 1
+
+    retriever = CloseTrackingRetriever()
+
+    async def _build_retriever(settings):
+        return retriever
+
+    monkeypatch.setattr(
+        knowledge_backend,
+        "build_retriever",
+        _build_retriever,
+    )
     second_scan = asyncio.Event()
     scan_calls = 0
 
@@ -216,6 +234,7 @@ async def test_lifespan_cancels_approval_expiry_scanner(
     assert scan_calls >= 2
     assert scanner_tasks[0].done()
     assert scanner_tasks[0].cancelled()
+    assert retriever.close_calls == 1
 
 
 @pytest.mark.asyncio
@@ -224,8 +243,26 @@ async def test_lifespan_startup_failure_does_not_leak_expiry_scanner(
 ) -> None:
     monkeypatch.setenv("AGENTBRIDGE_FAKE_RUNTIME", "1")
     import lifespan as lifespan_module
+    from adapters import knowledge_backend
     from testing.app_factory import create_test_app
 
+    class CloseTrackingRetriever:
+        def __init__(self) -> None:
+            self.close_calls = 0
+
+        async def close(self) -> None:
+            self.close_calls += 1
+
+    retriever = CloseTrackingRetriever()
+
+    async def _build_retriever(settings):
+        return retriever
+
+    monkeypatch.setattr(
+        knowledge_backend,
+        "build_retriever",
+        _build_retriever,
+    )
     scan_blocker = asyncio.Event()
 
     async def _scan(self, *, now, limit=100):
@@ -262,6 +299,7 @@ async def test_lifespan_startup_failure_does_not_leak_expiry_scanner(
             task.done() and task.cancelled() for task in scanner_tasks
         )
         assert scanner_tasks == []
+        assert retriever.close_calls == 1
     finally:
         for task in scanner_tasks:
             if not task.done():

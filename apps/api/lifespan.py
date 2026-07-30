@@ -166,116 +166,136 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     from adapters.knowledge_backend import build_retriever
 
     retriever = await build_retriever(settings)
-    ingest_job_store = MemoryIngestJobStore()
-    knowledge_ingest = build_knowledge_ingest(settings, retriever, ingest_job_store)
-    knowledge_status_provider = build_knowledge_status_provider(
-        settings,
-        retriever,
-        ingest_jobs=ingest_job_store,
-    )
-    data_source = getattr(app.state, "bootstrap_data_source", None) or _build_data_source(settings)
-    register_all(graphs, tools, input_builders, approval_actions=approval_actions, data_source=data_source)
-    llm_gateway = _build_llm_gateway(settings)
-    from adapters.prometheus_metrics import PrometheusMetrics
-    from observability.tracing import make_run_span_factory
-
-    metrics = PrometheusMetrics()
-    span_factory = make_run_span_factory(enabled=settings.otel_enabled)
-
-    lifecycle = RunLifecycle(
-        locks=locks,
-        checkpointers=checkpointers,
-        graphs=graphs,
-        tools=tools,
-        input_builders=input_builders,
-        runtime=runtime,
-        cancels=cancels,
-        hooks=hooks,
-        policy=policy,
-        audit=audit,
-        event_log=event_log,
-        message_store=message_store,
-        run_store=run_store,
-        metrics=metrics,
-        span_factory=span_factory,
-        approval_store=approval_store,
-        approval_executor=approval_actions,
-        approval_execution_lease_seconds=settings.approval_execution_lease_seconds,
-        safety_hooks=SafetyHooks(redact=True),
-    )
-
-    async def _approval_expiry_loop() -> None:
-        await lifecycle.expire_pending_approvals(
-            now=datetime.now(timezone.utc)
+    data_source: Any | None = None
+    approval_expiry_task: asyncio.Task[Any] | None = None
+    try:
+        ingest_job_store = MemoryIngestJobStore()
+        knowledge_ingest = build_knowledge_ingest(
+            settings,
+            retriever,
+            ingest_job_store,
         )
-        while True:
-            await asyncio.sleep(
-                settings.approval_expiry_scan_interval_seconds
-            )
+        knowledge_status_provider = build_knowledge_status_provider(
+            settings,
+            retriever,
+            ingest_jobs=ingest_job_store,
+        )
+        data_source = (
+            getattr(app.state, "bootstrap_data_source", None)
+            or _build_data_source(settings)
+        )
+        register_all(
+            graphs,
+            tools,
+            input_builders,
+            approval_actions=approval_actions,
+            data_source=data_source,
+        )
+        llm_gateway = _build_llm_gateway(settings)
+        from adapters.prometheus_metrics import PrometheusMetrics
+        from observability.tracing import make_run_span_factory
+
+        metrics = PrometheusMetrics()
+        span_factory = make_run_span_factory(enabled=settings.otel_enabled)
+
+        lifecycle = RunLifecycle(
+            locks=locks,
+            checkpointers=checkpointers,
+            graphs=graphs,
+            tools=tools,
+            input_builders=input_builders,
+            runtime=runtime,
+            cancels=cancels,
+            hooks=hooks,
+            policy=policy,
+            audit=audit,
+            event_log=event_log,
+            message_store=message_store,
+            run_store=run_store,
+            metrics=metrics,
+            span_factory=span_factory,
+            approval_store=approval_store,
+            approval_executor=approval_actions,
+            approval_execution_lease_seconds=(
+                settings.approval_execution_lease_seconds
+            ),
+            safety_hooks=SafetyHooks(redact=True),
+        )
+
+        async def _approval_expiry_loop() -> None:
             await lifecycle.expire_pending_approvals(
                 now=datetime.now(timezone.utc)
             )
 
-    pipeline = RequestPipeline(
-        lifecycle=lifecycle,
-        plugins=[
-            InputValidatorPlugin(BasicInputValidator()),
-            ToolPolicyPlugin(
-                policy=policy,
-                audit=audit,
-                tools_registry=tools,
-            ),
-        ],
-    )
+            while True:
+                await asyncio.sleep(
+                    settings.approval_expiry_scan_interval_seconds
+                )
+                await lifecycle.expire_pending_approvals(
+                    now=datetime.now(timezone.utc)
+                )
 
-    # Production app.state whitelist: lifecycle + pipeline + settings + stores.
-    app.state.settings = settings
-    app.state.run_lifecycle = lifecycle
-    app.state.pipeline = pipeline
-    app.state.audit = audit
-    app.state.event_log = event_log
-    app.state.message_store = message_store
-    app.state.run_store = run_store
-    app.state.approval_store = approval_store
-    app.state.approval_actions = approval_actions
-    app.state.policy = policy
-    app.state.config_provider = config_provider
-    app.state.prompt_registry = platform_prompt_registry
-    app.state.prompt_runtime = prompt_runtime
-    app.state.usage_store = usage_store
-    app.state.retriever = retriever
-    app.state.ingest_job_store = ingest_job_store
-    app.state.knowledge_ingest = knowledge_ingest
-    app.state.knowledge_status_provider = knowledge_status_provider
-    app.state.data_source = data_source
-    app.state.llm_gateway = llm_gateway
-    app.state.metrics = metrics
-    app.state.tools = tools
-    app.state.graphs = graphs
-    app.state.domain_catalog = build_domain_catalog(
-        route_names=tools.keys(),
-        tools_registry=tools,
-        graph_names=set(graphs.keys()),
-        meta_map=DOMAIN_META_MAP,
-    )
-    # Expose checkpointer factory for /ready (memory always "ready" after setup).
-    app.state.checkpointers = checkpointers
-    app.state.redis = redis_client
-    approval_expiry_task = asyncio.create_task(_approval_expiry_loop())
-    try:
+        pipeline = RequestPipeline(
+            lifecycle=lifecycle,
+            plugins=[
+                InputValidatorPlugin(BasicInputValidator()),
+                ToolPolicyPlugin(
+                    policy=policy,
+                    audit=audit,
+                    tools_registry=tools,
+                ),
+            ],
+        )
+
+        # Production app.state whitelist: lifecycle + pipeline + settings + stores.
+        app.state.settings = settings
+        app.state.run_lifecycle = lifecycle
+        app.state.pipeline = pipeline
+        app.state.audit = audit
+        app.state.event_log = event_log
+        app.state.message_store = message_store
+        app.state.run_store = run_store
+        app.state.approval_store = approval_store
+        app.state.approval_actions = approval_actions
+        app.state.policy = policy
+        app.state.config_provider = config_provider
+        app.state.prompt_registry = platform_prompt_registry
+        app.state.prompt_runtime = prompt_runtime
+        app.state.usage_store = usage_store
+        app.state.retriever = retriever
+        app.state.ingest_job_store = ingest_job_store
+        app.state.knowledge_ingest = knowledge_ingest
+        app.state.knowledge_status_provider = knowledge_status_provider
+        app.state.data_source = data_source
+        app.state.llm_gateway = llm_gateway
+        app.state.metrics = metrics
+        app.state.tools = tools
+        app.state.graphs = graphs
+        app.state.domain_catalog = build_domain_catalog(
+            route_names=tools.keys(),
+            tools_registry=tools,
+            graph_names=set(graphs.keys()),
+            meta_map=DOMAIN_META_MAP,
+        )
+        # Expose checkpointer factory for /ready (memory always "ready" after setup).
+        app.state.checkpointers = checkpointers
+        app.state.redis = redis_client
+        approval_expiry_task = asyncio.create_task(_approval_expiry_loop())
         yield
     finally:
-        approval_expiry_task.cancel()
         try:
-            with suppress(asyncio.CancelledError):
-                await approval_expiry_task
+            if approval_expiry_task is not None:
+                approval_expiry_task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await approval_expiry_task
         finally:
             close_retriever = getattr(retriever, "close", None)
             if close_retriever is not None:
                 result = close_retriever()
                 if hasattr(result, "__await__"):
                     await result
-            await data_source.close()
+            if data_source is not None:
+                await data_source.close()
             close_approval_store = getattr(approval_store, "close", None)
             if close_approval_store is not None:
                 result = close_approval_store()

@@ -25,6 +25,15 @@ class FailOnUse:
         raise AssertionError(f"external dependency used: {name}")
 
 
+class TrackExternalUse:
+    def __init__(self) -> None:
+        self.used = False
+
+    def __getattr__(self, name: str) -> NoReturn:
+        self.used = True
+        raise AssertionError(f"external dependency used: {name}")
+
+
 class FakeResponse:
     def __init__(
         self,
@@ -474,6 +483,38 @@ async def test_create_rejects_wrong_embedding_dimension_safely(
     assert str(captured.value) == PUBLIC_ERROR
     assert secret_dsn not in caplog.text
     assert api_key not in caplog.text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("model", "dimensions"),
+    [
+        ("other-512-model", 512),
+        ("BAAI/bge-m3", 1024),
+    ],
+)
+async def test_create_rejects_fixed_embedding_contract_before_external_io(
+    model: str,
+    dimensions: int,
+) -> None:
+    pool = TrackExternalUse()
+    client = TrackExternalUse()
+
+    with pytest.raises(KnowledgeBackendUnavailable) as captured:
+        await RagAgentPgRetriever.create(
+            dsn="postgresql://unused",
+            demo_tenant="rag-agent-demo",
+            embed_api_base="http://unused/v1",
+            embed_api_key="EMPTY",
+            embed_model=model,
+            embed_dimensions=dimensions,
+            pool=pool,
+            client=client,
+        )
+
+    assert str(captured.value) == PUBLIC_ERROR
+    assert pool.used is False
+    assert client.used is False
 
 
 @pytest.mark.asyncio

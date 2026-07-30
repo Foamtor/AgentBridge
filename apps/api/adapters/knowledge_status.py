@@ -30,12 +30,18 @@ class KnowledgeStatusProvider:
 
     async def get_status(self, *, tenant_id: str) -> dict[str, Any]:
         backend = (self._settings.knowledge_backend or "fake").strip().lower()
-        if backend == "external":
-            health = await self._external_health()
+        if backend in {"external", "rag_agent_pg"}:
+            health = await self._retriever_health()
+            if backend == "rag_agent_pg":
+                model = self._settings.rag_agent_embed_model or None
+                message = "probed by read-only RAG-Agent retriever"
+            else:
+                model = None
+                message = "managed by external RAG"
             embedding = {
                 "status": "skipped",
-                "model": None,
-                "message": "managed by external RAG",
+                "model": model,
+                "message": message,
             }
             healthy = health.get("status") == "ok"
             jobs: list[dict[str, Any]] = []
@@ -60,7 +66,7 @@ class KnowledgeStatusProvider:
             "ingest_jobs": jobs,
         }
 
-    async def _external_health(self) -> dict[str, Any]:
+    async def _retriever_health(self) -> dict[str, Any]:
         probe = getattr(self._retriever, "health_check", None)
         if not callable(probe):
             return {"status": "fail", "message": "retriever has no health_check"}
@@ -104,7 +110,7 @@ class KnowledgeStatusProvider:
         try:
             await embed_query("health")
             return {"status": "ok", "model": model}
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning("embedding health probe failed", exc_info=True)
             return {"status": "degraded", "model": model, "message": str(exc)}
 

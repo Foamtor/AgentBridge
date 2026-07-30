@@ -91,8 +91,10 @@ def test_rag_agent_pg_settings_have_safe_demo_defaults(
         ({"RAG_AGENT_DEMO_TENANT": "  "}, "RAG_AGENT_DEMO_TENANT"),
         ({"RAG_AGENT_EMBED_API_BASE": ""}, "RAG_AGENT_EMBED_API_BASE"),
         ({"RAG_AGENT_EMBED_MODEL": ""}, "RAG_AGENT_EMBED_MODEL"),
+        ({"RAG_AGENT_EMBED_MODEL": "other-512-model"}, "RAG_AGENT_EMBED_MODEL"),
         ({"RAG_AGENT_EMBED_DIMENSIONS": 0}, "RAG_AGENT_EMBED_DIMENSIONS"),
         ({"RAG_AGENT_EMBED_DIMENSIONS": -1}, "RAG_AGENT_EMBED_DIMENSIONS"),
+        ({"RAG_AGENT_EMBED_DIMENSIONS": 1024}, "RAG_AGENT_EMBED_DIMENSIONS"),
     ],
 )
 def test_validate_rag_agent_pg_requires_complete_positive_settings(
@@ -107,6 +109,31 @@ def test_validate_rag_agent_pg_requires_complete_positive_settings(
 
 def test_validate_rag_agent_pg_accepts_complete_settings() -> None:
     validate_rag_agent_pg_settings(rag_agent_settings())
+
+
+@pytest.mark.asyncio
+async def test_build_retriever_rejects_wrong_rag_agent_model_before_create(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from adapters import rag_agent_pg_retriever as adapter_module
+
+    class FailOnCreate:
+        @classmethod
+        async def create(cls, **kwargs: object) -> object:
+            raise AssertionError("adapter create must not be called")
+
+    monkeypatch.setattr(
+        adapter_module,
+        "RagAgentPgRetriever",
+        FailOnCreate,
+    )
+
+    with pytest.raises(RuntimeError, match="RAG_AGENT_EMBED_MODEL"):
+        await build_retriever(
+            rag_agent_settings(
+                RAG_AGENT_EMBED_MODEL="other-512-model",
+            )
+        )
 
 
 @pytest.mark.asyncio
