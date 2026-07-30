@@ -48,6 +48,7 @@ async def resolve_approval(
             tenant_id=tenant_id,
             decision=body.decision,
             sink=None,
+            approver_ctx=ctx,
         )
     except RunNotFound as exc:
         raise HTTPException(
