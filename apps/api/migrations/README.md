@@ -5,6 +5,7 @@ Checkpointer / schema migrations.
 | `001_checkpointer.sql` | LangGraph checkpointer tables |
 | `002_demo_readonly.sql` | Demo DataSource sample tables |
 | `003_knowledge_pgvector.sql` | R-A knowledge schema + `kb_chunks` (needs **pgvector**) |
+| `004_approval_execution.sql` | Durable, platform-generic approval action records |
 
 ## Knowledge (R-A)
 
@@ -14,3 +15,9 @@ Checkpointer / schema migrations.
 4. Seed: `python scripts/ingest_demo_rag.py`
 
 R-A does **not** call `init_vectorstore_table`; DDL is owned by this migration.
+
+## Approval execution (P1)
+
+Apply `004_approval_execution.sql` before setting `APPROVAL_STORE_BACKEND=postgres`.
+The `memory` backend remains suitable for tests and local demonstrations; the
+PostgreSQL backend is required for restart-safe approval execution.
