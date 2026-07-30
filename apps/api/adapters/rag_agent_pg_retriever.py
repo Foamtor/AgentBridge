@@ -57,6 +57,17 @@ class _CapabilityFailure(RuntimeError):
     """Safe internal probe/response validation detail."""
 
 
+def _validate_fixed_contract(model: str, dimensions: int) -> None:
+    if model != _EXPECTED_MODEL:
+        raise _CapabilityFailure(
+            "configured embedding model must be BAAI/bge-m3"
+        )
+    if int(dimensions) != _EXPECTED_DIMENSIONS:
+        raise _CapabilityFailure(
+            "configured embedding dimension must be 512"
+        )
+
+
 def _raise_unavailable(stage: str, exc: Exception) -> NoReturn:
     if isinstance(exc, _CapabilityFailure):
         logger.warning(
@@ -114,6 +125,11 @@ class RagAgentPgRetriever:
         pool: Any | None = None,
         client: httpx.AsyncClient | None = None,
     ) -> RagAgentPgRetriever:
+        try:
+            _validate_fixed_contract(embed_model, embed_dimensions)
+        except (TypeError, ValueError, _CapabilityFailure) as exc:
+            _raise_unavailable("startup", exc)
+
         owns_pool = pool is None
         owns_client = client is None
         created_pool = pool
@@ -210,14 +226,10 @@ class RagAgentPgRetriever:
             )
 
     async def _probe_dependencies(self) -> None:
-        if self._embed_model != _EXPECTED_MODEL:
-            raise _CapabilityFailure(
-                "configured embedding model must be BAAI/bge-m3"
-            )
-        if self._embed_dimensions != _EXPECTED_DIMENSIONS:
-            raise _CapabilityFailure(
-                "configured embedding dimension must be 512"
-            )
+        _validate_fixed_contract(
+            self._embed_model,
+            self._embed_dimensions,
+        )
         async with (
             self._pool.acquire() as connection,
             connection.transaction(readonly=True),
