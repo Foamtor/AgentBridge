@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 
 import pytest
+from agentbridge_core.application.run_lifecycle import RunLifecycle
 from agentbridge_core.errors import ApprovalStateConflict
+from config.settings import Settings
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 
 def _parse_sse(body: str) -> list[dict]:
@@ -155,3 +159,60 @@ def test_executing_approval_conflict_is_stable_409(client: TestClient) -> None:
         }
     }
     assert "raw internal conflict detail" not in response.text
+
+
+@pytest.mark.parametrize("interval", [0, -0.01])
+def test_approval_expiry_scan_interval_must_be_positive(interval: float) -> None:
+    with pytest.raises(ValidationError):
+        Settings(
+            _env_file=None,
+            APPROVAL_EXPIRY_SCAN_INTERVAL_SECONDS=interval,
+        )
+
+
+def test_approval_expiry_scan_interval_defaults_to_thirty_seconds() -> None:
+    settings = Settings(_env_file=None)
+
+    assert settings.approval_expiry_scan_interval_seconds == 30.0
+
+
+@pytest.mark.asyncio
+async def test_lifespan_cancels_approval_expiry_scanner(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AGENTBRIDGE_FAKE_RUNTIME", "1")
+    monkeypatch.setenv("APPROVAL_EXPIRY_SCAN_INTERVAL_SECONDS", "0.01")
+    from testing.app_factory import create_test_app
+
+    second_scan = asyncio.Event()
+    scan_calls = 0
+
+    async def _scan(self, *, now, limit=100):
+        nonlocal scan_calls
+        scan_calls += 1
+        if scan_calls >= 2:
+            second_scan.set()
+        return 0
+
+    monkeypatch.setattr(RunLifecycle, "expire_pending_approvals", _scan)
+    original_create_task = asyncio.create_task
+    scanner_tasks: list[asyncio.Task] = []
+
+    def _capture_task(coro, *args, **kwargs):
+        task = original_create_task(coro, *args, **kwargs)
+        code = getattr(coro, "cr_code", None)
+        if code is not None and code.co_name == "_approval_expiry_loop":
+            scanner_tasks.append(task)
+        return task
+
+    monkeypatch.setattr(asyncio, "create_task", _capture_task)
+    app = create_test_app()
+
+    async with app.router.lifespan_context(app):
+        await asyncio.wait_for(second_scan.wait(), timeout=1)
+        assert len(scanner_tasks) == 1
+        assert not scanner_tasks[0].done()
+
+    assert scan_calls >= 2
+    assert scanner_tasks[0].done()
+    assert scanner_tasks[0].cancelled()

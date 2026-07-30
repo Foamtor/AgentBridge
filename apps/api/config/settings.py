@@ -36,6 +36,11 @@ class Settings(BaseSettings):
     approval_execution_lease_seconds: float = Field(
         default=60.0, validation_alias="APPROVAL_EXECUTION_LEASE_SECONDS"
     )
+    approval_expiry_scan_interval_seconds: float = Field(
+        default=30.0,
+        gt=0,
+        validation_alias="APPROVAL_EXPIRY_SCAN_INTERVAL_SECONDS",
+    )
     fake_runtime: bool = Field(default=False, validation_alias="AGENTBRIDGE_FAKE_RUNTIME")
     hooks_backend: str = Field(default="noop", validation_alias="HOOKS_BACKEND")
     rate_limit_per_minute: int = Field(

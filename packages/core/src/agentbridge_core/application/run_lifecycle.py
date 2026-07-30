@@ -6,7 +6,7 @@ import asyncio
 import logging
 import uuid
 from contextlib import nullcontext
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from agentbridge_core.application.graph_config import build_graph_config
@@ -59,6 +59,11 @@ def _public_run_error(exc: Exception) -> tuple[str, str]:
 
 class EventLogAppendError(Exception):
     """Raised when EventLog.append fails; callers must not emit the failed event."""
+
+
+class _ApprovalTransition:
+    def __init__(self) -> None:
+        self.happened = False
 
 
 class RunLifecycle:
@@ -668,6 +673,7 @@ class RunLifecycle:
         ):
             raise ValueError("invalid_approval_action")
         timeout_seconds = float(data.get("timeout_seconds") or 30.0)
+        now = datetime.now(timezone.utc)
         approval_id = await self._approval_store.create(
             {
                 "tenant_id": tenant_id,
@@ -682,6 +688,8 @@ class RunLifecycle:
                 "action": action,
                 "requester_context": _approval_requester_snapshot(requester_ctx),
                 "timeout_seconds": timeout_seconds,
+                "approval_expires_at": now
+                + timedelta(seconds=timeout_seconds),
                 "status": "pending",
             }
         )
@@ -729,6 +737,31 @@ class RunLifecycle:
         except Exception:
             logger.exception("approval timeout handler failed id=%s", approval_id)
 
+    async def expire_pending_approvals(
+        self, *, now: datetime, limit: int = 100
+    ) -> int:
+        """Deny persisted pending approvals whose deadline has elapsed."""
+        if self._approval_store is None:
+            return 0
+        expired = await self._approval_store.list_expired_pending(
+            now=now, limit=limit
+        )
+        transitioned = 0
+        for record in expired:
+            transition = _ApprovalTransition()
+            await self.finalize_approval(
+                approval_id=str(record["approval_id"]),
+                tenant_id=str(record["tenant_id"]),
+                decision="deny",
+                reason="timeout",
+                sink=None,
+                _pending_only=True,
+                _transition=transition,
+            )
+            if transition.happened:
+                transitioned += 1
+        return transitioned
+
     async def finalize_approval(
         self,
         *,
@@ -738,6 +771,8 @@ class RunLifecycle:
         sink: EventSink | None,
         reason: str | None = None,
         approver_ctx: RunContext | None = None,
+        _pending_only: bool = False,
+        _transition: _ApprovalTransition | None = None,
     ) -> dict[str, Any]:
         """Resolve pending approval (approve/deny/timeout); re-acquire storage_key.
 
@@ -749,6 +784,8 @@ class RunLifecycle:
         rec = await self._approval_store.get(approval_id, tenant_id=tenant_id)
         if rec is None:
             raise RunNotFound(approval_id)
+        if _pending_only and rec.get("status") != "pending":
+            return rec
         if rec.get("action") is not None:
             return await self._finalize_action_approval(
                 rec=rec,
@@ -758,6 +795,7 @@ class RunLifecycle:
                 sink=sink,
                 reason=reason,
                 approver_ctx=approver_ctx,
+                transition=_transition,
             )
         if rec.get("status") != "pending":
             return rec
@@ -795,6 +833,8 @@ class RunLifecycle:
                     approval_id, tenant_id=tenant_id
                 )
                 return existing or rec
+            if _transition is not None:
+                _transition.happened = True
             sequence += 1
             resolved = build_extension_event(
                 "x.bridge.approval_resolved",
@@ -870,6 +910,7 @@ class RunLifecycle:
         sink: EventSink | None,
         reason: str | None,
         approver_ctx: RunContext | None,
+        transition: _ApprovalTransition | None,
     ) -> dict[str, Any]:
         """Resolve and execute a persisted action without rebuilding its payload."""
         assert self._approval_store is not None
@@ -935,6 +976,8 @@ class RunLifecycle:
                         )
                         or rec
                     )
+                if transition is not None:
+                    transition.happened = True
                 rec = updated
                 if decision != "approve":
                     sequence = await self._next_approval_sequence(
