@@ -933,6 +933,7 @@ class RunLifecycle:
             )
             if claimed is None:
                 return await self._approval_store.get(approval_id, tenant_id=tenant_id) or rec
+            execution_token = claimed["execution_token"]
             try:
                 fragments = await self._approval_executor.execute(
                     route=route,
@@ -941,7 +942,12 @@ class RunLifecycle:
                     approval_id=approval_id,
                 )
             except Exception as exc:  # noqa: BLE001
-                await self._approval_store.mark_retryable_failed(approval_id, tenant_id=tenant_id, error=str(exc))
+                await self._approval_store.mark_retryable_failed(
+                    approval_id,
+                    tenant_id=tenant_id,
+                    execution_token=execution_token,
+                    error=str(exc),
+                )
                 sequence += 1
                 await self._emit(out_sink, build_event("error", run_id=run_id, sequence=sequence, trace_id=trace_id, data={"code": "approval_execution_failed", "message": str(exc)}), tenant_id=tenant_id)
                 sequence += 1
@@ -950,6 +956,7 @@ class RunLifecycle:
             updated = await self._approval_store.mark_succeeded(
                 approval_id,
                 tenant_id=tenant_id,
+                execution_token=execution_token,
                 result={"fragments": [{"type": item.type, "data": item.data} for item in fragments]},
             )
             try:

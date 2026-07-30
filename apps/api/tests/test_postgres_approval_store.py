@@ -72,6 +72,7 @@ async def test_postgres_store_recovers_expired_execution_after_new_instance() ->
             approval_id, tenant_id="acme", now=t0 + timedelta(seconds=2)
         )
         assert recovered and recovered["status"] == "retryable_failed"
+        assert recovered["execution_token"] is None
         new = await second.claim_execution(
             approval_id,
             tenant_id="acme",
@@ -79,6 +80,15 @@ async def test_postgres_store_recovers_expired_execution_after_new_instance() ->
             lease_seconds=1,
         )
         assert new and new["execution_token"] != old["execution_token"]
+        assert (
+            await second.mark_retryable_failed(
+                approval_id,
+                tenant_id="acme",
+                execution_token=old["execution_token"],
+                error="old worker failed",
+            )
+            is None
+        )
         assert (
             await second.mark_succeeded(
                 approval_id,
