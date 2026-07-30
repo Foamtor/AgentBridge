@@ -519,6 +519,56 @@ async def test_create_rejects_fixed_embedding_contract_before_external_io(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
+    ("model", "dimensions"),
+    [
+        ("other-512-model", 512),
+        ("BAAI/bge-m3", 1024),
+    ],
+)
+async def test_create_rejects_fixed_contract_before_owned_resource_construction(
+    model: str,
+    dimensions: int,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import asyncpg
+    from adapters import rag_agent_pg_retriever as adapter_module
+
+    calls = {"pool": 0, "client": 0}
+
+    class CreatedPool:
+        async def close(self) -> None:
+            return None
+
+    class CreatedClient:
+        def __init__(self) -> None:
+            calls["client"] += 1
+
+        async def aclose(self) -> None:
+            return None
+
+    async def _create_pool(*, dsn: str) -> CreatedPool:
+        calls["pool"] += 1
+        return CreatedPool()
+
+    monkeypatch.setattr(asyncpg, "create_pool", _create_pool)
+    monkeypatch.setattr(adapter_module.httpx, "AsyncClient", CreatedClient)
+
+    with pytest.raises(KnowledgeBackendUnavailable) as captured:
+        await RagAgentPgRetriever.create(
+            dsn="postgresql://admin:secret@db/rag",
+            demo_tenant="rag-agent-demo",
+            embed_api_base="http://unused/v1",
+            embed_api_key="credential-secret",
+            embed_model=model,
+            embed_dimensions=dimensions,
+        )
+
+    assert str(captured.value) == PUBLIC_ERROR
+    assert calls == {"pool": 0, "client": 0}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
     "payload",
     [
         [],

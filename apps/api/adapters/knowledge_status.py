@@ -70,7 +70,17 @@ class KnowledgeStatusProvider:
         probe = getattr(self._retriever, "health_check", None)
         if not callable(probe):
             return {"status": "fail", "message": "retriever has no health_check"}
-        result = await probe()
+        try:
+            result = await probe()
+        except Exception as exc:  # noqa: BLE001 - sanitize dependency failures
+            logger.warning(
+                "knowledge retriever health probe failed error_type=%s",
+                type(exc).__name__,
+            )
+            return {
+                "status": "fail",
+                "message": "knowledge backend unavailable",
+            }
         if not isinstance(result, dict):
             return {"status": "fail", "message": "invalid health_check result"}
         return result
