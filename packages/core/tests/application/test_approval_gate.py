@@ -559,6 +559,7 @@ async def test_retryable_action_failure_then_success_has_monotonic_events_and_on
     assert any(event["type"] == "x.example.created" for event in logged)
     succeeded_run = await runs.get(run_id, tenant_id="acme")
     assert succeeded_run and succeeded_run["status"] == "done"
+    assert succeeded_run.get("error") is None
     projected = await messages.list_messages("acme", "t-action-retry")
     assert [message["role"] for message in projected] == ["user", "assistant"]
 
@@ -969,3 +970,193 @@ async def test_result_delivery_failure_projects_success_and_preserves_safe_run_e
     assert run["result_delivery_error"] == "approved action result delivery failed"
     projected = await messages.list_messages("acme", "t-delivery-error")
     assert [message["role"] for message in projected] == ["user", "assistant"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure_point", ["assistant_append", "run_upsert"])
+async def test_terminal_projection_repairs_partial_writes_without_duplicates(
+    graphs, tools, queue_and_sink, drain_events, failure_point
+) -> None:
+    class FailOnceMessageStore(MemoryMessageStore):
+        failed = False
+
+        async def append_message(self, tenant_id, thread_id, message):
+            if (
+                failure_point == "assistant_append"
+                and message["role"] == "assistant"
+                and not self.failed
+            ):
+                self.failed = True
+                raise RuntimeError("assistant projection unavailable")
+            await super().append_message(tenant_id, thread_id, message)
+
+    class FailOnceRunStore(MemoryRunStore):
+        failed = False
+
+        async def upsert(self, run):
+            if (
+                failure_point == "run_upsert"
+                and run.get("status") == "done"
+                and not self.failed
+            ):
+                self.failed = True
+                raise RuntimeError("run projection unavailable")
+            await super().upsert(run)
+
+    approvals = MemoryApprovalStore()
+    messages = FailOnceMessageStore()
+    runs = FailOnceRunStore()
+    queue, sink = queue_and_sink
+    lifecycle = _lc(
+        graphs=graphs,
+        tools=tools,
+        runtime=_ActionRuntime(),
+        approval_store=approvals,
+        approval_executor=_ScriptedExecutor(
+            [[OutboundFragment(type="x.example.created", data={"id": 1})]]
+        ),
+        policy=RolePolicyEngine(),
+        event_log=MemoryEventLog(),
+        run_store=runs,
+        message_store=messages,
+    )
+    approval_id, run_id = await _start_action(
+        lifecycle,
+        queue=queue,
+        sink=sink,
+        drain_events=drain_events,
+        thread_id=f"t-projection-repair-{failure_point}",
+    )
+    approver = RunContext(
+        tenant_id="acme", permissions=["approval:decide"]
+    )
+
+    with pytest.raises(RuntimeError, match="projection unavailable"):
+        await lifecycle.finalize_approval(
+            approval_id=approval_id,
+            tenant_id="acme",
+            decision="approve",
+            sink=_CapturingSink(),  # type: ignore[arg-type]
+            approver_ctx=approver,
+        )
+
+    partial = await messages.list_messages(
+        "acme", f"t-projection-repair-{failure_point}"
+    )
+    if failure_point == "assistant_append":
+        assert [message["role"] for message in partial] == ["user"]
+    else:
+        assert [message["role"] for message in partial] == [
+            "user",
+            "assistant",
+        ]
+    stored = await approvals.get(approval_id, tenant_id="acme")
+    assert stored and stored["status"] == "succeeded"
+
+    repaired = await lifecycle.finalize_approval(
+        approval_id=approval_id,
+        tenant_id="acme",
+        decision="approve",
+        sink=_CapturingSink(),  # type: ignore[arg-type]
+        approver_ctx=approver,
+    )
+
+    assert repaired["status"] == "succeeded"
+    projected = await messages.list_messages(
+        "acme", f"t-projection-repair-{failure_point}"
+    )
+    assert [message["role"] for message in projected] == ["user", "assistant"]
+    run = await runs.get(run_id, tenant_id="acme")
+    assert run and run["status"] == "done"
+    assert run.get("error") is None
+
+
+@pytest.mark.asyncio
+async def test_result_delivery_diagnostic_precedes_repairable_projection(
+    graphs, tools, queue_and_sink, drain_events
+) -> None:
+    class ToggleEventLog(MemoryEventLog):
+        fail_appends = False
+
+        async def append(self, run_id, event, *, tenant_id):
+            if self.fail_appends:
+                raise RuntimeError("postgresql://admin:secret@db/private")
+            await super().append(run_id, event, tenant_id=tenant_id)
+
+    class FailAssistantOnceStore(MemoryMessageStore):
+        failed = False
+
+        async def append_message(self, tenant_id, thread_id, message):
+            if message["role"] == "assistant" and not self.failed:
+                self.failed = True
+                raise RuntimeError("assistant projection unavailable")
+            await super().append_message(tenant_id, thread_id, message)
+
+    approvals = MemoryApprovalStore()
+    event_log = ToggleEventLog()
+    messages = FailAssistantOnceStore()
+    runs = MemoryRunStore()
+    queue, sink = queue_and_sink
+    lifecycle = _lc(
+        graphs=graphs,
+        tools=tools,
+        runtime=_ActionRuntime(),
+        approval_store=approvals,
+        approval_executor=_ScriptedExecutor(
+            [[OutboundFragment(type="x.example.created", data={"id": 1})]]
+        ),
+        policy=RolePolicyEngine(),
+        event_log=event_log,
+        run_store=runs,
+        message_store=messages,
+    )
+    approval_id, run_id = await _start_action(
+        lifecycle,
+        queue=queue,
+        sink=sink,
+        drain_events=drain_events,
+        thread_id="t-delivery-projection-repair",
+    )
+    event_log.fail_appends = True
+    approver = RunContext(
+        tenant_id="acme", permissions=["approval:decide"]
+    )
+
+    with pytest.raises(RuntimeError, match="assistant projection unavailable"):
+        await lifecycle.finalize_approval(
+            approval_id=approval_id,
+            tenant_id="acme",
+            decision="approve",
+            sink=_CapturingSink(),  # type: ignore[arg-type]
+            approver_ctx=approver,
+        )
+
+    diagnostic_run = await runs.get(run_id, tenant_id="acme")
+    assert diagnostic_run and diagnostic_run["status"] == "done"
+    assert (
+        diagnostic_run["result_delivery_error"]
+        == "approved action result delivery failed"
+    )
+    assert [message["role"] for message in await messages.list_messages(
+        "acme", "t-delivery-projection-repair"
+    )] == ["user"]
+
+    repaired = await lifecycle.finalize_approval(
+        approval_id=approval_id,
+        tenant_id="acme",
+        decision="approve",
+        sink=_CapturingSink(),  # type: ignore[arg-type]
+        approver_ctx=approver,
+    )
+
+    assert repaired["status"] == "succeeded"
+    projected = await messages.list_messages(
+        "acme", "t-delivery-projection-repair"
+    )
+    assert [message["role"] for message in projected] == ["user", "assistant"]
+    final_run = await runs.get(run_id, tenant_id="acme")
+    assert final_run and final_run["status"] == "done"
+    assert (
+        final_run["result_delivery_error"]
+        == "approved action result delivery failed"
+    )

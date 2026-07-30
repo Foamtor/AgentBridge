@@ -50,6 +50,39 @@ def test_postgres_approval_store_can_be_constructed() -> None:
     not os.environ.get("AGENTBRIDGE_TEST_PG_DSN"),
     reason="AGENTBRIDGE_TEST_PG_DSN not set",
 )
+async def test_postgres_store_persists_projection_query() -> None:
+    from adapters.postgres_approval_store import PostgresApprovalStore
+
+    dsn = os.environ["AGENTBRIDGE_TEST_PG_DSN"]
+    await _apply_approval_migration(dsn)
+    await _reset_approval_records(dsn)
+    store = PostgresApprovalStore(dsn)
+    approval_id = f"test-{uuid.uuid4().hex}"
+    try:
+        await store.create(
+            {
+                "approval_id": approval_id,
+                "tenant_id": "acme",
+                "run_id": "r-query",
+                "thread_id": "t-query",
+                "storage_key": "acme::t-query",
+                "sequence": 2,
+                "query": "the exact user request",
+            }
+        )
+
+        stored = await store.get(approval_id, tenant_id="acme")
+
+        assert stored and stored["query"] == "the exact user request"
+    finally:
+        await store.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    not os.environ.get("AGENTBRIDGE_TEST_PG_DSN"),
+    reason="AGENTBRIDGE_TEST_PG_DSN not set",
+)
 async def test_postgres_store_recovers_expired_execution_after_new_instance() -> None:
     from adapters.postgres_approval_store import PostgresApprovalStore
 

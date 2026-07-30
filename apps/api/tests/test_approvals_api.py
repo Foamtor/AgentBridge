@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 
 import pytest
+from agentbridge_core.errors import ApprovalStateConflict
 from fastapi.testclient import TestClient
 
 
@@ -83,3 +84,74 @@ def test_chat_injects_token_map(client: TestClient) -> None:
     )
     assert r.status_code == 200
     assert isinstance(seen["ctx"].metadata.get("token_map"), dict)
+
+
+def test_approval_response_exposes_only_safe_allowlisted_fields(
+    client: TestClient,
+) -> None:
+    secret = "postgresql://admin:secret@db/private SELECT password"
+
+    async def _finalize(**kwargs):
+        return {
+            "approval_id": kwargs["approval_id"],
+            "status": "retryable_failed",
+            "decision": "approve",
+            "reason": None,
+            "run_id": "r-safe",
+            "thread_id": "t-safe",
+            "result": {"ok": False},
+            "action": {"type": "example.write_v1", "payload": {"secret": secret}},
+            "requester_context": {"token": secret},
+            "execution_token": secret,
+            "execution_lease_expires_at": secret,
+            "error": secret,
+            "result_delivery_error": secret,
+        }
+
+    client.app.state.run_lifecycle.finalize_approval = _finalize
+    response = client.post(
+        "/approvals/ap-safe",
+        json={"decision": "approve"},
+    )
+
+    assert response.status_code == 200
+    approval = response.json()["approval"]
+    assert set(approval) <= {
+        "approval_id",
+        "status",
+        "decision",
+        "reason",
+        "run_id",
+        "thread_id",
+        "result",
+    }
+    for forbidden in (
+        "action",
+        "requester_context",
+        "execution_token",
+        "execution_lease_expires_at",
+        "error",
+        "result_delivery_error",
+    ):
+        assert forbidden not in approval
+    assert secret not in response.text
+
+
+def test_executing_approval_conflict_is_stable_409(client: TestClient) -> None:
+    async def _conflict(**kwargs):
+        raise ApprovalStateConflict("raw internal conflict detail")
+
+    client.app.state.run_lifecycle.finalize_approval = _conflict
+    response = client.post(
+        "/approvals/ap-executing",
+        json={"decision": "deny"},
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "detail": {
+            "code": "approval_state_conflict",
+            "message": "approval is executing",
+        }
+    }
+    assert "raw internal conflict detail" not in response.text
