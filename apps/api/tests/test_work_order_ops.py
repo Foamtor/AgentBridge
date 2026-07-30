@@ -188,11 +188,9 @@ def test_work_order_ops_retriever_failure_is_not_an_empty_hit(
             },
         )
     events = _events(response.text)
-    assert any(
-        event["type"] == "error"
-        and "知识暂不可用" in event["data"]["message"]
-        for event in events
-    )
+    error = next(event for event in events if event["type"] == "error")
+    assert error["data"] == {"code": "run_failed", "message": "run failed"}
+    assert "知识暂不可用" not in response.text
     assert not any(event["type"] == "x.bridge.citation" for event in events)
 
 

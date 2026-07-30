@@ -17,6 +17,14 @@ class RunNotFound(Exception):
     """Raised when cancel targets a missing run."""
 
 
+class ApprovalStateConflict(RuntimeError):
+    """Raised when an approval decision conflicts with active execution."""
+
+
+class KnowledgeBackendUnavailable(RuntimeError):
+    """Raised when the configured knowledge dependency is unavailable."""
+
+
 class InvalidInput(Exception):
     """Raised when InputValidator rejects the query."""
 
