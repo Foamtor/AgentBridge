@@ -208,13 +208,14 @@ EventLog 仍保持 append-before-SSE。领取序号成功但 EventLog append 失
 
 ### 7.3 终端投影
 
-action 与 legacy 审批共享一个终端收尾函数。下列路径都必须更新 RunStore 和 MessageStore：
+action 与 legacy 审批共享一个终端收尾函数。审批进入不可再执行的终态时更新 RunStore 和 MessageStore：
 
 - deny / timeout → `done`
 - 请求人或审批人权限复检失败 → `done`，业务 skipped
-- executor 异常 → `error`
 - executor 成功 → `done`
 - 业务成功但结果事件投递失败 → Run 状态仍为 `done`，同时增加 `result_delivery_error`，不得重新执行业务动作
+
+executor 异常进入 `retryable_failed` 时，RunStore 更新为 `error` 并保留可重试审批引用，但暂不写最终会话消息；随后成功或 deny 时只投影一次最终用户/助手消息，避免同一 run 在重试过程中重复追加消息。
 
 ### 7.4 决策转换
 
