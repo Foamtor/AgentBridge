@@ -366,3 +366,11 @@ cancel_run(lifecycle, *, thread_id, run_id=None)
 - M2a+：Policy 过滤 tool list（`list_tools`）+ 执行期再检（`invoke_tool`）  
 - M2b+：emit 路径 **append-before-emit** 写 EventLog  
 - M5+：`LLM_BACKEND=direct|gateway`（见完整方案 §5.2）
+# Domain extension contracts
+
+`x.*` events use the standard AgentBridge envelope and sequence. Consumers
+must sort and deduplicate by `sequence` and ignore unknown extension types.
+The non-normative schema examples for the golden reference are documented in
+[`apps/api/domains/work_order_ops/README.md`](../apps/api/domains/work_order_ops/README.md).
+Older clients may ignore `x.work_order_ops.*` while continuing to process
+stable `start`, `error`, and `done` events.

@@ -78,3 +78,11 @@ EMBED_DIMENSIONS=1024
 
 **Q：客户已有 RAG？**  
 用 `KNOWLEDGE_BACKEND=external` + `KB_EXTERNAL_BASE_URL`。对接字段以代码适配器与 `.env.example` 为准；历史协议稿若缺失，以完整方案与实现为准。
+# Work-order RAG reference
+
+The `work_order_ops` golden case combines tenant-scoped business data with SOP
+and FAQ retrieval. With `KB_EXTERNAL_FAILURE_POLICY=fail_run`, external
+timeouts and 5xx responses are dependency failures and must reach a stable
+error path; only a successful `200` response with `hits: []` means “no
+knowledge match.” See
+[`apps/api/domains/work_order_ops/README.md`](../apps/api/domains/work_order_ops/README.md).

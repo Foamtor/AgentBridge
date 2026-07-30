@@ -59,3 +59,10 @@
 - 不同业务插件之间默认不要互相 import
 - 核心库的 `application` 不能 import 业务代码；核心源码里不能写死业务名（例如 `demo_tools`）
 - 图自己的 recursion_limit 等配置写在业务的 `graph.py`，不要塞进 HTTP 路由层
+# Approval actions
+
+Register approved writes by the pair `(route, action.type)`, validate the
+versioned payload before preview and again before execution, and use
+`approval_id` as the business idempotency key. Domain bootstrap code depends
+on `ApprovalActionRegistrar`; it must not import the host registry adapter.
+Approved handlers return `OutboundFragment` values and never emit SSE directly.
