@@ -120,7 +120,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     graphs = GraphRegistry()
     tools = ToolRegistry()
     input_builders = InputBuilderRegistry()
-    register_all(graphs, tools, input_builders)
 
     checkpointers: Any
     if settings.use_memory_checkpointer:
@@ -172,7 +171,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         retriever,
         ingest_jobs=ingest_job_store,
     )
-    data_source = _build_data_source(settings)
+    data_source = getattr(app.state, "bootstrap_data_source", None) or _build_data_source(settings)
+    register_all(graphs, tools, input_builders, approval_actions=approval_actions, data_source=data_source)
     llm_gateway = _build_llm_gateway(settings)
     from adapters.prometheus_metrics import PrometheusMetrics
     from observability.tracing import make_run_span_factory
