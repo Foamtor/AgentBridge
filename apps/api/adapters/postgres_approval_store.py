@@ -32,10 +32,11 @@ class PostgresApprovalStore:
         sql = """
             INSERT INTO approval_records (
                 approval_id, tenant_id, route, run_id, thread_id, storage_key,
-                sequence, status, action, requester_context, last_sequence,
-                approval_expires_at
+                query, sequence, status, action, requester_context,
+                last_sequence, approval_expires_at
             ) VALUES (
-                $1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb, $11, $12
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb,
+                $11::jsonb, $12, $13
             )
         """
         pool = await self._ensure_pool()
@@ -48,6 +49,7 @@ class PostgresApprovalStore:
                 record.get("run_id"),
                 record.get("thread_id"),
                 record.get("storage_key"),
+                record.get("query"),
                 record.get("sequence"),
                 record.get("status", "pending"),
                 _json_value(record.get("action")),

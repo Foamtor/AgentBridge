@@ -230,6 +230,16 @@ class RunLifecycle:
         terminal: str,
         result_delivery_error: str | None = None,
     ) -> None:
+        if result_delivery_error is not None and self._run_store is not None:
+            await self._run_store.upsert(
+                {
+                    "run_id": str(rec["run_id"]),
+                    "tenant_id": str(rec["tenant_id"]),
+                    "thread_id": str(rec["thread_id"]),
+                    "status": terminal,
+                    "result_delivery_error": result_delivery_error,
+                }
+            )
         if (
             self._event_log is not None
             and self._message_store is not None
@@ -244,16 +254,6 @@ class RunLifecycle:
                 run_id=str(rec["run_id"]),
                 query=str(rec.get("query") or ""),
                 terminal=terminal,
-            )
-        if result_delivery_error is not None and self._run_store is not None:
-            await self._run_store.upsert(
-                {
-                    "run_id": str(rec["run_id"]),
-                    "tenant_id": str(rec["tenant_id"]),
-                    "thread_id": str(rec["thread_id"]),
-                    "status": terminal,
-                    "result_delivery_error": result_delivery_error,
-                }
             )
 
     async def start_stream(
@@ -978,6 +978,16 @@ class RunLifecycle:
                     )
                     return rec
             elif status not in {"approved_pending_execution", "retryable_failed"}:
+                if status in {"denied", "succeeded"}:
+                    await self._project_action_terminal(
+                        rec=rec,
+                        terminal="done",
+                        result_delivery_error=(
+                            "approved action result delivery failed"
+                            if rec.get("result_delivery_error")
+                            else None
+                        ),
+                    )
                 return rec
 
             if decision != "approve":
