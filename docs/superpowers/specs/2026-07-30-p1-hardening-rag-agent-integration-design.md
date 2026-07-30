@@ -282,10 +282,13 @@ async def list_expired_pending(
 
 ### 9.3 完成门禁
 
+仓库当前存在本次范围外的历史 Ruff 债务；本阶段要求所有改动文件通过
+Ruff，同时保留全量测试和架构扫描作为仓库级门禁。
+
 ```powershell
 $env:KNOWLEDGE_BACKEND='fake'
 python -m pytest packages/core/tests apps/api/tests -q
-python -m ruff check packages/core/src apps/api
+# Ruff 的逐文件完整命令见实施计划 Task 9 Step 5。
 python -c "from importlinter.cli import lint_imports; raise SystemExit(lint_imports())"
 python scripts/import_scan_core.py
 python scripts/import_scan_rag_engines.py
