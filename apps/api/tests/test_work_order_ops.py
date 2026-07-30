@@ -409,6 +409,213 @@ def test_natural_language_draft_uses_only_guarded_prepare_tool(
     }
 
 
+def test_same_thread_read_turn_does_not_reuse_stale_results_or_draft(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = "work-order-current-turn-read"
+    _configure_real_runtime_auth(monkeypatch, secret=secret)
+    from testing.app_factory import create_test_app
+
+    source = FakeDataSource()
+    source.seed(
+        "assignees",
+        [
+            {
+                "id": "assignee-rag-demo",
+                "tenant_id": "rag-agent-demo",
+                "active": True,
+            }
+        ],
+    )
+    source.seed(
+        "work_orders",
+        [
+            {
+                "id": "WO-OLD",
+                "tenant_id": "rag-agent-demo",
+                "title": "旧工单",
+                "status": "open",
+                "priority": "low",
+                "assignee_id": "assignee-rag-demo",
+            }
+        ],
+    )
+    retriever = FakeRetriever()
+    import asyncio
+
+    asyncio.run(
+        retriever.ingest(
+            [
+                {
+                    "chunk_id": "stale-citation",
+                    "doc_id": "stale-doc",
+                    "text": "创建工单 演示知识",
+                }
+            ],
+            tenant_id="rag-agent-demo",
+        )
+    )
+    app = create_test_app()
+    app.state.bootstrap_data_source = source
+    create_headers = {
+        "Authorization": (
+            f"Bearer {_token(secret, permissions=ALL_WORK_ORDER_PERMISSIONS)}"
+        )
+    }
+    read_headers = {
+        "Authorization": (f"Bearer {_token(secret, permissions=['workorder:read'])}")
+    }
+    with TestClient(app) as client:
+        client.app.state.retriever = retriever
+        first = client.post(
+            "/chat/stream",
+            headers=create_headers,
+            json={
+                "query": "创建工单",
+                "thread_id": "wo-current-turn-read",
+                "route": "work_order_ops",
+                "extra": {
+                    "work_order_draft": {
+                        "title": "首轮草稿",
+                        "priority": "medium",
+                        "assignee_id": "assignee-rag-demo",
+                        "ledger_summary": "首轮草稿台账",
+                    }
+                },
+            },
+        )
+        assert "x.bridge.approval_required" in _event_types(first.text)
+        first_citation = next(
+            event
+            for event in _events(first.text)
+            if event["type"] == "x.bridge.citation"
+        )
+        assert first_citation["data"]["citations"][0]["chunk_id"] == "stale-citation"
+
+        source.seed(
+            "work_orders",
+            [
+                {
+                    "id": "WO-CURRENT",
+                    "tenant_id": "rag-agent-demo",
+                    "title": "当前工单",
+                    "status": "closed",
+                    "priority": "high",
+                    "assignee_id": "assignee-rag-demo",
+                }
+            ],
+        )
+        second = client.post(
+            "/chat/stream",
+            headers=read_headers,
+            json={
+                "query": "show work orders",
+                "thread_id": "wo-current-turn-read",
+                "route": "work_order_ops",
+            },
+        )
+
+    second_events = _events(second.text)
+    listing = next(
+        event for event in second_events if event["type"] == "x.work_order_ops.list"
+    )
+    citation = next(
+        event for event in second_events if event["type"] == "x.bridge.citation"
+    )
+    assert [row["id"] for row in listing["data"]["rows"]] == ["WO-CURRENT"]
+    assert citation["data"]["citations"] == []
+    assert "x.work_order_ops.ledger_preview" not in _event_types(second.text)
+    assert "x.bridge.approval_required" not in _event_types(second.text)
+
+
+def test_same_thread_fresh_authorized_draft_uses_current_tool_result(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = "work-order-current-turn-draft"
+    _configure_real_runtime_auth(monkeypatch, secret=secret)
+    from testing.app_factory import create_test_app
+
+    source = FakeDataSource()
+    source.seed(
+        "assignees",
+        [
+            {
+                "id": "assignee-rag-demo",
+                "tenant_id": "rag-agent-demo",
+                "active": True,
+            }
+        ],
+    )
+    app = create_test_app()
+    app.state.bootstrap_data_source = source
+    headers = {
+        "Authorization": (
+            f"Bearer {_token(secret, permissions=ALL_WORK_ORDER_PERMISSIONS)}"
+        )
+    }
+
+    def request(title: str, ledger_summary: str) -> dict[str, Any]:
+        return {
+            "query": "创建工单",
+            "thread_id": "wo-current-turn-draft",
+            "route": "work_order_ops",
+            "extra": {
+                "work_order_draft": {
+                    "title": title,
+                    "priority": "high",
+                    "assignee_id": "assignee-rag-demo",
+                    "ledger_summary": ledger_summary,
+                }
+            },
+        }
+
+    with TestClient(app) as client:
+        first = client.post(
+            "/chat/stream",
+            headers=headers,
+            json=request("首轮园区告警", "首轮园区告警台账"),
+        )
+        second = client.post(
+            "/chat/stream",
+            headers=headers,
+            json=request("本轮温室告警", "本轮温室告警台账"),
+        )
+
+    first_action = next(
+        event
+        for event in _events(first.text)
+        if event["type"] == "x.bridge.approval_required"
+    )["data"]["action"]
+    second_action = next(
+        event
+        for event in _events(second.text)
+        if event["type"] == "x.bridge.approval_required"
+    )["data"]["action"]
+    assert first_action["payload"]["title"] == "首轮园区告警"
+    assert second_action["payload"] == {
+        "draft_id": second_action["payload"]["draft_id"],
+        "title": "本轮温室告警",
+        "priority": "high",
+        "assignee_id": "assignee-rag-demo",
+        "ledger_summary": "本轮温室告警台账",
+    }
+    first_draft_calls = [
+        event["data"]["tool_call_id"]
+        for event in _events(first.text)
+        if event["type"] == "tool_call"
+        and event["data"]["name"] == "prepare_work_order_draft"
+    ]
+    second_draft_calls = [
+        event["data"]["tool_call_id"]
+        for event in _events(second.text)
+        if event["type"] == "tool_call"
+        and event["data"]["name"] == "prepare_work_order_draft"
+    ]
+    assert len(first_draft_calls) == 1
+    assert len(second_draft_calls) == 1
+    assert first_draft_calls[0] != second_draft_calls[0]
+
+
 def test_input_builder_copies_only_structured_draft() -> None:
     from domains.work_order_ops.bootstrap import register
 
@@ -650,6 +857,80 @@ def test_structured_draft_missing_priority_has_stable_error_and_no_approval(
         )
 
     assert DRAFT_VALIDATION_MESSAGE in response.text
+    assert "x.bridge.approval_required" not in _event_types(response.text)
+    assert not any(
+        event["type"] == "tool_result"
+        and event["data"]["name"] == "prepare_work_order_draft"
+        for event in _events(response.text)
+    )
+    assert "validation error" not in response.text.lower()
+    assert "field required" not in response.text.lower()
+    assert "type=missing" not in response.text.lower()
+    assert "input_value" not in response.text.lower()
+
+
+@pytest.mark.parametrize("path", ["read", "draft"])
+def test_backend_query_errors_are_sanitized_in_every_sse_frame(
+    monkeypatch: pytest.MonkeyPatch,
+    path: str,
+) -> None:
+    secret = f"work-order-backend-sanitize-{path}"
+    _configure_real_runtime_auth(monkeypatch, secret=secret)
+    from testing.app_factory import create_test_app
+
+    class FailingDataSource(FakeDataSource):
+        async def query(self, sql: str, *params: Any) -> list[dict[str, Any]]:
+            raise RuntimeError(
+                f"secret-marker postgresql://demo:password@db SQL={sql} params={params}"
+            )
+
+    app = create_test_app()
+    app.state.bootstrap_data_source = FailingDataSource()
+    if path == "read":
+        permissions = ["workorder:read"]
+        body: dict[str, Any] = {
+            "query": "show work orders",
+            "thread_id": "wo-backend-sanitize-read",
+            "route": "work_order_ops",
+        }
+        expected_summaries = {"work order data unavailable"}
+    else:
+        permissions = ["workorder:create", "workorder:assign"]
+        body = {
+            "query": "创建工单",
+            "thread_id": "wo-backend-sanitize-draft",
+            "route": "work_order_ops",
+            "extra": {
+                "work_order_draft": {
+                    "title": "园区网络告警",
+                    "priority": "high",
+                    "assignee_id": "assignee-rag-demo",
+                    "ledger_summary": "用户报告园区网络中断，需立即排查",
+                }
+            },
+        }
+        expected_summaries = {"work order draft validation failed"}
+    headers = {"Authorization": f"Bearer {_token(secret, permissions=permissions)}"}
+
+    with TestClient(app) as client:
+        response = client.post("/chat/stream", headers=headers, json=body)
+
+    lowered = response.text.lower()
+    for unsafe in (
+        "secret-marker",
+        "postgresql://",
+        "password",
+        "select *",
+        "params=",
+    ):
+        assert unsafe not in lowered
+    summaries = {
+        event["data"]["summary"]
+        for event in _events(response.text)
+        if event["type"] == "tool_result" and not event["data"]["ok"]
+    }
+    assert summaries
+    assert summaries <= expected_summaries
     assert "x.bridge.approval_required" not in _event_types(response.text)
 
 

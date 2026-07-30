@@ -12,6 +12,8 @@ from langchain_core.tools import InjectedToolArg, tool
 from domains.work_order_ops.approval import CreateWorkOrderDraft
 
 SAFE_ORDER_FIELDS = ("id", "title", "status", "priority", "assignee_id")
+WORK_ORDER_DATA_ERROR = "work order data unavailable"
+WORK_ORDER_DRAFT_ERROR = "work order draft validation failed"
 
 
 def _source(config: RunnableConfig) -> tuple[Any | None, Any]:
@@ -27,9 +29,12 @@ async def list_work_orders(
     source, ctx = _source(config)
     if source is None:
         return []
-    rows = await source.query(
-        "SELECT * FROM work_orders WHERE tenant_id = $1", ctx.tenant_id
-    )
+    try:
+        rows = await source.query(
+            "SELECT * FROM work_orders WHERE tenant_id = $1", ctx.tenant_id
+        )
+    except Exception as exc:
+        raise RuntimeError(WORK_ORDER_DATA_ERROR) from exc
     return [{key: row.get(key) for key in SAFE_ORDER_FIELDS} for row in rows]
 
 
@@ -44,9 +49,12 @@ async def work_order_statistics(
     source, ctx = _source(config)
     if source is None:
         return {}
-    rows = await source.query(
-        "SELECT * FROM work_orders WHERE tenant_id = $1", ctx.tenant_id
-    )
+    try:
+        rows = await source.query(
+            "SELECT * FROM work_orders WHERE tenant_id = $1", ctx.tenant_id
+        )
+    except Exception as exc:
+        raise RuntimeError(WORK_ORDER_DATA_ERROR) from exc
     counts: dict[str, int] = {}
     for row in rows:
         key = str(row.get(dimension) or "unknown")
@@ -89,11 +97,14 @@ async def prepare_work_order_draft(
     )
     if source is None:
         raise ValueError("assignee is inactive or unavailable")
-    assignees = await source.query(
-        "SELECT * FROM assignees WHERE id = $1 AND tenant_id = $2",
-        draft.assignee_id,
-        ctx.tenant_id,
-    )
+    try:
+        assignees = await source.query(
+            "SELECT * FROM assignees WHERE id = $1 AND tenant_id = $2",
+            draft.assignee_id,
+            ctx.tenant_id,
+        )
+    except Exception as exc:
+        raise RuntimeError(WORK_ORDER_DRAFT_ERROR) from exc
     if not assignees or not assignees[0].get("active"):
         raise ValueError("assignee is inactive or unavailable")
     return draft.model_dump()

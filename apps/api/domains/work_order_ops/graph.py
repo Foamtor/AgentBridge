@@ -102,41 +102,55 @@ def _tool_name(tool: Any) -> str:
     return str(getattr(tool, "name", "") or "")
 
 
+def _run_id(config: RunnableConfig) -> str:
+    return get_run_context(config).run_id or "work-order"
+
+
 def _plan_reads(
     state: WorkOrderOpsState,
+    config: RunnableConfig,
     *,
     available_names: frozenset[str],
 ) -> dict[str, Any]:
     query = _query_text(state)
     tool_calls: list[dict[str, Any]] = []
+    call_ids: dict[str, str] = {}
+    run_id = _run_id(config)
     if "list_work_orders" in available_names:
+        call_ids["list_work_orders"] = f"tc-{run_id}-list"
         tool_calls.append(
             {
                 "name": "list_work_orders",
                 "args": {},
-                "id": "tc-work-orders-list",
+                "id": call_ids["list_work_orders"],
                 "type": "tool_call",
             }
         )
     if "work_order_statistics" in available_names:
+        call_ids["work_order_statistics"] = f"tc-{run_id}-statistics"
         tool_calls.append(
             {
                 "name": "work_order_statistics",
                 "args": {"dimension": "status"},
-                "id": "tc-work-orders-statistics",
+                "id": call_ids["work_order_statistics"],
                 "type": "tool_call",
             }
         )
     if "search_work_order_knowledge" in available_names:
+        call_ids["search_work_order_knowledge"] = f"tc-{run_id}-knowledge"
         tool_calls.append(
             {
                 "name": "search_work_order_knowledge",
                 "args": {"query": query},
-                "id": "tc-work-orders-knowledge",
+                "id": call_ids["search_work_order_knowledge"],
                 "type": "tool_call",
             }
         )
-    return {"messages": [AIMessage(content="", tool_calls=tool_calls)]}
+    return {
+        "messages": [AIMessage(content="", tool_calls=tool_calls)],
+        "current_read_call_ids": call_ids,
+        "current_draft_call_id": None,
+    }
 
 
 def _draft_call(args: dict[str, Any], *, call_id: str) -> AIMessage:
@@ -153,7 +167,7 @@ def _draft_call(args: dict[str, Any], *, call_id: str) -> AIMessage:
     )
 
 
-def _model_draft_call(response: Any) -> AIMessage | None:
+def _model_draft_args(response: Any) -> dict[str, Any] | None:
     tool_calls = getattr(response, "tool_calls", None)
     if not isinstance(tool_calls, list):
         return None
@@ -163,16 +177,20 @@ def _model_draft_call(response: Any) -> AIMessage | None:
         args = item.get("args")
         if not isinstance(args, dict):
             return None
-        call_id = item.get("id")
-        return _draft_call(
-            args,
-            call_id=(
-                str(call_id)
-                if isinstance(call_id, str) and call_id
-                else "tc-work-orders-draft-model"
-            ),
-        )
+        return dict(args)
     return None
+
+
+def _validated_draft_args(args: dict[str, Any]) -> dict[str, Any]:
+    candidate = dict(args)
+    candidate["draft_id"] = "draft-validation"
+    draft = CreateWorkOrderDraft.model_validate(candidate)
+    return {
+        "title": draft.title,
+        "priority": draft.priority,
+        "assignee_id": draft.assignee_id,
+        "ledger_summary": draft.ledger_summary,
+    }
 
 
 async def _plan_draft(
@@ -182,22 +200,38 @@ async def _plan_draft(
     draft_tool: Any | None,
 ) -> dict[str, Any]:
     if not _is_create_request(state):
-        return {"messages": [AIMessage(content="")]}
+        return {
+            "messages": [AIMessage(content="")],
+            "current_draft_call_id": None,
+        }
     if draft_tool is None:
-        return {"messages": [AIMessage(content=_CREATE_NOT_ALLOWED_MESSAGE)]}
+        return {
+            "messages": [AIMessage(content=_CREATE_NOT_ALLOWED_MESSAGE)],
+            "current_draft_call_id": None,
+        }
 
     structured = state.get("structured_draft")
     if structured is not None:
+        try:
+            args = _validated_draft_args(structured)
+        except (TypeError, ValueError):
+            return {
+                "messages": [AIMessage(content=_DRAFT_VALIDATION_MESSAGE)],
+                "current_draft_call_id": None,
+            }
+        call_id = f"tc-{_run_id(config)}-draft-structured"
         return {
-            "messages": [
-                _draft_call(structured, call_id="tc-work-orders-draft-structured")
-            ]
+            "messages": [_draft_call(args, call_id=call_id)],
+            "current_draft_call_id": call_id,
         }
 
     ctx = get_run_context(config)
     gateway = ctx.metadata.get("llm_gateway")
     if gateway is None:
-        return {"messages": [AIMessage(content=_MISSING_FIELDS_MESSAGE)]}
+        return {
+            "messages": [AIMessage(content=_MISSING_FIELDS_MESSAGE)],
+            "current_draft_call_id": None,
+        }
     response = await gateway.chat(
         [{"role": "user", "content": _query_text(state)}],
         ctx=ctx,
@@ -205,10 +239,24 @@ async def _plan_draft(
         tools=[draft_tool],
         tool_choice=_DRAFT_TOOL_NAME,
     )
-    call = _model_draft_call(response)
-    if call is None:
-        return {"messages": [AIMessage(content=_MISSING_FIELDS_MESSAGE)]}
-    return {"messages": [call]}
+    raw_args = _model_draft_args(response)
+    if raw_args is None:
+        return {
+            "messages": [AIMessage(content=_MISSING_FIELDS_MESSAGE)],
+            "current_draft_call_id": None,
+        }
+    try:
+        args = _validated_draft_args(raw_args)
+    except (TypeError, ValueError):
+        return {
+            "messages": [AIMessage(content=_DRAFT_VALIDATION_MESSAGE)],
+            "current_draft_call_id": None,
+        }
+    call_id = f"tc-{_run_id(config)}-draft-model"
+    return {
+        "messages": [_draft_call(args, call_id=call_id)],
+        "current_draft_call_id": call_id,
+    }
 
 
 def _route_draft_tools(state: WorkOrderOpsState) -> str:
@@ -234,29 +282,46 @@ def _parse_tool_content(content: Any) -> Any:
         return None
 
 
-def _tool_results(state: WorkOrderOpsState, name: str) -> list[tuple[Any, bool]]:
-    results: list[tuple[Any, bool]] = []
-    for message in state.get("messages", []):
-        if not isinstance(message, ToolMessage) or message.name != name:
+def _tool_results(
+    state: WorkOrderOpsState,
+    name: str,
+    call_id: str | None,
+) -> list[tuple[Any, bool]]:
+    if call_id is None:
+        return []
+    for message in reversed(state.get("messages", [])):
+        if (
+            not isinstance(message, ToolMessage)
+            or message.name != name
+            or message.tool_call_id != call_id
+        ):
             continue
-        results.append(
+        return [
             (
                 _parse_tool_content(message.content),
                 getattr(message, "status", "success") == "error",
             )
-        )
-    return results
+        ]
+    return []
 
 
 def _read_rows(state: WorkOrderOpsState) -> list[dict[str, Any]]:
-    for value, failed in _tool_results(state, "list_work_orders"):
+    call_id = (state.get("current_read_call_ids") or {}).get("list_work_orders")
+    for value, failed in _tool_results(state, "list_work_orders", call_id):
         if not failed and isinstance(value, list):
             return [row for row in value if isinstance(row, dict)]
     return []
 
 
 def _read_citations(state: WorkOrderOpsState) -> list[dict[str, Any]]:
-    for value, failed in _tool_results(state, "search_work_order_knowledge"):
+    call_id = (state.get("current_read_call_ids") or {}).get(
+        "search_work_order_knowledge"
+    )
+    for value, failed in _tool_results(
+        state,
+        "search_work_order_knowledge",
+        call_id,
+    ):
         if not failed and isinstance(value, list):
             return [item for item in value if isinstance(item, dict)]
     return []
@@ -265,7 +330,11 @@ def _read_citations(state: WorkOrderOpsState) -> list[dict[str, Any]]:
 def _read_draft(
     state: WorkOrderOpsState,
 ) -> tuple[CreateWorkOrderDraft | None, bool]:
-    results = _tool_results(state, _DRAFT_TOOL_NAME)
+    results = _tool_results(
+        state,
+        _DRAFT_TOOL_NAME,
+        state.get("current_draft_call_id"),
+    )
     if not results:
         return None, False
     for value, failed in results:
@@ -375,11 +444,15 @@ def build_work_order_ops_graph(
     ) -> dict[str, Any]:
         return await _plan_draft(state, config, draft_tool=draft_tool)
 
+    def plan_reads(state: WorkOrderOpsState, config: RunnableConfig) -> dict[str, Any]:
+        return _plan_reads(
+            state,
+            config,
+            available_names=available_names,
+        )
+
     graph = StateGraph(WorkOrderOpsState)
-    graph.add_node(
-        "plan_reads",
-        lambda state: _plan_reads(state, available_names=available_names),
-    )
+    graph.add_node("plan_reads", plan_reads)
     graph.add_node("read_tools", ToolNode(guarded_tools))
     graph.add_node("plan_draft", plan_draft)
     graph.add_node(
