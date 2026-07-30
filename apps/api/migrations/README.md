@@ -6,6 +6,7 @@ Checkpointer / schema migrations.
 | `002_demo_readonly.sql` | Demo DataSource sample tables |
 | `003_knowledge_pgvector.sql` | R-A knowledge schema + `kb_chunks` (needs **pgvector**) |
 | `004_approval_execution.sql` | Durable, platform-generic approval action records |
+| `005_work_order_ops.sql` | Synthetic tenant-scoped golden-case business data |
 
 ## Knowledge (R-A)
 
