@@ -30,6 +30,12 @@ class Settings(BaseSettings):
         default=False, validation_alias="ENABLE_DATA_SOURCE"
     )
     data_source_dsn: str = Field(default="", validation_alias="DATA_SOURCE_DSN")
+    approval_store_backend: str = Field(
+        default="memory", validation_alias="APPROVAL_STORE_BACKEND"
+    )
+    approval_execution_lease_seconds: float = Field(
+        default=60.0, validation_alias="APPROVAL_EXECUTION_LEASE_SECONDS"
+    )
     fake_runtime: bool = Field(default=False, validation_alias="AGENTBRIDGE_FAKE_RUNTIME")
     hooks_backend: str = Field(default="noop", validation_alias="HOOKS_BACKEND")
     rate_limit_per_minute: int = Field(
