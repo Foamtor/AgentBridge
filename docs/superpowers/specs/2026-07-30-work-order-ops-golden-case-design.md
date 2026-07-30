@@ -42,6 +42,23 @@ domain 仅从 `RunContext.metadata` 取已注入的 `data_source`、`retriever` 
 
 `ApprovalResumeExecutor` 不 import domain；`work_order_ops` 在注册期登记自己的 `work_order_ops.create_v1` handler。该 handler 只依赖注入的 Port。核心只认识通用 action envelope 和 executor Port，禁止出现 `work_order_ops`、工单或台账名称。
 
+### 2.2 审批执行状态机与幂等
+
+批准不是一次不可重试的“resolve”操作。ApprovalStore 增加通用的执行状态与原子 claim 语义：
+
+```text
+pending
+  ├─ deny / timeout → denied（终端，零写入）
+  └─ approve → approved_pending_execution
+                  → executing（单消费者 claim）
+                  ├─ succeeded（持久化 result）
+                  └─ retryable_failed（记录错误，可安全重试）
+```
+
+`claim_execution` 只能从 `approved_pending_execution` 或 `retryable_failed` 进入 `executing`；并发的批准/重试请求只能有一个成功 claim。每个 action 以 `approval_id` 为幂等键。`work_orders` 与 `ledgers` 均增加 `approval_id`，并各自建立 `(tenant_id, approval_id)` 唯一约束；handler 先检查已有成功结果，再在同一事务内写入两条记录。数据库事务已提交但进程在 `mark_succeeded` 前退出时，重试会读取同一 `approval_id` 的记录、重建相同 result 后标记成功，而不是再次创建。
+
+executor 成功后将标准化 result payload 持久化到 ApprovalStore，再返回 `OutboundFragment`。若随后 EventLog append 失败，业务动作仍为 `succeeded`，Lifecycle 发稳定 `error`，并在审批查询/审计中明确标为“业务已完成，结果事件未送达”；不得把它改写为 `retryable_failed` 或重新执行。P2 再评估同库 outbox，以实现业务提交与结果事件的端到端最终投递。
+
 ## 3. 数据与权限
 
 示例数据至少包含：
@@ -144,7 +161,9 @@ SSE 继续使用现有统一信封：`type`、`run_id`、`event_id`、`sequence`
 
 Lifecycle 必须在发出审批事件前校验 `action.type` 非空、`payload` 为 JSON 对象，并将 action、请求人 `RunContext` 快照、route、run/thread/tenant、审批序号一起写入 ApprovalStore。模型不得在批准后重新生成或更改该 payload；审批人审核的是已持久化的这份草稿。
 
-批准后，Lifecycle 重获线程锁，以存储的请求人上下文再次调用 Policy 的 `invoke_tool` 决策，并要求当前审批人仍具有 `approval:decide`。只有两项均通过才调用 `ApprovalResumeExecutor`。executor 的 domain handler 在事务成功提交后返回 `x.work_order_ops.work_order_created`：
+`ApprovalResumeExecutor` 的注册键是 `(route, action.type)`，而非仅 `action.type`。executor 必须拒绝审批记录 route 与 handler 不匹配、未登记 handler 或 action version 不支持的请求。`work_order_ops.create_v1` 在发出预览前和批准执行前均用同一 Pydantic `CreateWorkOrderDraft` 校验 `title`、`priority` 枚举、`assignee_id`、台账摘要与长度限制；处理人租户/启用状态在执行事务中复验。任何校验失败均不 claim 成功、不写入业务表。
+
+批准后，Lifecycle 重获线程锁，以存储的请求人上下文再次调用 Policy 的 `invoke_tool` 决策，并要求当前审批人仍具有 `approval:decide`。只有两项均通过才原子 claim 执行并调用 `ApprovalResumeExecutor`。executor 的 domain handler 在事务成功提交后返回 `x.work_order_ops.work_order_created`：
 
 ```json
 {
@@ -156,7 +175,7 @@ Lifecycle 必须在发出审批事件前校验 `action.type` 非空、`payload` 
 }
 ```
 
-拒绝、超时、策略复检失败、处理人失效或事务失败时，不发 `work_order_created`，也不得有任何工单/台账写入；平台以 `x.bridge.approval_resolved` 和终端事件表达结果。若 executor 失败，Lifecycle 发稳定 `error` 并以 `error` 终端，而不是伪造成功的 `tool_result`。
+拒绝、超时、策略复检失败、处理人失效或事务失败时，不发 `work_order_created`，也不得有任何工单/台账写入；平台以 `x.bridge.approval_resolved` 和终端事件表达结果。若 executor 失败，Lifecycle 发稳定 `error` 并以 `error` 终端，而不是伪造成功的 `tool_result`。仅已提交的动作可产生 `work_order_created`，且相同 `approval_id` 重试的结果载荷必须完全一致。
 
 ## 5. 业务流程与失败语义
 
@@ -167,14 +186,15 @@ Lifecycle 必须在发出审批事件前校验 `action.type` 非空、`payload` 
 创建工单
   → 校验处理人、查询必要知识 → ledger_preview
   → approval_required + 已持久化 action envelope（释放 thread 锁）
-  → approve：重验 Policy / 审批人 → 同 run 调 executor
-             → 单一事务写工单 + 台账 → work_order_created → done
+  → approve：重验 Policy / 审批人 → 原子 claim → 同 run 调 executor
+             → 单一事务写工单 + 台账 + 持久化 result
+             → work_order_created → done
   → deny / timeout：零写入 → approval_resolved → done
 ```
 
 查询不到数据返回空列表或零值图表，不把“没有权限”“后端失败”“没有匹配项”混为同一种结果：权限错误由 Policy 拒绝，依赖故障走 `error`，空查询结果在业务 payload 中表达。RAG 超时或 external 后端失败遵从配置的降级策略，并在文本/业务结果中可识别地说明知识未命中或暂不可用。
 
-创建工单与创建台账必须在同一业务事务中完成；任何一步失败均回滚。审批恢复时重新校验请求人权限、审批人权限、处理人有效性与租户归属。请求人上下文快照和复检结果要写审计，便于解释“请求时允许、批准时被拒绝”的情况。
+创建工单与创建台账必须在同一业务事务中完成；任何一步失败均回滚。审批恢复时重新校验请求人权限、审批人权限、handler route/action 绑定、类型化草稿、处理人有效性与租户归属。请求人上下文快照和复检结果要写审计，便于解释“请求时允许、批准时被拒绝”的情况。
 
 ## 6. 测试与验收
 
@@ -187,7 +207,10 @@ Lifecycle 必须在发出审批事件前校验 `action.type` 非空、`payload` 
 - 审批前、拒绝、超时均零写入；批准后工单与台账同时存在；
 - 处理人失效、请求人权限复检失败、重复审批、事务失败和恢复竞争均不产生部分写入；
 - ApprovalStore 持久化的 action 与实际写入字段完全一致，批准后不重新生成草稿；
+- handler 的 `(route, action.type)` 不匹配、未登记 action、版本不支持或草稿校验失败时均零写入；
+- 并发批准仅一次 claim；数据库提交后崩溃的重试复用同一 `approval_id` 和 result，不重复创建；
 - Fake 事务的回滚语义与 Postgres 事务一致；executor 未登记 action、executor 异常时均发 `error` 且不伪造成功；
+- 业务提交后 EventLog append 失败时，审批结果保持 `succeeded`，不允许重新写入；审计和审批查询可查到结果事件未送达；
 - 旧客户端忽略 `x.work_order_ops.*` 仍能接收 `start`、稳定事件及 `done`。
 
 手工验收以新环境、脱敏数据、真实 `langchain_pg` 路径和 external 检索路径各跑一轮为准。P2 再补全生产依赖故障、备份恢复和双实例验证。
