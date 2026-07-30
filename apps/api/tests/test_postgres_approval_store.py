@@ -29,6 +29,16 @@ async def _apply_approval_migration(dsn: str) -> None:
         await connection.close()
 
 
+async def _reset_approval_records(dsn: str) -> None:
+    import asyncpg
+
+    connection: Any = await asyncpg.connect(dsn)
+    try:
+        await connection.execute("TRUNCATE TABLE approval_records")
+    finally:
+        await connection.close()
+
+
 def test_postgres_approval_store_can_be_constructed() -> None:
     from adapters.postgres_approval_store import PostgresApprovalStore
 
@@ -45,6 +55,7 @@ async def test_postgres_store_recovers_expired_execution_after_new_instance() ->
 
     dsn = os.environ["AGENTBRIDGE_TEST_PG_DSN"]
     await _apply_approval_migration(dsn)
+    await _reset_approval_records(dsn)
     t0 = datetime(2026, 7, 30, tzinfo=UTC)
     record = {
         "approval_id": f"test-{uuid.uuid4().hex}",
@@ -119,6 +130,7 @@ async def test_postgres_sequence_is_atomic_across_instances() -> None:
 
     dsn = os.environ["AGENTBRIDGE_TEST_PG_DSN"]
     await _apply_approval_migration(dsn)
+    await _reset_approval_records(dsn)
     approval_id = f"test-{uuid.uuid4().hex}"
     first = PostgresApprovalStore(dsn)
     second = PostgresApprovalStore(dsn)
@@ -153,6 +165,7 @@ async def test_postgres_lists_expired_pending_records_in_stable_order() -> None:
 
     dsn = os.environ["AGENTBRIDGE_TEST_PG_DSN"]
     await _apply_approval_migration(dsn)
+    await _reset_approval_records(dsn)
     now = datetime(2026, 7, 30, tzinfo=UTC)
     store = PostgresApprovalStore(dsn)
     first_id = f"test-{uuid.uuid4().hex}"
