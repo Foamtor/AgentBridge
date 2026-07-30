@@ -64,6 +64,16 @@ def _build_data_source(settings: Settings) -> Any:
     return PostgresDataSource(dsn)
 
 
+def _build_approval_store(settings: Settings) -> Any:
+    if settings.approval_store_backend == "memory":
+        return MemoryApprovalStore()
+    if settings.approval_store_backend == "postgres":
+        from adapters.postgres_approval_store import PostgresApprovalStore
+
+        return PostgresApprovalStore(_resolve_postgres_dsn(settings))
+    raise ValueError("unsupported approval store backend")
+
+
 def _build_llm_gateway(settings: Settings) -> Any:
     """Build gateway; default FakeChatModel keeps CI offline."""
     from agentbridge_core.adapters.alias_llm_gateway import AliasLLMGateway
@@ -148,7 +158,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         DomainFilePromptRegistry(Path(__file__).resolve().parent / "domains"),
     )
     usage_store = MemoryUsageStore()
-    approval_store = MemoryApprovalStore()
+    approval_store = _build_approval_store(settings)
+    from adapters.approval_action_registry import ApprovalActionRegistry
+
+    approval_actions = ApprovalActionRegistry()
     from adapters.knowledge_backend import build_retriever
 
     retriever = await build_retriever(settings)
@@ -184,6 +197,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         metrics=metrics,
         span_factory=span_factory,
         approval_store=approval_store,
+        approval_executor=approval_actions,
+        approval_execution_lease_seconds=settings.approval_execution_lease_seconds,
         safety_hooks=SafetyHooks(redact=True),
     )
     pipeline = RequestPipeline(
@@ -207,6 +222,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.message_store = message_store
     app.state.run_store = run_store
     app.state.approval_store = approval_store
+    app.state.approval_actions = approval_actions
     app.state.policy = policy
     app.state.config_provider = config_provider
     app.state.prompt_registry = platform_prompt_registry
@@ -239,6 +255,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             if hasattr(result, "__await__"):
                 await result
         await data_source.close()
+        close_approval_store = getattr(approval_store, "close", None)
+        if close_approval_store is not None:
+            result = close_approval_store()
+            if hasattr(result, "__await__"):
+                await result
         await checkpointers.teardown()
         if redis_client is not None:
             close = getattr(redis_client, "aclose", None) or getattr(
