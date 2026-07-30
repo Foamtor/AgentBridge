@@ -216,3 +216,55 @@ async def test_lifespan_cancels_approval_expiry_scanner(
     assert scan_calls >= 2
     assert scanner_tasks[0].done()
     assert scanner_tasks[0].cancelled()
+
+
+@pytest.mark.asyncio
+async def test_lifespan_startup_failure_does_not_leak_expiry_scanner(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AGENTBRIDGE_FAKE_RUNTIME", "1")
+    import lifespan as lifespan_module
+    from testing.app_factory import create_test_app
+
+    scan_blocker = asyncio.Event()
+
+    async def _scan(self, *, now, limit=100):
+        await scan_blocker.wait()
+        return 0
+
+    monkeypatch.setattr(RunLifecycle, "expire_pending_approvals", _scan)
+    original_create_task = asyncio.create_task
+    scanner_tasks: list[asyncio.Task] = []
+
+    def _capture_task(coro, *args, **kwargs):
+        task = original_create_task(coro, *args, **kwargs)
+        code = getattr(coro, "cr_code", None)
+        if code is not None and code.co_name == "_approval_expiry_loop":
+            scanner_tasks.append(task)
+        return task
+
+    def _fail_catalog(**kwargs):
+        raise RuntimeError("catalog startup failed")
+
+    monkeypatch.setattr(asyncio, "create_task", _capture_task)
+    monkeypatch.setattr(
+        lifespan_module, "build_domain_catalog", _fail_catalog
+    )
+    app = create_test_app()
+
+    with pytest.raises(RuntimeError, match="catalog startup failed"):
+        async with app.router.lifespan_context(app):
+            pass
+    await asyncio.sleep(0)
+
+    try:
+        assert all(
+            task.done() and task.cancelled() for task in scanner_tasks
+        )
+        assert scanner_tasks == []
+    finally:
+        for task in scanner_tasks:
+            if not task.done():
+                task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
