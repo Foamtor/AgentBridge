@@ -44,4 +44,5 @@
 | [知识库](./knowledge-base.md) | 检索与引用细节 |
 | [路线图](./roadmap.md) | 做到哪一步了 |
 | [发布规划](./release-plan.md) | 当前如何收敛为传统业务 AI 改造 + RAG 的可发布版本 |
+| [v0.1.0 技术预览说明](./releases/v0.1.0-tech-preview.md) | 了解可体验能力、已知限制与公开发布前提 |
 | [superpowers/](./superpowers/plans/README.md) | **历史**设计与分期计划（归档，日常别从这入门） |
