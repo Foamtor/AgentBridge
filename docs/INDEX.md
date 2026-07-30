@@ -43,4 +43,5 @@
 | [怎么加插件（细）](./add-a-domain.md) | 已经决定加插件，要逐步清单 |
 | [知识库](./knowledge-base.md) | 检索与引用细节 |
 | [路线图](./roadmap.md) | 做到哪一步了 |
+| [发布规划](./release-plan.md) | 当前如何收敛为传统业务 AI 改造 + RAG 的可发布版本 |
 | [superpowers/](./superpowers/plans/README.md) | **历史**设计与分期计划（归档，日常别从这入门） |
