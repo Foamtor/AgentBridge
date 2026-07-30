@@ -12,10 +12,12 @@ def attach_tool_meta(
     *,
     required_roles: list[str] | None = None,
     required_permissions: list[str] | None = None,
+    required_permissions_all: list[str] | None = None,
 ) -> Any:
     meta = {
         "required_roles": list(required_roles or []),
         "required_permissions": list(required_permissions or []),
+        "required_permissions_all": list(required_permissions_all or []),
     }
     setattr(tool, _META_ATTR, meta)
     return tool
@@ -27,5 +29,10 @@ def get_tool_meta(tool: Any) -> dict[str, Any]:
         return {
             "required_roles": list(raw.get("required_roles") or []),
             "required_permissions": list(raw.get("required_permissions") or []),
+            "required_permissions_all": list(raw.get("required_permissions_all") or []),
         }
-    return {"required_roles": [], "required_permissions": []}
+    return {
+        "required_roles": [],
+        "required_permissions": [],
+        "required_permissions_all": [],
+    }
