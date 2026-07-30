@@ -13,7 +13,9 @@ from agentbridge_core.adapters.memory_event_log import MemoryEventLog
 from agentbridge_core.adapters.memory_message_store import MemoryMessageStore
 from agentbridge_core.adapters.memory_run_store import MemoryRunStore
 from agentbridge_core.adapters.noop_hooks import NoopHooks
+from agentbridge_core.adapters.role_policy import RolePolicyEngine
 from agentbridge_core.application.run_lifecycle import RunLifecycle
+from agentbridge_core.protocol.fragments import OutboundFragment
 from agentbridge_core.protocol.context import RunContext, checkpoint_thread_key
 from agentbridge_core.registry.input_builders import InputBuilderRegistry
 
@@ -36,6 +38,9 @@ def _lc(**kwargs):
         message_store=kwargs.get("message_store") or MemoryMessageStore(),
         run_store=kwargs.get("run_store") or MemoryRunStore(),
         approval_store=kwargs.get("approval_store") or MemoryApprovalStore(),
+        approval_executor=kwargs.get("approval_executor"),
+        approval_execution_lease_seconds=kwargs.get("approval_execution_lease_seconds", 60.0),
+        policy=kwargs.get("policy"),
     )
 
 
@@ -163,3 +168,77 @@ async def test_timeout_denies(graphs, tools, queue_and_sink, drain_events) -> No
     run = await runs.get(run_id, tenant_id="acme")
     assert run is not None
     assert run["status"] == "done"
+
+
+@pytest.mark.asyncio
+async def test_approved_action_executes_once(graphs, tools, queue_and_sink, drain_events) -> None:
+    class ActionRuntime:
+        async def astream(self, builder, **kwargs):  # noqa: ANN001
+            yield OutboundFragment(
+                type="x.bridge.approval_required",
+                data={
+                    "tool": "create",
+                    "action": {"type": "example.write_v1", "payload": {"x": 1}},
+                },
+            )
+
+    class Executor:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, dict, str]] = []
+
+        def resource_for(self, *, route: str, action: dict) -> dict:  # noqa: ANN001
+            return {"name": action["type"]}
+
+        async def execute(self, *, route: str, action: dict, requester_ctx, approval_id: str):  # noqa: ANN001,E501
+            self.calls.append((route, action, approval_id))
+            return [
+                OutboundFragment(
+                    type="x.example.created", data={"id": action["payload"]["x"]}
+                )
+            ]
+
+    approvals = MemoryApprovalStore()
+    executor = Executor()
+    q, sink = queue_and_sink
+    lc = _lc(
+        graphs=graphs,
+        tools=tools,
+        runtime=ActionRuntime(),
+        approval_store=approvals,
+        approval_executor=executor,
+        policy=RolePolicyEngine(),
+    )
+    await lc.start_stream(
+        query="write",
+        thread_id="t-action-1",
+        route="echo",
+        sink=sink,
+        ctx=RunContext(tenant_id="acme", user_id="requester"),
+    )
+    required = next(
+        event for event in await drain_events(q) if event["type"] == "x.bridge.approval_required"
+    )
+
+    class CapturingSink:
+        def __init__(self) -> None:
+            self.events: list[dict] = []
+
+        async def emit(self, event: dict) -> None:
+            self.events.append(event)
+
+        async def close(self) -> None:
+            return None
+
+    cap = CapturingSink()
+    approval_id = required["data"]["approval_id"]
+    await lc.finalize_approval(
+        approval_id=approval_id,
+        tenant_id="acme",
+        decision="approve",
+        sink=cap,  # type: ignore[arg-type]
+        approver_ctx=RunContext(tenant_id="acme", permissions=["approval:decide"]),
+    )
+    assert executor.calls == [
+        ("echo", {"type": "example.write_v1", "payload": {"x": 1}}, approval_id)
+    ]
+    assert any(event["type"] == "x.example.created" for event in cap.events)
