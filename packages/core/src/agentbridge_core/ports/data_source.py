@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any, Protocol
+from collections.abc import Awaitable, Callable
+from typing import Any, Protocol, TypeVar
+
+T = TypeVar("T")
 
 
 class DataSource(Protocol):
@@ -11,3 +14,7 @@ class DataSource(Protocol):
     async def execute(self, sql: str, *params: Any) -> int: ...
 
     async def close(self) -> None: ...
+
+
+class TransactionalDataSource(DataSource, Protocol):
+    async def transaction(self, operation: Callable[[DataSource], Awaitable[T]]) -> T: ...
