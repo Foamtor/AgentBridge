@@ -13,6 +13,7 @@ from agentbridge_core.protocol.knowledge import KnowledgeHit
 logger = logging.getLogger(__name__)
 
 _BACKEND = "rag_agent_pg"
+_EXPECTED_MODEL = "BAAI/bge-m3"
 _EXPECTED_DIMENSIONS = 512
 _PUBLIC_ERROR = "knowledge backend unavailable"
 
@@ -209,6 +210,10 @@ class RagAgentPgRetriever:
             )
 
     async def _probe_dependencies(self) -> None:
+        if self._embed_model != _EXPECTED_MODEL:
+            raise _CapabilityFailure(
+                "configured embedding model must be BAAI/bge-m3"
+            )
         if self._embed_dimensions != _EXPECTED_DIMENSIONS:
             raise _CapabilityFailure(
                 "configured embedding dimension must be 512"
