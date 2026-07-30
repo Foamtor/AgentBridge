@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from agentbridge_core.adapters.approval_aware_runtime import ApprovalAwareRuntime
@@ -146,6 +146,42 @@ async def test_approval_releases_lock_allows_second_run(
 
 
 @pytest.mark.asyncio
+async def test_new_approval_persists_absolute_expiry(
+    graphs, tools, queue_and_sink, drain_events
+) -> None:
+    approvals = MemoryApprovalStore()
+    queue, sink = queue_and_sink
+    lifecycle = _lc(
+        graphs=graphs,
+        tools=tools,
+        approval_store=approvals,
+        runtime=ApprovalAwareRuntime(timeout_seconds=60),
+    )
+    before = datetime.now(timezone.utc)
+
+    await lifecycle.start_stream(
+        query="write",
+        thread_id="t-expiry-persisted",
+        route="echo",
+        sink=sink,
+        ctx=RunContext(tenant_id="acme"),
+    )
+
+    after = datetime.now(timezone.utc)
+    required = next(
+        event
+        for event in await drain_events(queue)
+        if event["type"] == "x.bridge.approval_required"
+    )
+    approval = await approvals.get(
+        required["data"]["approval_id"], tenant_id="acme"
+    )
+    assert approval is not None
+    assert before + timedelta(seconds=60) <= approval["approval_expires_at"]
+    assert approval["approval_expires_at"] <= after + timedelta(seconds=60)
+
+
+@pytest.mark.asyncio
 async def test_resume_same_run_id(
     graphs, tools, queue_and_sink, drain_events
 ) -> None:
@@ -233,6 +269,147 @@ async def test_timeout_denies(graphs, tools, queue_and_sink, drain_events) -> No
     run = await runs.get(run_id, tenant_id="acme")
     assert run is not None
     assert run["status"] == "done"
+
+
+@pytest.mark.asyncio
+async def test_expiry_scan_denies_only_expired_pending_approval(
+    graphs, tools
+) -> None:
+    now = datetime.now(timezone.utc)
+    approvals = MemoryApprovalStore()
+    events = MemoryEventLog()
+    runs = MemoryRunStore()
+    lifecycle = _lc(
+        graphs=graphs,
+        tools=tools,
+        approval_store=approvals,
+        event_log=events,
+        run_store=runs,
+    )
+
+    async def create_pending(
+        *,
+        approval_id: str,
+        run_id: str,
+        thread_id: str,
+        expires_at: datetime,
+    ) -> None:
+        await approvals.create(
+            {
+                "approval_id": approval_id,
+                "tenant_id": "acme",
+                "thread_id": thread_id,
+                "storage_key": checkpoint_thread_key("acme", thread_id),
+                "run_id": run_id,
+                "trace_id": run_id,
+                "sequence": 0,
+                "route": "echo",
+                "query": "write",
+                "action": {
+                    "type": "example.write_v1",
+                    "payload": {"id": approval_id},
+                },
+                "requester_context": {"tenant_id": "acme"},
+                "status": "pending",
+                "approval_expires_at": expires_at,
+            }
+        )
+        await runs.upsert(
+            {
+                "run_id": run_id,
+                "tenant_id": "acme",
+                "thread_id": thread_id,
+                "status": "awaiting_approval",
+            }
+        )
+
+    await create_pending(
+        approval_id="ap-expired",
+        run_id="r-expired",
+        thread_id="t-expired",
+        expires_at=now - timedelta(seconds=1),
+    )
+    await create_pending(
+        approval_id="ap-future",
+        run_id="r-future",
+        thread_id="t-future",
+        expires_at=now + timedelta(seconds=30),
+    )
+
+    count = await lifecycle.expire_pending_approvals(now=now, limit=100)
+
+    assert count == 1
+    expired = await approvals.get("ap-expired", tenant_id="acme")
+    future = await approvals.get("ap-future", tenant_id="acme")
+    assert expired and expired["status"] == "denied"
+    assert future and future["status"] == "pending"
+    run = await runs.get("r-expired", tenant_id="acme")
+    assert run and run["status"] == "done"
+    logged = await events.list("r-expired", tenant_id="acme")
+    assert [event["type"] for event in logged] == [
+        "x.bridge.approval_resolved",
+        "done",
+    ]
+    assert logged[0]["data"]["reason"] == "timeout"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("concurrent_decision", "expected_status"),
+    [
+        ("approve", "approved_pending_execution"),
+        ("deny", "denied"),
+    ],
+)
+async def test_expiry_scan_does_not_count_concurrent_resolution(
+    graphs, tools, concurrent_decision, expected_status
+) -> None:
+    class ConcurrentResolutionStore(MemoryApprovalStore):
+        async def list_expired_pending(self, *, now, limit=100):
+            rows = await super().list_expired_pending(now=now, limit=limit)
+            await self.decide(
+                rows[0]["approval_id"],
+                tenant_id=rows[0]["tenant_id"],
+                decision=concurrent_decision,
+                reason="timeout",
+            )
+            return rows
+
+    now = datetime.now(timezone.utc)
+    approvals = ConcurrentResolutionStore()
+    events = MemoryEventLog()
+    approval_id = await approvals.create(
+        {
+            "tenant_id": "acme",
+            "thread_id": "t-race",
+            "storage_key": checkpoint_thread_key("acme", "t-race"),
+            "run_id": "r-race",
+            "trace_id": "r-race",
+            "sequence": 0,
+            "route": "echo",
+            "query": "write",
+            "action": {
+                "type": "example.write_v1",
+                "payload": {"id": 1},
+            },
+            "requester_context": {"tenant_id": "acme"},
+            "status": "pending",
+            "approval_expires_at": now - timedelta(seconds=1),
+        }
+    )
+    lifecycle = _lc(
+        graphs=graphs,
+        tools=tools,
+        approval_store=approvals,
+        event_log=events,
+    )
+
+    count = await lifecycle.expire_pending_approvals(now=now)
+
+    assert count == 0
+    approval = await approvals.get(approval_id, tenant_id="acme")
+    assert approval and approval["status"] == expected_status
+    assert await events.list("r-race", tenant_id="acme") == []
 
 
 @pytest.mark.asyncio

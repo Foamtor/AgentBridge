@@ -2,27 +2,33 @@
 
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
+import asyncio
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager, suppress
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, AsyncIterator
+from typing import Any
 
-from fastapi import FastAPI
-
+from adapters.domain_prompt_registry import DomainFilePromptRegistry
+from adapters.knowledge_ingest_factory import build_knowledge_ingest
+from adapters.knowledge_status import build_knowledge_status_provider
+from adapters.memory_usage_store import MemoryUsageStore
+from admin.catalog import build_domain_catalog
 from agentbridge_core.adapters.basic_input_validator import BasicInputValidator
 from agentbridge_core.adapters.inprocess_cancel import InProcessCancelRegistry
 from agentbridge_core.adapters.inprocess_lock import InProcessThreadLock
 from agentbridge_core.adapters.langgraph_runtime import LangGraphRuntime
+from agentbridge_core.adapters.layered_prompt_registry import LayeredPromptRegistry
 from agentbridge_core.adapters.logging_hooks import LoggingHooks
 from agentbridge_core.adapters.memory_approval_store import MemoryApprovalStore
 from agentbridge_core.adapters.memory_audit_logger import MemoryAuditLogger
 from agentbridge_core.adapters.memory_checkpointer import MemoryCheckpointerFactory
-from agentbridge_core.adapters.memory_event_log import MemoryEventLog
-from agentbridge_core.adapters.memory_message_store import MemoryMessageStore
-from agentbridge_core.adapters.memory_run_store import MemoryRunStore
-from agentbridge_core.adapters.memory_ingest_job_store import MemoryIngestJobStore
 from agentbridge_core.adapters.memory_config_provider import MemoryConfigProvider
-from agentbridge_core.adapters.layered_prompt_registry import LayeredPromptRegistry
+from agentbridge_core.adapters.memory_event_log import MemoryEventLog
+from agentbridge_core.adapters.memory_ingest_job_store import MemoryIngestJobStore
+from agentbridge_core.adapters.memory_message_store import MemoryMessageStore
 from agentbridge_core.adapters.memory_prompt_registry import MemoryPromptRegistry
+from agentbridge_core.adapters.memory_run_store import MemoryRunStore
 from agentbridge_core.adapters.noop_data_source import NoopDataSource
 from agentbridge_core.adapters.noop_hooks import NoopHooks
 from agentbridge_core.adapters.role_policy import RolePolicyEngine
@@ -38,12 +44,8 @@ from agentbridge_core.registry.input_builders import InputBuilderRegistry
 from agentbridge_core.registry.tools import ToolRegistry
 from config.logging import configure_logging
 from config.settings import Settings, get_settings
-from admin.catalog import build_domain_catalog
-from adapters.domain_prompt_registry import DomainFilePromptRegistry
-from adapters.knowledge_ingest_factory import build_knowledge_ingest
-from adapters.knowledge_status import build_knowledge_status_provider
-from adapters.memory_usage_store import MemoryUsageStore
 from domains.bootstrap import DOMAIN_META_MAP, register_all
+from fastapi import FastAPI
 
 
 def _resolve_postgres_dsn(settings: Settings) -> str:
@@ -201,6 +203,20 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         approval_execution_lease_seconds=settings.approval_execution_lease_seconds,
         safety_hooks=SafetyHooks(redact=True),
     )
+
+    async def _approval_expiry_loop() -> None:
+        await lifecycle.expire_pending_approvals(
+            now=datetime.now(timezone.utc)
+        )
+        while True:
+            await asyncio.sleep(
+                settings.approval_expiry_scan_interval_seconds
+            )
+            await lifecycle.expire_pending_approvals(
+                now=datetime.now(timezone.utc)
+            )
+
+    approval_expiry_task = asyncio.create_task(_approval_expiry_loop())
     pipeline = RequestPipeline(
         lifecycle=lifecycle,
         plugins=[
@@ -249,23 +265,28 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
         yield
     finally:
-        close_retriever = getattr(retriever, "close", None)
-        if close_retriever is not None:
-            result = close_retriever()
-            if hasattr(result, "__await__"):
-                await result
-        await data_source.close()
-        close_approval_store = getattr(approval_store, "close", None)
-        if close_approval_store is not None:
-            result = close_approval_store()
-            if hasattr(result, "__await__"):
-                await result
-        await checkpointers.teardown()
-        if redis_client is not None:
-            close = getattr(redis_client, "aclose", None) or getattr(
-                redis_client, "close", None
-            )
-            if close is not None:
-                result = close()
+        approval_expiry_task.cancel()
+        try:
+            with suppress(asyncio.CancelledError):
+                await approval_expiry_task
+        finally:
+            close_retriever = getattr(retriever, "close", None)
+            if close_retriever is not None:
+                result = close_retriever()
                 if hasattr(result, "__await__"):
                     await result
+            await data_source.close()
+            close_approval_store = getattr(approval_store, "close", None)
+            if close_approval_store is not None:
+                result = close_approval_store()
+                if hasattr(result, "__await__"):
+                    await result
+            await checkpointers.teardown()
+            if redis_client is not None:
+                close = getattr(redis_client, "aclose", None) or getattr(
+                    redis_client, "close", None
+                )
+                if close is not None:
+                    result = close()
+                    if hasattr(result, "__await__"):
+                        await result
