@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import Awaitable, Callable
+from typing import Any, TypeVar
+
+from agentbridge_core.ports.data_source import DataSource
+
+T = TypeVar("T")
 
 
 class NoopDataSource:
@@ -11,6 +16,9 @@ class NoopDataSource:
 
     async def execute(self, sql: str, *params: Any) -> int:
         return 0
+
+    async def transaction(self, operation: Callable[[DataSource], Awaitable[T]]) -> T:
+        return await operation(self)
 
     async def close(self) -> None:
         return None
