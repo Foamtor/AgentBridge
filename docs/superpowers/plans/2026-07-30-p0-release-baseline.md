@@ -22,6 +22,7 @@
 
 - Modify: `docs/00-AgentBridge完整方案.md` — 正式版本语义、M11/M12 和 P0/P1 发布状态。
 - Modify: `docs/roadmap.md` — 用户可读的当前状态、技术预览与稳定版条件。
+- Modify: `docs/release-plan.md` — 发布阶段、技术预览与正式稳定版门槛的唯一衔接说明。
 - Modify: `README.md` — 对外定位和技术预览边界。
 - Modify: `docs/deploy.md` — 支持矩阵、真实部署前提和明确限制。
 - Create: `docs/releases/v0.1.0-tech-preview.md` — 首版预览 release notes。
@@ -32,6 +33,7 @@
 **Files:**
 - Modify: `docs/00-AgentBridge完整方案.md:1-10, 460-484, 附录 D`
 - Modify: `docs/roadmap.md:1-84`
+- Modify: `docs/release-plan.md:118-139`
 - Test: 文本一致性检查
 
 **Consumes:** 现有 M0–M12 状态和 `docs/release-plan.md` 的 P0–P3 分期。
@@ -43,7 +45,8 @@
 ```powershell
 $spec = Get-Content -Raw docs/00-AgentBridge完整方案.md
 $roadmap = Get-Content -Raw docs/roadmap.md
-if ($spec -notmatch 'v0\.1\.0' -or $spec -notmatch 'M11' -or $roadmap -notmatch '技术预览') { throw 'release baseline wording is not aligned' }
+$releasePlan = Get-Content -Raw docs/release-plan.md
+if ($spec -notmatch 'v0\.1\.0' -or $spec -notmatch 'M11' -or $roadmap -notmatch '技术预览' -or $releasePlan -notmatch 'v0\.1\.0' -or $releasePlan -notmatch 'P0–P3') { throw 'release baseline wording is not aligned' }
 ```
 
 - [ ] **Step 2: 运行断言并确认失败**
@@ -61,7 +64,7 @@ Expected: `release baseline wording is not aligned`。
 | v2.1 | M11 + M12 发布验收通过；版本是否发布取决于 P1/P2，而非仅代码合入 |
 ```
 
-保留既有 `v1.0 = M0–M4` 和 `v2.0 = M10`。路线图链接 `release-plan.md` 的发布门槛，避免把“代码合入”写成“发布完成”。
+保留既有 `v1.0 = M0–M4` 和 `v2.0 = M10`。在 `release-plan.md` 明确：`v0.1.0` 是 P0 后可形成的技术预览说明，`v1.0.0` 仍须 P0–P3、黄金案例、真实生产路径、全套 CI 和公开漏洞报告渠道；路线图链接该门槛，避免把“代码合入”写成“发布完成”。
 
 - [ ] **Step 4: 重新运行一致性断言**
 
@@ -71,13 +74,13 @@ Expected: 无输出、退出码 0。
 
 - [ ] **Step 5: 审阅改动范围**
 
-Run: `git diff --check; git diff -- docs/00-AgentBridge完整方案.md docs/roadmap.md`
+Run: `git diff --check; git diff -- docs/00-AgentBridge完整方案.md docs/roadmap.md docs/release-plan.md`
 
 Expected: 无空白错误；仅版本、状态与链接发生变化。
 
 - [ ] **Step 6: 提交**
 
-Run: `git add docs/00-AgentBridge完整方案.md docs/roadmap.md; git commit -m "docs: align release baseline and milestones"`
+Run: `git add docs/00-AgentBridge完整方案.md docs/roadmap.md docs/release-plan.md; git commit -m "docs: align release baseline and milestones"`
 
 ### Task 2: 写入支持矩阵和已知限制
 
@@ -165,10 +168,10 @@ Expected: `release notes missing`。
 ## 可体验：流式对话、domain 插件、权限双检、审计/回放、RAG 接入、调试控制台
 ## 推荐环境：Python 3.12、Postgres；RAG 另需 pgvector 与 embedding 服务
 ## 已知限制：P1 工单黄金案例尚未交付；真实生产验证未完成；多机非默认；external ingest 可返回 501
-## 升级与反馈：配置变更前备份；一般问题走 Issue；安全漏洞不在公开 Issue 中披露
+## 升级与反馈：配置变更前备份；一般问题走 Issue；公开 tag/release 前必须先发布 SECURITY.md 中的私密漏洞报告渠道
 ```
 
-在 `docs/INDEX.md` 增加链接。
+在 `docs/INDEX.md` 增加链接。若 P3 尚未提供并验证私密漏洞报告渠道，本文件只可作为仓库内技术预览草案，不得据此创建公开 tag 或 GitHub Release；不得虚构邮箱、Issue 模板或平台功能作为报告渠道。
 
 - [ ] **Step 4: 运行 release notes 检查和格式检查**
 
@@ -188,6 +191,6 @@ Run: `git add docs/releases/v0.1.0-tech-preview.md docs/INDEX.md; git commit -m 
 
 - [ ] **Step 1: 检查文档状态与空白错误**
 
-Run: `git diff --check HEAD~3..HEAD; rg -n "v0\.1\.0|M11|M12|技术预览" README.md docs/00-AgentBridge完整方案.md docs/roadmap.md docs/deploy.md docs/releases/v0.1.0-tech-preview.md`
+Run: `git diff --check HEAD~3..HEAD; rg -n "v0\.1\.0|M11|M12|技术预览|P0–P3|SECURITY\.md" README.md docs/00-AgentBridge完整方案.md docs/roadmap.md docs/release-plan.md docs/deploy.md docs/releases/v0.1.0-tech-preview.md`
 
 Expected: 无空白错误；所有门面文档包含相同技术预览口径。
