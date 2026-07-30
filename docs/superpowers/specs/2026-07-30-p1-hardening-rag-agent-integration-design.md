@@ -32,7 +32,7 @@
 - `RagAgentPgRetriever.similarity_search(..., tenant_id=...)` 只有在 `tenant_id == "rag-agent-demo"` 时访问外部数据库。
 - 其它租户返回空命中，且不得建立数据库连接或调用 embedding 服务。
 - 该映射代表共享知识被显式授权给一个演示租户，不声称 RAG-Agent 原始数据具备租户标签。
-- `005_work_order_ops.sql` 的脱敏工单、处理人和台账种子同步使用 `rag-agent-demo`，保证同一演示身份能完成结构化查询、RAG 和审批写入闭环；原有其它租户种子只保留作隔离测试。
+- `007_work_order_demo_tenant.sql` 新增 `rag-agent-demo` 的脱敏工单、处理人和台账种子，保证同一演示身份能完成结构化查询、RAG 和审批写入闭环；原有其它租户种子只保留作隔离测试。
 
 ### 2.3 现有后端兼容
 
@@ -73,11 +73,27 @@ POST /chat/stream
 
 `RagAgentPgRetriever` 是 adapter，只在 `apps/api/lifespan.py` 及其工厂中创建。domain 只依赖注入的 `Retriever` Port。
 
+为支持自然语言生成类型化工具调用，通用 `LLMGateway.chat` 增加可选的 `tools` 和 `tool_choice` 参数。Direct/Alias gateway 只负责将已由 Lifecycle 过滤和包装的工具绑定到宿主模型；core 不认识工单字段或业务工具名。现有不传工具的调用保持兼容。
+
+若宿主模型不支持 `bind_tools`，带工具的调用以稳定的 `llm_tool_binding_unsupported` 失败；不得绕开 guarded tools 直接调用原始工具。
+
 ## 4. 动态工单草稿
 
 ### 4.1 双入口
 
-自然语言是主要入口。graph 使用注入的 LLM Gateway 选择模型并调用绑定后的 `prepare_work_order_draft` 工具，工具参数为：
+自然语言是主要入口。graph 使用 `RunContext.metadata["llm_gateway"]`，按请求的模型别名调用：
+
+```python
+await gateway.chat(
+    messages,
+    ctx=ctx,
+    model=model_alias,
+    tools=[guarded_prepare_tool],
+    tool_choice="prepare_work_order_draft",
+)
+```
+
+LLM 返回的 tool call 再交给使用同一组 guarded tools 的 `ToolNode` 执行。工具参数为：
 
 ```json
 {
@@ -105,6 +121,8 @@ POST /chat/stream
 
 结构化输入跳过 LLM 参数提取，但不能跳过类型校验、工具调用期 Policy、处理人检查或人工审批。
 
+`work_order_ops` input builder 将 `query`、`model` 和 `extra.work_order_draft` 写入 graph state。graph 只用关键词判断是否进入创建分支，不用关键词推断或填充草稿字段。
+
 ### 4.2 单一草稿来源
 
 - 两个入口最终都调用 `prepare_work_order_draft`。
@@ -120,6 +138,7 @@ POST /chat/stream
 - graph 不手写 `workorder:*`、`knowledge:read` 权限判断。
 - Lifecycle 先用 `Policy.filter_tools` 过滤模型或 graph 可见工具。
 - ToolNode 或统一工具调用入口使用 `guard_tools` 包装后的工具，调用时再次执行 `Policy.decide(action="invoke_tool")` 并记录审计。
+- graph builder 只接收 Lifecycle 传入的 guarded tools，并按工具 `name` 选择可调用项；不得回退到模块级原始工具。
 - 缺少 `workorder:read` 时不产生工单列表或统计业务结果；缺少 `knowledge:read` 时不执行知识检索；缺少 create/assign 任一权限时不能生成审批 action。
 - 权限拒绝、知识空命中和知识依赖故障是三个不同结果。
 
@@ -179,6 +198,8 @@ ApprovalStore 的 claim 结果增加 `execution_token`，每次从 `approved_pen
 
 `recover_expired_execution` 仅在租约过期时原子清除旧 token 并进入 `retryable_failed`。旧 worker 使用旧 token 完成时得到 `None`，不得发结果事件或覆盖新 worker。
 
+Lifecycle 只有在 `mark_succeeded(..., execution_token=...)` 返回当前成功记录后才能发业务结果；返回 `None` 表示 claim 已失效，当前 worker 静默结束并读取最新状态。
+
 ### 7.2 Sequence cursor
 
 ApprovalStore 持久化 `last_sequence`，并提供原子 `next_sequence(approval_id, tenant_id) -> int`。创建审批时保存 approval event 的 sequence；恢复过程每次发事件前领取下一序号。失败后重试成功必须继续递增，不得复用此前 `error` 或 `done` 的 sequence。
@@ -193,7 +214,7 @@ action 与 legacy 审批共享一个终端收尾函数。下列路径都必须�
 - 请求人或审批人权限复检失败 → `done`，业务 skipped
 - executor 异常 → `error`
 - executor 成功 → `done`
-- 业务成功但结果事件投递失败 → Run 标记业务完成并记录 delivery failure
+- 业务成功但结果事件投递失败 → Run 状态仍为 `done`，同时增加 `result_delivery_error`，不得重新执行业务动作
 
 ### 7.4 决策转换
 
@@ -205,11 +226,19 @@ action 与 legacy 审批共享一个终端收尾函数。下列路径都必须�
 
 ### 7.5 Pending 超时恢复
 
-审批记录持久化 `approval_expires_at`。内存后台任务只负责低延迟体验；PostgreSQL 路径在启动时及周期扫描时原子将过期 pending 审批转为 denied，并写入终端事件和 Run 投影。重启不能让 pending 审批永久悬挂。
+审批记录持久化 `approval_expires_at`。ApprovalStore 增加：
+
+```python
+async def list_expired_pending(
+    self, *, now: datetime, limit: int = 100
+) -> list[dict[str, Any]]: ...
+```
+
+内存后台任务只负责低延迟体验；Lifecycle 提供 `expire_pending_approvals(now, limit)`，逐条调用已有原子 `decide(..., decision="timeout")` 并完成终端事件与 Run 投影。`lifespan.py` 启动一个可取消的周期任务，并在启动后立即执行一次。重启不能让 pending 审批永久悬挂。
 
 ## 8. API 与错误安全
 
-- `/approvals/{id}` 使用显式响应 DTO，不直接返回数据库内部记录。
+- `/approvals/{id}` 使用显式响应 DTO，不直接返回数据库内部记录。响应只包含 `approval_id`、`status`、`decision`、`reason`、`run_id`、`thread_id` 和已经标准化的业务 `result`；不包含 action、请求人快照、execution token、租约、内部错误或 DSN。
 - executor、SQL、schema 和网络异常不原样进入 SSE 或 HTTP 响应。
 - 稳定错误至少包括：
   - `approval_execution_failed`
@@ -264,7 +293,16 @@ git diff --check
 
 真实 PostgreSQL/RAG-Agent 测试不得由 Fake 测试替代。公开发布仍受 P2/P3、安全报告渠道和发布工程门槛约束。
 
-## 10. 非目标
+## 10. 数据库迁移
+
+不回写已经存在的 `004`/`005` migration：
+
+- `006_approval_hardening.sql`：为 `approval_records` 增加 `execution_token`、`last_sequence`、`approval_expires_at` 及过期 pending 扫描索引。
+- `007_work_order_demo_tenant.sql`：幂等新增 `rag-agent-demo` 的脱敏处理人、工单和台账种子；保留其它租户种子用于隔离测试。
+
+RAG-Agent 数据库不执行 AgentBridge migration。
+
+## 11. 非目标
 
 - 不修改或重构 RAG-Agent。
 - 不为 RAG-Agent 增加新的 HTTP API。
