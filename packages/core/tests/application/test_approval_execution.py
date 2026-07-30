@@ -162,9 +162,10 @@ async def test_expired_worker_cannot_finish_new_execution_claim() -> None:
         approval_id, tenant_id="acme", now=t0, lease_seconds=1
     )
     assert old and old["execution_token"]
-    assert await store.recover_expired_execution(
+    recovered = await store.recover_expired_execution(
         approval_id, tenant_id="acme", now=t0 + timedelta(seconds=2)
     )
+    assert recovered and recovered["execution_token"] is None
     new = await store.claim_execution(
         approval_id,
         tenant_id="acme",
@@ -172,6 +173,15 @@ async def test_expired_worker_cannot_finish_new_execution_claim() -> None:
         lease_seconds=60,
     )
     assert new and new["execution_token"] != old["execution_token"]
+    assert (
+        await store.mark_retryable_failed(
+            approval_id,
+            tenant_id="acme",
+            execution_token=old["execution_token"],
+            error="old worker failed",
+        )
+        is None
+    )
     assert (
         await store.mark_succeeded(
             approval_id,

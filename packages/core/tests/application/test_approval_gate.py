@@ -250,6 +250,80 @@ async def test_approved_action_executes_once(graphs, tools, queue_and_sink, drai
         and record["result"] == "allowed"
         for record in audit.records
     )
+    stored = await approvals.get(approval_id, tenant_id="acme")
+    assert stored and stored["status"] == "succeeded"
+
+
+@pytest.mark.asyncio
+async def test_approved_action_failure_is_persisted_as_retryable(
+    graphs, tools, queue_and_sink, drain_events
+) -> None:
+    class ActionRuntime:
+        async def astream(self, builder, **kwargs):
+            yield OutboundFragment(
+                type="x.bridge.approval_required",
+                data={
+                    "action": {"type": "example.write_v1", "payload": {"x": 1}},
+                },
+            )
+
+    class FailingExecutor:
+        def resource_for(self, *, route: str, action: dict) -> dict:
+            return {"name": action["type"]}
+
+        async def execute(
+            self, *, route: str, action: dict, requester_ctx, approval_id: str
+        ):
+            raise RuntimeError("executor unavailable")
+
+    approvals = MemoryApprovalStore()
+    q, sink = queue_and_sink
+    lifecycle = _lc(
+        graphs=graphs,
+        tools=tools,
+        runtime=ActionRuntime(),
+        approval_store=approvals,
+        approval_executor=FailingExecutor(),
+        policy=RolePolicyEngine(),
+    )
+    await lifecycle.start_stream(
+        query="write",
+        thread_id="t-action-failure",
+        route="echo",
+        sink=sink,
+        ctx=RunContext(tenant_id="acme", user_id="requester"),
+    )
+    required = next(
+        event
+        for event in await drain_events(q)
+        if event["type"] == "x.bridge.approval_required"
+    )
+
+    class CapturingSink:
+        def __init__(self) -> None:
+            self.events: list[dict] = []
+
+        async def emit(self, event: dict) -> None:
+            self.events.append(event)
+
+        async def close(self) -> None:
+            return None
+
+    cap = CapturingSink()
+    approval_id = required["data"]["approval_id"]
+    result = await lifecycle.finalize_approval(
+        approval_id=approval_id,
+        tenant_id="acme",
+        decision="approve",
+        sink=cap,  # type: ignore[arg-type]
+        approver_ctx=RunContext(
+            tenant_id="acme", permissions=["approval:decide"]
+        ),
+    )
+
+    assert result["status"] == "retryable_failed"
+    assert result["error"] == "executor unavailable"
+    assert [event["type"] for event in cap.events] == ["error", "done"]
 
 
 @pytest.mark.asyncio
