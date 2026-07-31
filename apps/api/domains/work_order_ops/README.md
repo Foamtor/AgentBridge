@@ -20,6 +20,19 @@ Use `APPROVAL_STORE_BACKEND=postgres` for P1 restart-safe acceptance.
 Configure `KNOWLEDGE_BACKEND=langchain_pg` for the real RAG path, or
 `KNOWLEDGE_BACKEND=external` for a remote retrieval service.
 
+For the read-only RAG-Agent reference backend, provide a read-only DSN through
+the deployment environment and run the acceptance probe. Do not commit a DSN:
+
+```powershell
+$env:KNOWLEDGE_BACKEND='rag_agent_pg'
+$env:RAG_AGENT_PG_DSN='provided by the secure local environment'
+$env:RAG_AGENT_DEMO_TENANT='rag-agent-demo'
+$env:RAG_AGENT_EMBED_API_BASE='http://127.0.0.1:8080/v1'
+$env:RAG_AGENT_EMBED_MODEL='BAAI/bge-m3'
+$env:RAG_AGENT_EMBED_DIMENSIONS='512'
+python scripts/verify_rag_agent_readonly.py
+```
+
 Required permissions:
 
 - `workorder:read`: list and statistics;
