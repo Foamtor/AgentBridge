@@ -2,18 +2,31 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import pytest
 from agentbridge_core.adapters.fake_data_source import FakeDataSource
 from agentbridge_core.adapters.fake_retriever import FakeRetriever
+from agentbridge_core.adapters.inprocess_cancel import InProcessCancelRegistry
+from agentbridge_core.adapters.inprocess_lock import InProcessThreadLock
 from agentbridge_core.adapters.memory_audit_logger import MemoryAuditLogger
+from agentbridge_core.adapters.memory_checkpointer import MemoryCheckpointerFactory
+from agentbridge_core.adapters.memory_event_log import MemoryEventLog
+from agentbridge_core.adapters.memory_message_store import MemoryMessageStore
+from agentbridge_core.adapters.memory_run_store import MemoryRunStore
+from agentbridge_core.adapters.noop_hooks import NoopHooks
 from agentbridge_core.adapters.role_policy import RolePolicyEngine
+from agentbridge_core.application.run_lifecycle import RunLifecycle
 from agentbridge_core.application.tool_guard import guard_tools
 from agentbridge_core.protocol.context import RUN_CONTEXT_KEY, RunContext
+from agentbridge_core.registry.graphs import GraphRegistry
+from agentbridge_core.registry.input_builders import InputBuilderRegistry
+from agentbridge_core.registry.tools import ToolRegistry
 from domains.work_order_ops.approval import make_create_work_order_handler
 from domains.work_order_ops.graph import _chart_payload
 from domains.work_order_ops.tools import prepare_work_order_draft
@@ -44,11 +57,13 @@ def _events(body: str) -> list[dict]:
     ]
 
 
-def _token(secret: str, *, permissions: list[str]) -> str:
+def _token(
+    secret: str, *, permissions: list[str], tenant_id: str = "rag-agent-demo"
+) -> str:
     return jwt.encode(
         {
             "sub": "work-order-user",
-            "tenant_id": "rag-agent-demo",
+            "tenant_id": tenant_id,
             "roles": ["viewer"],
             "permissions": permissions,
         },
@@ -1062,7 +1077,10 @@ async def test_create_handler_is_transactional_and_idempotent() -> None:
             "ledger_summary": "Synthetic ledger",
         },
     }
-    ctx = RunContext(tenant_id="acme")
+    ctx = RunContext(
+        tenant_id="acme",
+        permissions=["workorder:create", "workorder:assign"],
+    )
     first = await handler(action=action, requester_ctx=ctx, approval_id="ap-1")
     second = await handler(action=action, requester_ctx=ctx, approval_id="ap-1")
 
@@ -1112,6 +1130,343 @@ async def test_create_handler_rejects_inactive_assignee_without_partial_write() 
     )
 
 
+@pytest.mark.asyncio
+async def test_create_handler_rolls_back_when_ledger_insert_fails() -> None:
+    class LedgerFailingDataSource(FakeDataSource):
+        async def execute(self, sql: str, *params: Any) -> int:
+            if "INSERT INTO ledgers" in sql:
+                raise RuntimeError("ledger insert unavailable")
+            return await super().execute(sql, *params)
+
+    source = LedgerFailingDataSource()
+    source.seed(
+        "assignees",
+        [{"id": "a1", "tenant_id": "acme", "active": True}],
+    )
+    action = {
+        "type": "work_order_ops.create_v1",
+        "payload": {
+            "draft_id": "rollback-draft",
+            "title": "Synthetic rollback alert",
+            "priority": "high",
+            "assignee_id": "a1",
+            "ledger_summary": "Synthetic rollback ledger",
+        },
+    }
+
+    with pytest.raises(RuntimeError, match="ledger insert unavailable"):
+        await make_create_work_order_handler(source)(
+            action=action,
+            requester_ctx=RunContext(tenant_id="acme"),
+            approval_id="ap-rollback",
+        )
+
+    assert await source.query("SELECT * FROM work_orders WHERE tenant_id = $1", "acme") == []
+    assert await source.query("SELECT * FROM ledgers WHERE tenant_id = $1", "acme") == []
+
+
+def test_denying_work_order_approval_performs_no_business_write(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = "work-order-deny-secret"
+    _configure_real_runtime_auth(monkeypatch, secret=secret)
+    source = FakeDataSource()
+    source.seed(
+        "assignees",
+        [{"id": "assignee-rag-demo", "tenant_id": "rag-agent-demo", "active": True}],
+    )
+    from testing.app_factory import create_test_app
+
+    app = create_test_app()
+    app.state.bootstrap_data_source = source
+    headers = {"Authorization": f"Bearer {_token(secret, permissions=ALL_WORK_ORDER_PERMISSIONS)}"}
+    body = {
+        "query": "创建工单",
+        "thread_id": "wo-deny",
+        "route": "work_order_ops",
+        "extra": {
+            "work_order_draft": {
+                "title": "拒绝写入验证",
+                "priority": "high",
+                "assignee_id": "assignee-rag-demo",
+                "ledger_summary": "审批拒绝时不得写入",
+            }
+        },
+    }
+    with TestClient(app) as client:
+        created = client.post("/chat/stream", headers=headers, json=body)
+        approval_id = next(
+            event["data"]["approval_id"]
+            for event in _events(created.text)
+            if event["type"] == "x.bridge.approval_required"
+        )
+        denied = client.post(
+            f"/approvals/{approval_id}", headers=headers, json={"decision": "deny"}
+        )
+
+    assert denied.status_code == 200
+    assert denied.json()["approval"]["status"] == "denied"
+    assert awaitable_empty(source, "work_orders")
+    assert awaitable_empty(source, "ledgers")
+    assert not any(
+        event["type"] == "x.work_order_ops.work_order_created"
+        for event in _events(created.text)
+    )
+
+
+def test_approval_requires_same_tenant_and_decide_permission_without_business_write(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = "work-order-approval-authorization-secret"
+    _configure_real_runtime_auth(monkeypatch, secret=secret)
+    source = FakeDataSource()
+    source.seed(
+        "assignees",
+        [{"id": "assignee-rag-demo", "tenant_id": "rag-agent-demo", "active": True}],
+    )
+    from testing.app_factory import create_test_app
+
+    app = create_test_app()
+    app.state.bootstrap_data_source = source
+    requester_headers = {
+        "Authorization": f"Bearer {_token(secret, permissions=ALL_WORK_ORDER_PERMISSIONS)}"
+    }
+    body = {
+        "query": "创建工单",
+        "thread_id": "wo-approval-auth",
+        "route": "work_order_ops",
+        "extra": {
+            "work_order_draft": {
+                "title": "审批鉴权验证",
+                "priority": "medium",
+                "assignee_id": "assignee-rag-demo",
+                "ledger_summary": "越权审批不得写入",
+            }
+        },
+    }
+    with TestClient(app) as client:
+        created = client.post("/chat/stream", headers=requester_headers, json=body)
+        approval_id = next(
+            event["data"]["approval_id"]
+            for event in _events(created.text)
+            if event["type"] == "x.bridge.approval_required"
+        )
+        missing_permission = client.post(
+            f"/approvals/{approval_id}",
+            headers={
+                "Authorization": f"Bearer {_token(secret, permissions=['workorder:create'])}"
+            },
+            json={"decision": "approve"},
+        )
+        cross_tenant = client.post(
+            f"/approvals/{approval_id}",
+            headers={
+                "Authorization": f"Bearer {_token(secret, permissions=['approval:decide'], tenant_id='other')}"
+            },
+            json={"decision": "approve"},
+        )
+
+    assert missing_permission.status_code == 403
+    assert cross_tenant.status_code == 404
+    assert awaitable_empty(source, "work_orders")
+    assert awaitable_empty(source, "ledgers")
+
+
+def test_timeout_and_requester_permission_revocation_do_not_write_work_orders(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = "work-order-timeout-and-revocation-secret"
+    _configure_real_runtime_auth(monkeypatch, secret=secret)
+    source = FakeDataSource()
+    source.seed(
+        "assignees",
+        [{"id": "assignee-rag-demo", "tenant_id": "rag-agent-demo", "active": True}],
+    )
+    from testing.app_factory import create_test_app
+
+    app = create_test_app()
+    app.state.bootstrap_data_source = source
+    headers = {"Authorization": f"Bearer {_token(secret, permissions=ALL_WORK_ORDER_PERMISSIONS)}"}
+
+    def create_pending(client: TestClient, thread_id: str) -> str:
+        response = client.post(
+            "/chat/stream",
+            headers=headers,
+            json={
+                "query": "创建工单",
+                "thread_id": thread_id,
+                "route": "work_order_ops",
+                "extra": {
+                    "work_order_draft": {
+                        "title": f"{thread_id} 工单",
+                        "priority": "high",
+                        "assignee_id": "assignee-rag-demo",
+                        "ledger_summary": f"{thread_id} 台账",
+                    }
+                },
+            },
+        )
+        return next(
+            event["data"]["approval_id"]
+            for event in _events(response.text)
+            if event["type"] == "x.bridge.approval_required"
+        )
+
+    with TestClient(app) as client:
+        timeout_id = create_pending(client, "wo-timeout")
+        timeout = client.portal.call(
+            lambda: client.app.state.run_lifecycle.finalize_approval(
+                approval_id=timeout_id,
+                tenant_id="rag-agent-demo",
+                decision="deny",
+                reason="timeout",
+                sink=None,
+            )
+        )
+        revoked_id = create_pending(client, "wo-requester-revoked")
+        # The approval snapshot is the authority Lifecycle re-checks at execution.
+        client.app.state.approval_store._by_id[revoked_id]["requester_context"][
+            "permissions"
+        ] = []
+        revoked = client.post(
+            f"/approvals/{revoked_id}", headers=headers, json={"decision": "approve"}
+        )
+
+    assert timeout["status"] == "denied"
+    assert timeout["reason"] == "timeout"
+    assert revoked.status_code == 200
+    assert revoked.json()["approval"]["status"] == "denied"
+    assert awaitable_empty(source, "work_orders")
+    assert awaitable_empty(source, "ledgers")
+
+
+def test_concurrent_approve_and_delivery_failure_preserve_one_committed_work_order(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FailingEventLog(MemoryEventLog):
+        fail_appends = False
+
+        async def append(self, run_id: str, event: dict, *, tenant_id: str) -> None:
+            if self.fail_appends:
+                raise RuntimeError("event log unavailable")
+            await super().append(run_id, event, tenant_id=tenant_id)
+
+    class CapturingSink:
+        def __init__(self) -> None:
+            self.events: list[dict[str, Any]] = []
+
+        async def emit(self, event: dict[str, Any]) -> None:
+            self.events.append(event)
+
+        async def close(self) -> None:
+            return None
+
+    secret = "work-order-concurrent-delivery-secret"
+    _configure_real_runtime_auth(monkeypatch, secret=secret)
+    source = FakeDataSource()
+    source.seed(
+        "assignees",
+        [{"id": "assignee-rag-demo", "tenant_id": "rag-agent-demo", "active": True}],
+    )
+    from testing.app_factory import create_test_app
+
+    app = create_test_app()
+    app.state.bootstrap_data_source = source
+    headers = {"Authorization": f"Bearer {_token(secret, permissions=ALL_WORK_ORDER_PERMISSIONS)}"}
+    with TestClient(app) as client:
+        created = client.post(
+            "/chat/stream",
+            headers=headers,
+            json={
+                "query": "创建工单",
+                "thread_id": "wo-concurrent-delivery",
+                "route": "work_order_ops",
+                "extra": {
+                    "work_order_draft": {
+                        "title": "并发审批工单",
+                        "priority": "high",
+                        "assignee_id": "assignee-rag-demo",
+                        "ledger_summary": "并发审批台账",
+                    }
+                },
+            },
+        )
+        required = next(
+            event
+            for event in _events(created.text)
+            if event["type"] == "x.bridge.approval_required"
+        )
+        approval_id = required["data"]["approval_id"]
+        run_id = required["run_id"]
+        lifecycle = client.app.state.run_lifecycle
+        failing_log = FailingEventLog()
+        lifecycle._event_log = failing_log
+
+        async def approve_twice() -> list[dict[str, Any]]:
+            sinks = [CapturingSink(), CapturingSink()]
+            return await asyncio.gather(
+                *(
+                    lifecycle.finalize_approval(
+                        approval_id=approval_id,
+                        tenant_id="rag-agent-demo",
+                        decision="approve",
+                        sink=sink,
+                        approver_ctx=RunContext(
+                            tenant_id="rag-agent-demo",
+                            permissions=["approval:decide"],
+                        ),
+                    )
+                    for sink in sinks
+                )
+            )
+
+        failing_log.fail_appends = True
+        results = client.portal.call(approve_twice)
+        stored = client.portal.call(
+            lambda: client.app.state.approval_store.get(
+                approval_id, tenant_id="rag-agent-demo"
+            )
+        )
+        run = client.portal.call(
+            lambda: client.app.state.run_store.get(run_id, tenant_id="rag-agent-demo")
+        )
+
+    assert {result["status"] for result in results} <= {"succeeded", "executing"}
+    assert stored and stored["status"] == "succeeded"
+    assert stored["result_delivery_error"]
+    assert run and run["status"] == "done"
+    assert run["result_delivery_error"]
+    assert len(source._tables["work_orders"]) == 1
+    assert len(source._tables["ledgers"]) == 1
+
+
+def test_old_client_can_ignore_work_order_extensions_and_still_observe_done(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AGENTBRIDGE_FAKE_RUNTIME", "0")
+    from testing.app_factory import create_test_app
+
+    app = create_test_app()
+    with TestClient(app) as client:
+        response = client.post(
+            "/chat/stream",
+            json={
+                "query": "show work orders",
+                "thread_id": "wo-old-client",
+                "route": "work_order_ops",
+            },
+        )
+
+    stable_types = [
+        event["type"]
+        for event in _events(response.text)
+        if not event["type"].startswith("x.work_order_ops.")
+    ]
+    assert response.status_code == 200
+    assert stable_types[0] == "start"
+    assert stable_types[-1] == "done"
+
+
 def test_work_order_ops_retriever_failure_is_not_an_empty_hit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1148,20 +1503,29 @@ def test_work_order_ops_retriever_failure_is_not_an_empty_hit(
     not os.environ.get("AGENTBRIDGE_TEST_PG_DSN"),
     reason="AGENTBRIDGE_TEST_PG_DSN not set",
 )
-async def test_postgres_handler_rebuilds_same_result_after_new_instance() -> None:
+async def test_postgres_approval_recovery_reuses_committed_business_result() -> None:
     import asyncpg
+    from adapters.approval_action_registry import ApprovalActionRegistry
+    from adapters.postgres_approval_store import PostgresApprovalStore
     from adapters.postgres_data_source import PostgresDataSource
 
     dsn = os.environ["AGENTBRIDGE_TEST_PG_DSN"]
-    migration = (
-        Path(__file__).resolve().parents[1] / "migrations" / "005_work_order_ops.sql"
-    )
+    migration_dir = Path(__file__).resolve().parents[1] / "migrations"
     connection = await asyncpg.connect(dsn)
     try:
-        await connection.execute(migration.read_text(encoding="utf-8"))
+        for filename in (
+            "004_approval_execution.sql",
+            "005_work_order_ops.sql",
+            "006_approval_hardening.sql",
+            "007_work_order_demo_tenant.sql",
+        ):
+            await connection.execute(
+                (migration_dir / filename).read_text(encoding="utf-8")
+            )
     finally:
         await connection.close()
 
+    approval_id = f"pg-recovery-{os.urandom(8).hex()}"
     action = {
         "type": "work_order_ops.create_v1",
         "payload": {
@@ -1172,20 +1536,124 @@ async def test_postgres_handler_rebuilds_same_result_after_new_instance() -> Non
             "ledger_summary": "Synthetic recovery ledger",
         },
     }
-    ctx = RunContext(tenant_id="acme")
+    ctx = RunContext(
+        tenant_id="acme",
+        permissions=["workorder:create", "workorder:assign"],
+    )
     first_source = PostgresDataSource(dsn)
+    first_store = PostgresApprovalStore(dsn)
+    first_registry = ApprovalActionRegistry()
+    first_registry.register(
+        "work_order_ops",
+        "work_order_ops.create_v1",
+        make_create_work_order_handler(first_source),
+        {
+            "name": "create_work_order",
+            "required_permissions_all": ["workorder:create", "workorder:assign"],
+        },
+    )
     try:
-        first = await make_create_work_order_handler(first_source)(
-            action=action, requester_ctx=ctx, approval_id="pg-recovery-test"
+        await first_store.create(
+            {
+                "approval_id": approval_id,
+                "tenant_id": "acme",
+                "route": "work_order_ops",
+                "run_id": f"run-{approval_id}",
+                "thread_id": f"thread-{approval_id}",
+                "storage_key": f"acme::thread-{approval_id}",
+                "sequence": 1,
+                "action": action,
+                "requester_context": ctx.model_dump(),
+            }
+        )
+        approved = await first_store.decide(
+            approval_id, tenant_id="acme", decision="approve"
+        )
+        assert approved and approved["status"] == "approved_pending_execution"
+        claimed = await first_store.claim_execution(
+            approval_id,
+            tenant_id="acme",
+            now=datetime.now(UTC),
+            lease_seconds=0.01,
+        )
+        assert claimed and claimed["execution_token"]
+        first = await first_registry.execute(
+            route="work_order_ops",
+            action=action,
+            requester_ctx=ctx,
+            approval_id=approval_id,
         )
     finally:
         await first_source.close()
+        await first_store.close()
 
     second_source = PostgresDataSource(dsn)
+    second_store = PostgresApprovalStore(dsn)
+    second_registry = ApprovalActionRegistry()
+    second_registry.register(
+        "work_order_ops",
+        "work_order_ops.create_v1",
+        make_create_work_order_handler(second_source),
+        {
+            "name": "create_work_order",
+            "required_permissions_all": ["workorder:create", "workorder:assign"],
+        },
+    )
+
+    class CapturingSink:
+        async def emit(self, event: dict[str, Any]) -> None:
+            return None
+
+        async def close(self) -> None:
+            return None
+
+    second_lifecycle = RunLifecycle(
+        locks=InProcessThreadLock(),
+        checkpointers=MemoryCheckpointerFactory(),
+        graphs=GraphRegistry(),
+        tools=ToolRegistry(),
+        input_builders=InputBuilderRegistry(),
+        runtime=object(),
+        cancels=InProcessCancelRegistry(),
+        hooks=NoopHooks(),
+        event_log=MemoryEventLog(),
+        message_store=MemoryMessageStore(),
+        run_store=MemoryRunStore(),
+        approval_store=second_store,
+        approval_executor=second_registry,
+        policy=RolePolicyEngine(),
+    )
     try:
-        second = await make_create_work_order_handler(second_source)(
-            action=action, requester_ctx=ctx, approval_id="pg-recovery-test"
+        await asyncio.sleep(0.02)
+        succeeded = await second_lifecycle.finalize_approval(
+            approval_id=approval_id,
+            tenant_id="acme",
+            decision="approve",
+            sink=CapturingSink(),
+            approver_ctx=RunContext(
+                tenant_id="acme", permissions=["approval:decide"]
+            ),
         )
+        assert succeeded and succeeded["status"] == "succeeded"
+        assert len(
+            await second_source.query(
+                "SELECT * FROM work_orders WHERE approval_id = $1 AND tenant_id = $2",
+                approval_id,
+                "acme",
+            )
+        ) == 1
+        assert len(
+            await second_source.query(
+                "SELECT * FROM ledgers WHERE approval_id = $1 AND tenant_id = $2",
+                approval_id,
+                "acme",
+            )
+        ) == 1
     finally:
         await second_source.close()
-    assert first == second
+        await second_store.close()
+    assert succeeded["result"] == {
+        "fragments": [
+            {"type": fragment.type, "data": fragment.data} for fragment in first
+        ]
+    }
