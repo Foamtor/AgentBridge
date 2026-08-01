@@ -1,6 +1,6 @@
 # P2-A 运行、安全、RAG 与控制台验收记录
 
-> **状态：** 进行中。此记录只公开脱敏后的命令、版本、数量和结论；它不是生产部署、具体 IdP 认证或多机验收证据。
+> **状态：** 已完成（P2-A）。此记录只公开脱敏后的命令、版本、数量和结论；它不是生产部署、具体 IdP 认证或多机验收证据。
 
 ## 脱敏规则
 
@@ -18,7 +18,7 @@ P2-B 仍需完成：干净环境部署、迁移与升级/回滚、备份恢复�
 
 | 字段 | 当前记录 |
 |---|---|
-| 分支与基线提交 | `codex/p2a-release-validation`；待 A9 汇总最终 SHA |
+| 分支与 A9 验证提交 | `codex/p2a-release-validation`；`3b9231a` |
 | Python | 3.12.13（本地 `.venv`） |
 | Node / npm | 22.14.0 / 10.9.2 |
 | PostgreSQL 测试库 | 独立可销毁 pgvector 容器；连接信息未记录 |
@@ -35,6 +35,7 @@ P2-B 仍需完成：干净环境部署、迁移与升级/回滚、备份恢复�
 | A0 | 全仓 Ruff 基线 | recorded | 61 条既有债务；P2-A 仅要求变更路径为零，清零移交 P3 |
 | A4 | 平台 pgvector live | pass | 独立容器；同租户 citation、跨租户零命中；不记录文档或向量 |
 | A9（预检） | 全量 Python/架构/Web 门禁 | pass | 354 passed，7 skipped；变更路径 Ruff、架构扫描、Web test/build 均通过 |
+| A9（最终） | 全量 Python/架构/Web 门禁 | pass | 356 passed，8 skipped；A4 live 27 passed；变更路径 Ruff、架构扫描、证据检查、Web test/build 均通过 |
 
 ## 任务状态
 
@@ -49,7 +50,7 @@ P2-B 仍需完成：干净环境部署、迁移与升级/回滚、备份恢复�
 | A6 | complete | 取消、EventLog 顺序、投递失败与审批幂等矩阵通过（43 passed，1 skipped） |
 | A7 | complete | 单机限流、窗口恢复与 readiness/status 安全矩阵通过（10 passed） |
 | A8 | complete | Node 22.14 下 Vitest（6 tests）、build、控制台 stream→replay→audit 闭环与 CI job 通过 |
-| A9 | pending | 全量复核与发布口径 |
+| A9 | complete | 全量门禁、独立 diff 审阅、脱敏扫描与发布口径更新完成 |
 
 ## 阻塞项与已知限制
 
@@ -71,4 +72,4 @@ P2-B 仍需完成：干净环境部署、迁移与升级/回滚、备份恢复�
 | A8 web console | pass | Codex / 2026-08-01；Vitest 6 passed、build 通过、闭环仅输出状态与数量 |
 | A4 platform pgvector | pass | Codex / 2026-08-01；独立容器、512 维本机 embedding、同租户 citation/跨租户隔离通过 |
 | A4 RAG-Agent readonly probe | pass | Codex / 2026-08-01；demo tenant 5 citations，other tenant 0；输出采用固定 allowlist |
-| A9 | pending | 待实施 |
+| A9 final review | pass | Codex / 2026-08-01；全量门禁与 base-to-head 审阅通过，无 Critical/Important 问题 |
