@@ -45,7 +45,7 @@ P2-B 仍需完成：干净环境部署、迁移与升级/回滚、备份恢复�
 | A4 | pending | pgvector 与只读 RAG-Agent；需要安全注入测试连接 |
 | A5 | complete | MockTransport 协议、失败策略、501 与 citation 矩阵通过；厂商现场联调仍属 P2-B |
 | A6 | complete | 取消、EventLog 顺序、投递失败与审批幂等矩阵通过（43 passed，1 skipped） |
-| A7 | pending | 单机限流与 readiness |
+| A7 | complete | 单机限流、窗口恢复与 readiness/status 安全矩阵通过（10 passed） |
 | A8 | pending | Vitest、控制台与 CI |
 | A9 | pending | 全量复核与发布口径 |
 
@@ -65,4 +65,5 @@ P2-B 仍需完成：干净环境部署、迁移与升级/回滚、备份恢复�
 | A3 授权与审计 | pass | Codex / 2026-08-01 |
 | A5 external RAG contract | pass | Codex / 2026-08-01；18 passed，vendor-live deferred to P2-B |
 | A6 lifecycle and delivery | pass | Codex / 2026-08-01；43 passed，1 skipped |
-| A4、A7–A9 | pending | 待实施 |
+| A7 single-node readiness | pass | Codex / 2026-08-01；10 passed；不含 Redis/多机结论 |
+| A4、A8–A9 | pending | 待实施 |
