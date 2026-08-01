@@ -12,11 +12,14 @@ export async function adminFetch<T>(
   if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(`${apiBase()}${path}`, { ...init, headers });
   if (!res.ok) {
-    const detail = await res.json().catch(() => ({}));
+    // API error bodies may include operator-only diagnostics. The console only
+    // needs a stable status-level message and must not surface them to users.
     const message =
-      typeof detail?.detail?.message === "string"
-        ? detail.detail.message
-        : `HTTP ${res.status}`;
+      res.status === 401
+        ? "Unauthorized"
+        : res.status === 403
+          ? "Forbidden"
+          : `Request failed (HTTP ${res.status})`;
     throw new Error(message);
   }
   return (await res.json()) as T;
