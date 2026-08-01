@@ -55,7 +55,7 @@ EMBED_DIMENSIONS=512
 手测步骤：
 
 1. `docker compose --profile rag up -d`
-2. 执行 `apps/api/migrations/003_knowledge_pgvector.sql`；既有安装再执行 `004_knowledge_unbounded_vector.sql`。`EMBED_DIMENSIONS` 必须与 embedding 模型输出一致。
+2. 执行 `apps/api/migrations/003_knowledge_pgvector.sql`。P2-A 参考模型为 `BAAI/bge-m3`（512 维）；既有集合更换模型维度时必须重建并重嵌入，升级流程留在 P2-B。
 3. 配好 `EMBED_*`，跑 `python scripts/ingest_demo_rag.py`
 4. 启动 API，对 `demo_rag` 发对话，应看到带 `chunk_id` / `doc_id` 的 citation；跨租户搜不到
 
