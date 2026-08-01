@@ -30,6 +30,7 @@
 | Fake | 内存检索；CI 默认 |
 | `langchain_pg` | PG + pgvector + HTTP Embedding（OpenAI 兼容 / TEI） |
 | `external` | 外部 HTTP 检索（由 lifespan 组装；ingest 可能 501） |
+| `rag_agent_pg` | 已完成真实验收的只读 RAG-Agent PostgreSQL 接入；仅固定演示租户可检索 |
 | 示例插件 | `demo_rag` → SSE `x.bridge.citation`（字段对齐 `KnowledgeHit`） |
 | HTTP `/ingest` | 已提供（需 `knowledge:write`）；后端不支持时返回 501 |
 | 种子脚本 | `scripts/ingest_demo_rag.py`（进程内入库，便于本地灌 demo） |
@@ -39,6 +40,9 @@
 ```bash
 pip install -e "apps/api[rag]"
 ```
+
+`rag_agent_pg` 不会摄取或修改 RAG-Agent 数据。使用只读账号，并可运行
+`python scripts/verify_rag_agent_readonly.py` 完成无正文、无凭据输出的验收探针。
 
 ```env
 KNOWLEDGE_BACKEND=langchain_pg
@@ -78,3 +82,11 @@ EMBED_DIMENSIONS=1024
 
 **Q：客户已有 RAG？**  
 用 `KNOWLEDGE_BACKEND=external` + `KB_EXTERNAL_BASE_URL`。对接字段以代码适配器与 `.env.example` 为准；历史协议稿若缺失，以完整方案与实现为准。
+# Work-order RAG reference
+
+The `work_order_ops` golden case combines tenant-scoped business data with SOP
+and FAQ retrieval. With `KB_EXTERNAL_FAILURE_POLICY=fail_run`, external
+timeouts and 5xx responses are dependency failures and must reach a stable
+error path; only a successful `200` response with `hits: []` means “no
+knowledge match.” See
+[`apps/api/domains/work_order_ops/README.md`](../apps/api/domains/work_order_ops/README.md).

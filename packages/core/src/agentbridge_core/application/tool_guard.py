@@ -31,15 +31,17 @@ def _resource_for(tool: Any) -> dict[str, Any]:
         "name": name,
         "required_roles": meta["required_roles"],
         "required_permissions": meta["required_permissions"],
+        "required_permissions_all": meta["required_permissions_all"],
     }
 
 
 def _deny_reason_code(resource: dict[str, Any]) -> str:
     roles = list(resource.get("required_roles") or [])
     perms = list(resource.get("required_permissions") or [])
-    if roles and not perms:
+    perms_all = list(resource.get("required_permissions_all") or [])
+    if roles and not perms and not perms_all:
         return "role_mismatch"
-    if perms and not roles:
+    if (perms or perms_all) and not roles:
         return "permission_mismatch"
     return "policy_deny"
 

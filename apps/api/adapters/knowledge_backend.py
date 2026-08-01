@@ -7,6 +7,9 @@ from typing import Any
 from agentbridge_core.adapters.fake_retriever import FakeRetriever
 from config.settings import Settings
 
+_RAG_AGENT_EMBED_MODEL = "BAAI/bge-m3"
+_RAG_AGENT_EMBED_DIMENSIONS = 512
+
 
 def resolve_kb_dsn(settings: Settings) -> str:
     if settings.kb_dsn:
@@ -44,6 +47,41 @@ def validate_external_settings(settings: Settings) -> None:
         )
 
 
+def validate_rag_agent_pg_settings(settings: Settings) -> None:
+    missing: list[str] = []
+    incompatible: list[str] = []
+    if not (settings.rag_agent_pg_dsn or "").strip():
+        missing.append("RAG_AGENT_PG_DSN")
+    if not (settings.rag_agent_demo_tenant or "").strip():
+        missing.append("RAG_AGENT_DEMO_TENANT")
+    if not (settings.rag_agent_embed_api_base or "").strip():
+        missing.append("RAG_AGENT_EMBED_API_BASE")
+    model = (settings.rag_agent_embed_model or "").strip()
+    if not model:
+        missing.append("RAG_AGENT_EMBED_MODEL")
+    elif model != _RAG_AGENT_EMBED_MODEL:
+        incompatible.append(
+            f"RAG_AGENT_EMBED_MODEL must be {_RAG_AGENT_EMBED_MODEL}"
+        )
+    dimensions = settings.rag_agent_embed_dimensions
+    if dimensions is None or int(dimensions) <= 0:
+        missing.append("RAG_AGENT_EMBED_DIMENSIONS")
+    elif int(dimensions) != _RAG_AGENT_EMBED_DIMENSIONS:
+        incompatible.append(
+            f"RAG_AGENT_EMBED_DIMENSIONS must be {_RAG_AGENT_EMBED_DIMENSIONS}"
+        )
+    if missing:
+        raise RuntimeError(
+            "KNOWLEDGE_BACKEND=rag_agent_pg missing required config: "
+            + ", ".join(missing)
+        )
+    if incompatible:
+        raise RuntimeError(
+            "KNOWLEDGE_BACKEND=rag_agent_pg incompatible config: "
+            + ", ".join(incompatible)
+        )
+
+
 async def build_retriever(settings: Settings) -> Any:
     backend = (settings.knowledge_backend or "fake").strip().lower()
     if backend == "fake":
@@ -60,7 +98,9 @@ async def build_retriever(settings: Settings) -> Any:
         )
     if backend == "langchain_pg":
         validate_langchain_pg_settings(settings)
-        from agentbridge_core.adapters.langchain_pg_retriever import LangchainPgRetriever
+        from agentbridge_core.adapters.langchain_pg_retriever import (
+            LangchainPgRetriever,
+        )
 
         return await LangchainPgRetriever.create(
             dsn=resolve_kb_dsn(settings),
@@ -69,6 +109,19 @@ async def build_retriever(settings: Settings) -> Any:
             embed_dimensions=int(settings.embed_dimensions),
             embed_api_key=settings.embed_api_key or "",
         )
+    if backend == "rag_agent_pg":
+        validate_rag_agent_pg_settings(settings)
+        from adapters.rag_agent_pg_retriever import RagAgentPgRetriever
+
+        return await RagAgentPgRetriever.create(
+            dsn=settings.rag_agent_pg_dsn.strip(),
+            demo_tenant=settings.rag_agent_demo_tenant.strip(),
+            embed_api_base=settings.rag_agent_embed_api_base.strip(),
+            embed_api_key=settings.rag_agent_embed_api_key or "",
+            embed_model=settings.rag_agent_embed_model.strip(),
+            embed_dimensions=int(settings.rag_agent_embed_dimensions),
+        )
     raise RuntimeError(
-        f"Unsupported KNOWLEDGE_BACKEND={backend!r}; use fake|langchain_pg|external"
+        "Unsupported KNOWLEDGE_BACKEND="
+        f"{backend!r}; use fake|langchain_pg|external|rag_agent_pg"
     )

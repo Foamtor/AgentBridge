@@ -11,6 +11,20 @@
 | 单机生产 | 本进程内存 | 本进程或 Redis | Postgres | 主承诺 |
 | 多机 | Redis（或数据库锁） | Redis | 集中式 Postgres | 需显式配置 |
 
+## 支持矩阵与当前承诺
+
+| 环境 | PostgreSQL / pgvector | Redis | OIDC | LLM Gateway | RAG 后端 | 当前承诺 |
+|------|------------------------|-------|------|-------------|----------|----------|
+| 本地体验 | 可不用 | 不用 | 可不用 | 可用默认 Fake 模型 | `fake` | 仅开发与 CI |
+| 单机技术预览 | 推荐 Postgres | 可不用 | 可选 | direct 或 gateway | `fake`、`langchain_pg`、`external` | 可体验，不承诺生产稳定 |
+| 单机生产验收候选 | 必须真实 Postgres；RAG 另需 pgvector | 进程内或 Redis | 必须启用 | 必须配置真实出口 | 按下方支持矩阵 | 仍须完成 P1/P2/P3 发布门槛 |
+| 双实例验证 | 集中式 Postgres | 必须 Redis 锁与限流 | 必须启用 | 必须配置真实出口 | 按下方支持矩阵 | P2 验收项，尚非默认承诺 |
+
+- `fake` 仅本地/CI，不能作为生产证据。
+- `langchain_pg` 需要 pgvector、`[rag]` extra 和兼容 embedding 服务。
+- `external` 支持检索；不支持摄取时 `POST /ingest` 返回 501。
+- 多实例必须设置 Redis 锁和限流；未演练前仅技术预览。
+
 ## 两档 Quick Start
 
 | 档 | 适用 | 数据库 | 时间 |

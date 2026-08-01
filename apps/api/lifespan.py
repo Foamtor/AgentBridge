@@ -2,27 +2,33 @@
 
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
+import asyncio
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager, suppress
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, AsyncIterator
+from typing import Any
 
-from fastapi import FastAPI
-
+from adapters.domain_prompt_registry import DomainFilePromptRegistry
+from adapters.knowledge_ingest_factory import build_knowledge_ingest
+from adapters.knowledge_status import build_knowledge_status_provider
+from adapters.memory_usage_store import MemoryUsageStore
+from admin.catalog import build_domain_catalog
 from agentbridge_core.adapters.basic_input_validator import BasicInputValidator
 from agentbridge_core.adapters.inprocess_cancel import InProcessCancelRegistry
 from agentbridge_core.adapters.inprocess_lock import InProcessThreadLock
 from agentbridge_core.adapters.langgraph_runtime import LangGraphRuntime
+from agentbridge_core.adapters.layered_prompt_registry import LayeredPromptRegistry
 from agentbridge_core.adapters.logging_hooks import LoggingHooks
 from agentbridge_core.adapters.memory_approval_store import MemoryApprovalStore
 from agentbridge_core.adapters.memory_audit_logger import MemoryAuditLogger
 from agentbridge_core.adapters.memory_checkpointer import MemoryCheckpointerFactory
-from agentbridge_core.adapters.memory_event_log import MemoryEventLog
-from agentbridge_core.adapters.memory_message_store import MemoryMessageStore
-from agentbridge_core.adapters.memory_run_store import MemoryRunStore
-from agentbridge_core.adapters.memory_ingest_job_store import MemoryIngestJobStore
 from agentbridge_core.adapters.memory_config_provider import MemoryConfigProvider
-from agentbridge_core.adapters.layered_prompt_registry import LayeredPromptRegistry
+from agentbridge_core.adapters.memory_event_log import MemoryEventLog
+from agentbridge_core.adapters.memory_ingest_job_store import MemoryIngestJobStore
+from agentbridge_core.adapters.memory_message_store import MemoryMessageStore
 from agentbridge_core.adapters.memory_prompt_registry import MemoryPromptRegistry
+from agentbridge_core.adapters.memory_run_store import MemoryRunStore
 from agentbridge_core.adapters.noop_data_source import NoopDataSource
 from agentbridge_core.adapters.noop_hooks import NoopHooks
 from agentbridge_core.adapters.role_policy import RolePolicyEngine
@@ -38,12 +44,8 @@ from agentbridge_core.registry.input_builders import InputBuilderRegistry
 from agentbridge_core.registry.tools import ToolRegistry
 from config.logging import configure_logging
 from config.settings import Settings, get_settings
-from admin.catalog import build_domain_catalog
-from adapters.domain_prompt_registry import DomainFilePromptRegistry
-from adapters.knowledge_ingest_factory import build_knowledge_ingest
-from adapters.knowledge_status import build_knowledge_status_provider
-from adapters.memory_usage_store import MemoryUsageStore
 from domains.bootstrap import DOMAIN_META_MAP, register_all
+from fastapi import FastAPI
 
 
 def _resolve_postgres_dsn(settings: Settings) -> str:
@@ -62,6 +64,16 @@ def _build_data_source(settings: Settings) -> Any:
     from adapters.postgres_data_source import PostgresDataSource
 
     return PostgresDataSource(dsn)
+
+
+def _build_approval_store(settings: Settings) -> Any:
+    if settings.approval_store_backend == "memory":
+        return MemoryApprovalStore()
+    if settings.approval_store_backend == "postgres":
+        from adapters.postgres_approval_store import PostgresApprovalStore
+
+        return PostgresApprovalStore(_resolve_postgres_dsn(settings))
+    raise ValueError("unsupported approval store backend")
 
 
 def _build_llm_gateway(settings: Settings) -> Any:
@@ -110,7 +122,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     graphs = GraphRegistry()
     tools = ToolRegistry()
     input_builders = InputBuilderRegistry()
-    register_all(graphs, tools, input_builders)
 
     checkpointers: Any
     if settings.use_memory_checkpointer:
@@ -148,103 +159,154 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         DomainFilePromptRegistry(Path(__file__).resolve().parent / "domains"),
     )
     usage_store = MemoryUsageStore()
-    approval_store = MemoryApprovalStore()
+    approval_store = _build_approval_store(settings)
+    from adapters.approval_action_registry import ApprovalActionRegistry
+
+    approval_actions = ApprovalActionRegistry()
     from adapters.knowledge_backend import build_retriever
 
     retriever = await build_retriever(settings)
-    ingest_job_store = MemoryIngestJobStore()
-    knowledge_ingest = build_knowledge_ingest(settings, retriever, ingest_job_store)
-    knowledge_status_provider = build_knowledge_status_provider(
-        settings,
-        retriever,
-        ingest_jobs=ingest_job_store,
-    )
-    data_source = _build_data_source(settings)
-    llm_gateway = _build_llm_gateway(settings)
-    from adapters.prometheus_metrics import PrometheusMetrics
-    from observability.tracing import make_run_span_factory
-
-    metrics = PrometheusMetrics()
-    span_factory = make_run_span_factory(enabled=settings.otel_enabled)
-
-    lifecycle = RunLifecycle(
-        locks=locks,
-        checkpointers=checkpointers,
-        graphs=graphs,
-        tools=tools,
-        input_builders=input_builders,
-        runtime=runtime,
-        cancels=cancels,
-        hooks=hooks,
-        policy=policy,
-        audit=audit,
-        event_log=event_log,
-        message_store=message_store,
-        run_store=run_store,
-        metrics=metrics,
-        span_factory=span_factory,
-        approval_store=approval_store,
-        safety_hooks=SafetyHooks(redact=True),
-    )
-    pipeline = RequestPipeline(
-        lifecycle=lifecycle,
-        plugins=[
-            InputValidatorPlugin(BasicInputValidator()),
-            ToolPolicyPlugin(
-                policy=policy,
-                audit=audit,
-                tools_registry=tools,
-            ),
-        ],
-    )
-
-    # Production app.state whitelist: lifecycle + pipeline + settings + stores.
-    app.state.settings = settings
-    app.state.run_lifecycle = lifecycle
-    app.state.pipeline = pipeline
-    app.state.audit = audit
-    app.state.event_log = event_log
-    app.state.message_store = message_store
-    app.state.run_store = run_store
-    app.state.approval_store = approval_store
-    app.state.policy = policy
-    app.state.config_provider = config_provider
-    app.state.prompt_registry = platform_prompt_registry
-    app.state.prompt_runtime = prompt_runtime
-    app.state.usage_store = usage_store
-    app.state.retriever = retriever
-    app.state.ingest_job_store = ingest_job_store
-    app.state.knowledge_ingest = knowledge_ingest
-    app.state.knowledge_status_provider = knowledge_status_provider
-    app.state.data_source = data_source
-    app.state.llm_gateway = llm_gateway
-    app.state.metrics = metrics
-    app.state.tools = tools
-    app.state.graphs = graphs
-    app.state.domain_catalog = build_domain_catalog(
-        route_names=tools.keys(),
-        tools_registry=tools,
-        graph_names=set(graphs.keys()),
-        meta_map=DOMAIN_META_MAP,
-    )
-    # Expose checkpointer factory for /ready (memory always "ready" after setup).
-    app.state.checkpointers = checkpointers
-    app.state.redis = redis_client
+    data_source: Any | None = None
+    approval_expiry_task: asyncio.Task[Any] | None = None
     try:
+        ingest_job_store = MemoryIngestJobStore()
+        knowledge_ingest = build_knowledge_ingest(
+            settings,
+            retriever,
+            ingest_job_store,
+        )
+        knowledge_status_provider = build_knowledge_status_provider(
+            settings,
+            retriever,
+            ingest_jobs=ingest_job_store,
+        )
+        data_source = (
+            getattr(app.state, "bootstrap_data_source", None)
+            or _build_data_source(settings)
+        )
+        register_all(
+            graphs,
+            tools,
+            input_builders,
+            approval_actions=approval_actions,
+            data_source=data_source,
+        )
+        llm_gateway = _build_llm_gateway(settings)
+        from adapters.prometheus_metrics import PrometheusMetrics
+        from observability.tracing import make_run_span_factory
+
+        metrics = PrometheusMetrics()
+        span_factory = make_run_span_factory(enabled=settings.otel_enabled)
+
+        lifecycle = RunLifecycle(
+            locks=locks,
+            checkpointers=checkpointers,
+            graphs=graphs,
+            tools=tools,
+            input_builders=input_builders,
+            runtime=runtime,
+            cancels=cancels,
+            hooks=hooks,
+            policy=policy,
+            audit=audit,
+            event_log=event_log,
+            message_store=message_store,
+            run_store=run_store,
+            metrics=metrics,
+            span_factory=span_factory,
+            approval_store=approval_store,
+            approval_executor=approval_actions,
+            approval_execution_lease_seconds=(
+                settings.approval_execution_lease_seconds
+            ),
+            safety_hooks=SafetyHooks(redact=True),
+        )
+
+        async def _approval_expiry_loop() -> None:
+            await lifecycle.expire_pending_approvals(
+                now=datetime.now(timezone.utc)
+            )
+
+            while True:
+                await asyncio.sleep(
+                    settings.approval_expiry_scan_interval_seconds
+                )
+                await lifecycle.expire_pending_approvals(
+                    now=datetime.now(timezone.utc)
+                )
+
+        pipeline = RequestPipeline(
+            lifecycle=lifecycle,
+            plugins=[
+                InputValidatorPlugin(BasicInputValidator()),
+                ToolPolicyPlugin(
+                    policy=policy,
+                    audit=audit,
+                    tools_registry=tools,
+                ),
+            ],
+        )
+
+        # Production app.state whitelist: lifecycle + pipeline + settings + stores.
+        app.state.settings = settings
+        app.state.run_lifecycle = lifecycle
+        app.state.pipeline = pipeline
+        app.state.audit = audit
+        app.state.event_log = event_log
+        app.state.message_store = message_store
+        app.state.run_store = run_store
+        app.state.approval_store = approval_store
+        app.state.approval_actions = approval_actions
+        app.state.policy = policy
+        app.state.config_provider = config_provider
+        app.state.prompt_registry = platform_prompt_registry
+        app.state.prompt_runtime = prompt_runtime
+        app.state.usage_store = usage_store
+        app.state.retriever = retriever
+        app.state.ingest_job_store = ingest_job_store
+        app.state.knowledge_ingest = knowledge_ingest
+        app.state.knowledge_status_provider = knowledge_status_provider
+        app.state.data_source = data_source
+        app.state.llm_gateway = llm_gateway
+        app.state.metrics = metrics
+        app.state.tools = tools
+        app.state.graphs = graphs
+        app.state.domain_catalog = build_domain_catalog(
+            route_names=tools.keys(),
+            tools_registry=tools,
+            graph_names=set(graphs.keys()),
+            meta_map=DOMAIN_META_MAP,
+        )
+        # Expose checkpointer factory for /ready (memory always "ready" after setup).
+        app.state.checkpointers = checkpointers
+        app.state.redis = redis_client
+        approval_expiry_task = asyncio.create_task(_approval_expiry_loop())
         yield
     finally:
-        close_retriever = getattr(retriever, "close", None)
-        if close_retriever is not None:
-            result = close_retriever()
-            if hasattr(result, "__await__"):
-                await result
-        await data_source.close()
-        await checkpointers.teardown()
-        if redis_client is not None:
-            close = getattr(redis_client, "aclose", None) or getattr(
-                redis_client, "close", None
-            )
-            if close is not None:
-                result = close()
+        try:
+            if approval_expiry_task is not None:
+                approval_expiry_task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await approval_expiry_task
+        finally:
+            close_retriever = getattr(retriever, "close", None)
+            if close_retriever is not None:
+                result = close_retriever()
                 if hasattr(result, "__await__"):
                     await result
+            if data_source is not None:
+                await data_source.close()
+            close_approval_store = getattr(approval_store, "close", None)
+            if close_approval_store is not None:
+                result = close_approval_store()
+                if hasattr(result, "__await__"):
+                    await result
+            await checkpointers.teardown()
+            if redis_client is not None:
+                close = getattr(redis_client, "aclose", None) or getattr(
+                    redis_client, "close", None
+                )
+                if close is not None:
+                    result = close()
+                    if hasattr(result, "__await__"):
+                        await result

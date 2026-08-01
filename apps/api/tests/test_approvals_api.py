@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 
 import pytest
+from agentbridge_core.application.run_lifecycle import RunLifecycle
+from agentbridge_core.errors import ApprovalStateConflict
+from config.settings import Settings
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 
 def _parse_sse(body: str) -> list[dict]:
@@ -83,3 +88,221 @@ def test_chat_injects_token_map(client: TestClient) -> None:
     )
     assert r.status_code == 200
     assert isinstance(seen["ctx"].metadata.get("token_map"), dict)
+
+
+def test_approval_response_exposes_only_safe_allowlisted_fields(
+    client: TestClient,
+) -> None:
+    secret = "postgresql://admin:secret@db/private SELECT password"
+
+    async def _finalize(**kwargs):
+        return {
+            "approval_id": kwargs["approval_id"],
+            "status": "retryable_failed",
+            "decision": "approve",
+            "reason": None,
+            "run_id": "r-safe",
+            "thread_id": "t-safe",
+            "result": {"ok": False},
+            "action": {"type": "example.write_v1", "payload": {"secret": secret}},
+            "requester_context": {"token": secret},
+            "execution_token": secret,
+            "execution_lease_expires_at": secret,
+            "error": secret,
+            "result_delivery_error": secret,
+        }
+
+    client.app.state.run_lifecycle.finalize_approval = _finalize
+    response = client.post(
+        "/approvals/ap-safe",
+        json={"decision": "approve"},
+    )
+
+    assert response.status_code == 200
+    approval = response.json()["approval"]
+    assert set(approval) <= {
+        "approval_id",
+        "status",
+        "decision",
+        "reason",
+        "run_id",
+        "thread_id",
+        "result",
+    }
+    for forbidden in (
+        "action",
+        "requester_context",
+        "execution_token",
+        "execution_lease_expires_at",
+        "error",
+        "result_delivery_error",
+    ):
+        assert forbidden not in approval
+    assert secret not in response.text
+
+
+def test_executing_approval_conflict_is_stable_409(client: TestClient) -> None:
+    async def _conflict(**kwargs):
+        raise ApprovalStateConflict("raw internal conflict detail")
+
+    client.app.state.run_lifecycle.finalize_approval = _conflict
+    response = client.post(
+        "/approvals/ap-executing",
+        json={"decision": "deny"},
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "detail": {
+            "code": "approval_state_conflict",
+            "message": "approval is executing",
+        }
+    }
+    assert "raw internal conflict detail" not in response.text
+
+
+@pytest.mark.parametrize("interval", [0, -0.01])
+def test_approval_expiry_scan_interval_must_be_positive(interval: float) -> None:
+    with pytest.raises(ValidationError):
+        Settings(
+            _env_file=None,
+            APPROVAL_EXPIRY_SCAN_INTERVAL_SECONDS=interval,
+        )
+
+
+def test_approval_expiry_scan_interval_defaults_to_thirty_seconds() -> None:
+    settings = Settings(_env_file=None)
+
+    assert settings.approval_expiry_scan_interval_seconds == 30.0
+
+
+@pytest.mark.asyncio
+async def test_lifespan_cancels_approval_expiry_scanner(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AGENTBRIDGE_FAKE_RUNTIME", "1")
+    monkeypatch.setenv("APPROVAL_EXPIRY_SCAN_INTERVAL_SECONDS", "0.01")
+    from adapters import knowledge_backend
+    from testing.app_factory import create_test_app
+
+    class CloseTrackingRetriever:
+        def __init__(self) -> None:
+            self.close_calls = 0
+
+        async def close(self) -> None:
+            self.close_calls += 1
+
+    retriever = CloseTrackingRetriever()
+
+    async def _build_retriever(settings):
+        return retriever
+
+    monkeypatch.setattr(
+        knowledge_backend,
+        "build_retriever",
+        _build_retriever,
+    )
+    second_scan = asyncio.Event()
+    scan_calls = 0
+
+    async def _scan(self, *, now, limit=100):
+        nonlocal scan_calls
+        scan_calls += 1
+        if scan_calls >= 2:
+            second_scan.set()
+        return 0
+
+    monkeypatch.setattr(RunLifecycle, "expire_pending_approvals", _scan)
+    original_create_task = asyncio.create_task
+    scanner_tasks: list[asyncio.Task] = []
+
+    def _capture_task(coro, *args, **kwargs):
+        task = original_create_task(coro, *args, **kwargs)
+        code = getattr(coro, "cr_code", None)
+        if code is not None and code.co_name == "_approval_expiry_loop":
+            scanner_tasks.append(task)
+        return task
+
+    monkeypatch.setattr(asyncio, "create_task", _capture_task)
+    app = create_test_app()
+
+    async with app.router.lifespan_context(app):
+        await asyncio.wait_for(second_scan.wait(), timeout=1)
+        assert len(scanner_tasks) == 1
+        assert not scanner_tasks[0].done()
+
+    assert scan_calls >= 2
+    assert scanner_tasks[0].done()
+    assert scanner_tasks[0].cancelled()
+    assert retriever.close_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_lifespan_startup_failure_does_not_leak_expiry_scanner(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AGENTBRIDGE_FAKE_RUNTIME", "1")
+    import lifespan as lifespan_module
+    from adapters import knowledge_backend
+    from testing.app_factory import create_test_app
+
+    class CloseTrackingRetriever:
+        def __init__(self) -> None:
+            self.close_calls = 0
+
+        async def close(self) -> None:
+            self.close_calls += 1
+
+    retriever = CloseTrackingRetriever()
+
+    async def _build_retriever(settings):
+        return retriever
+
+    monkeypatch.setattr(
+        knowledge_backend,
+        "build_retriever",
+        _build_retriever,
+    )
+    scan_blocker = asyncio.Event()
+
+    async def _scan(self, *, now, limit=100):
+        await scan_blocker.wait()
+        return 0
+
+    monkeypatch.setattr(RunLifecycle, "expire_pending_approvals", _scan)
+    original_create_task = asyncio.create_task
+    scanner_tasks: list[asyncio.Task] = []
+
+    def _capture_task(coro, *args, **kwargs):
+        task = original_create_task(coro, *args, **kwargs)
+        code = getattr(coro, "cr_code", None)
+        if code is not None and code.co_name == "_approval_expiry_loop":
+            scanner_tasks.append(task)
+        return task
+
+    def _fail_catalog(**kwargs):
+        raise RuntimeError("catalog startup failed")
+
+    monkeypatch.setattr(asyncio, "create_task", _capture_task)
+    monkeypatch.setattr(
+        lifespan_module, "build_domain_catalog", _fail_catalog
+    )
+    app = create_test_app()
+
+    with pytest.raises(RuntimeError, match="catalog startup failed"):
+        async with app.router.lifespan_context(app):
+            pass
+    await asyncio.sleep(0)
+
+    try:
+        assert all(
+            task.done() and task.cancelled() for task in scanner_tasks
+        )
+        assert scanner_tasks == []
+        assert retriever.close_calls == 1
+    finally:
+        for task in scanner_tasks:
+            if not task.done():
+                task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task

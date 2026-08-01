@@ -20,12 +20,21 @@ class DirectLLMGateway:
         *,
         ctx: RunContext,
         model: str | None = None,
+        tools: list[Any] | None = None,
+        tool_choice: str | None = None,
     ) -> Any:
         _ = (ctx, model)
-        ainvoke = getattr(self._model, "ainvoke", None)
+        backend = self._model
+        if tools:
+            bind_tools = getattr(backend, "bind_tools", None)
+            if not callable(bind_tools):
+                raise RuntimeError("llm_tool_binding_unsupported")
+            kwargs = {"tool_choice": tool_choice} if tool_choice else {}
+            backend = bind_tools(list(tools), **kwargs)
+        ainvoke = getattr(backend, "ainvoke", None)
         if callable(ainvoke):
             return await ainvoke(messages)
-        invoke = getattr(self._model, "invoke", None)
+        invoke = getattr(backend, "invoke", None)
         if callable(invoke):
             return invoke(messages)
         raise TypeError("injected model has no ainvoke/invoke")

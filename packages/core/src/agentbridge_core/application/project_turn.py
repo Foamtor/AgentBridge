@@ -45,11 +45,18 @@ async def project_turn(
     terminal: str,
 ) -> None:
     events = await event_log.list(run_id, tenant_id=tenant_id)
-    await message_store.append_message(
-        tenant_id,
-        thread_id,
-        {"role": "user", "content": query, "run_id": run_id},
-    )
+    existing = await message_store.list_messages(tenant_id, thread_id)
+    projected_roles = {
+        str(message.get("role"))
+        for message in existing
+        if message.get("run_id") == run_id
+    }
+    if "user" not in projected_roles:
+        await message_store.append_message(
+            tenant_id,
+            thread_id,
+            {"role": "user", "content": query, "run_id": run_id},
+        )
     assistant: dict[str, Any] = {
         "role": "assistant",
         "content": _merge_text_deltas(events),
@@ -58,13 +65,15 @@ async def project_turn(
     trace = _tool_trace(events)
     if trace:
         assistant["tool_trace"] = trace
-    await message_store.append_message(tenant_id, thread_id, assistant)
-    await run_store.upsert(
-        {
-            "run_id": run_id,
-            "tenant_id": tenant_id,
-            "thread_id": thread_id,
-            "status": terminal,
-            "ended_at": datetime.now(timezone.utc).isoformat(),
-        }
-    )
+    if "assistant" not in projected_roles:
+        await message_store.append_message(tenant_id, thread_id, assistant)
+    projected_run = {
+        "run_id": run_id,
+        "tenant_id": tenant_id,
+        "thread_id": thread_id,
+        "status": terminal,
+        "ended_at": datetime.now(timezone.utc).isoformat(),
+    }
+    if terminal == "done":
+        projected_run["error"] = None
+    await run_store.upsert(projected_run)
