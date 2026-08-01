@@ -6,7 +6,6 @@ import os
 
 import pytest
 from fastapi.testclient import TestClient
-
 from middleware.rate_limit import SlidingWindowLimiter
 
 
@@ -16,6 +15,7 @@ def test_sliding_window_third_denied() -> None:
     assert lim.allow("k", now=now) is True
     assert lim.allow("k", now=now + 0.1) is True
     assert lim.allow("k", now=now + 0.2) is False
+    assert lim.allow("k", now=now + 60.1) is True
 
 
 def test_sliding_window_disabled_when_limit_zero() -> None:
