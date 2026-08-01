@@ -4,17 +4,32 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
+from agentbridge_core.application.errors import RunNotFound, ThreadBusy
+from agentbridge_core.errors import ApprovalStateConflict
+from auth.run_context import claims_to_run_context
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
-
-from agentbridge_core.application.errors import RunNotFound, ThreadBusy
-from auth.run_context import claims_to_run_context
 
 router = APIRouter(prefix="/approvals", tags=["approvals"])
 
 
 class ApprovalDecisionBody(BaseModel):
     decision: Literal["approve", "deny"]
+
+
+class ApprovalPublic(BaseModel):
+    approval_id: str
+    status: str
+    decision: str | None = None
+    reason: str | None = None
+    run_id: str | None = None
+    thread_id: str | None = None
+    result: dict[str, Any] | None = None
+
+
+class ApprovalDecisionResponse(BaseModel):
+    ok: Literal[True] = True
+    approval: ApprovalPublic
 
 
 def _ctx(request: Request):
@@ -27,10 +42,14 @@ def _ctx(request: Request):
     )
 
 
-@router.post("/{approval_id}")
+@router.post(
+    "/{approval_id}",
+    response_model=ApprovalDecisionResponse,
+    response_model_exclude_none=True,
+)
 async def resolve_approval(
     approval_id: str, body: ApprovalDecisionBody, request: Request
-) -> dict[str, Any]:
+) -> ApprovalDecisionResponse:
     ctx = _ctx(request)
     if "approval:decide" not in ctx.permissions and "*" not in ctx.permissions:
         raise HTTPException(
@@ -48,6 +67,7 @@ async def resolve_approval(
             tenant_id=tenant_id,
             decision=body.decision,
             sink=None,
+            approver_ctx=ctx,
         )
     except RunNotFound as exc:
         raise HTTPException(
@@ -62,4 +82,14 @@ async def resolve_approval(
                 "message": "cannot resume; lock held",
             },
         ) from exc
-    return {"ok": True, "approval": rec}
+    except ApprovalStateConflict as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "approval_state_conflict",
+                "message": "approval is executing",
+            },
+        ) from exc
+    return ApprovalDecisionResponse(
+        approval=ApprovalPublic.model_validate(rec)
+    )

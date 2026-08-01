@@ -55,6 +55,43 @@ async def test_guard_denies_invoke_for_viewer() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("permissions", [["perm:create"], ["perm:assign"]])
+async def test_guard_denies_when_one_all_required_permission_is_missing(
+    permissions: list[str],
+) -> None:
+    raw = attach_tool_meta(
+        _T(),
+        required_permissions_all=["perm:create", "perm:assign"],
+    )
+    ctx = RunContext(permissions=permissions, tenant_id="t", user_id="u1")
+    audit = MemoryAuditLogger()
+    guarded = guard_tools([raw], policy=RolePolicyEngine(), ctx=ctx, audit=audit)
+
+    assert await guarded[0].ainvoke({}) == "forbidden"
+    assert raw.called is False
+    denied = [record for record in audit.records if record["result"] == "denied"]
+    assert denied[0]["detail"]["reason_code"] == "permission_mismatch"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "permissions", [["perm:create", "perm:assign"], ["*"]]
+)
+async def test_guard_allows_when_all_required_permissions_are_present(
+    permissions: list[str],
+) -> None:
+    raw = attach_tool_meta(
+        _T(),
+        required_permissions_all=["perm:create", "perm:assign"],
+    )
+    ctx = RunContext(permissions=permissions, tenant_id="t", user_id="u1")
+    guarded = guard_tools([raw], policy=RolePolicyEngine(), ctx=ctx)
+
+    assert await guarded[0].ainvoke({}) == "did-delete"
+    assert raw.called is True
+
+
+@pytest.mark.asyncio
 async def test_guard_deny_uses_ctx_policy_bundle_version() -> None:
     raw = attach_tool_meta(_T(), required_roles=["admin"])
     ctx = RunContext(
