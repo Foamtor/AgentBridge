@@ -113,6 +113,8 @@ pip install -e "packages/core[postgres]"
 | `KB_DSN` | 知识库 PG（可省略则用 `PG_DSN`）；需 pgvector |
 | `EMBED_API_BASE` / `EMBED_MODEL` / `EMBED_API_KEY` | Embedding（OpenAI 兼容；本机 TEI） |
 | `EMBED_DIMENSIONS` | 向量维数，须与 embedding 模型输出一致 |
+
+> 同一知识集合不能混用不同向量维度。P2-A 参考配置为 `BAAI/bge-m3` / `512`；已有集合切换模型时必须重建并重嵌入，升级流程留在 P2-B。
 | `KB_EXTERNAL_BASE_URL` | 仅 `external`（R-C） |
 
 安装：`pip install -e "apps/api[rag]"`。  

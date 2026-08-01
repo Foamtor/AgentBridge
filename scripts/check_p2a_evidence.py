@@ -33,6 +33,11 @@ _SECRET_PATTERNS = (
     r"bearer\s+eyJ[\w.-]+",
     r"(?:api[_-]?key|password)\s*[:=]\s*\S+",
 )
+_TASK_STATUS_RE = re.compile(
+    r"^\|\s*(A[0-9])\s*\|\s*(\w+)\s*\|",
+    flags=re.MULTILINE,
+)
+_ALLOWED_TASK_STATUSES = {"complete", "pending", "blocked"}
 
 
 def validate_evidence(text: str) -> list[str]:
@@ -47,6 +52,15 @@ def validate_evidence(text: str) -> list[str]:
     for pattern in _SECRET_PATTERNS:
         if re.search(pattern, lowered, flags=re.IGNORECASE):
             errors.append("disallowed-secret-pattern")
+    statuses = dict(_TASK_STATUS_RE.findall(text))
+    for task in (f"A{i}" for i in range(10)):
+        status = statuses.get(task)
+        if status not in _ALLOWED_TASK_STATUSES:
+            errors.append("invalid-or-missing-task-status")
+    if "**状态：** 已完成（P2-A）" in text and any(
+        statuses.get(task) != "complete" for task in (f"A{i}" for i in range(10))
+    ):
+        errors.append("completed-record-has-incomplete-task")
     return errors
 
 

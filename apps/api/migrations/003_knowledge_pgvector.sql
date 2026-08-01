@@ -5,13 +5,14 @@ CREATE EXTENSION IF NOT EXISTS vector;
 
 CREATE SCHEMA IF NOT EXISTS knowledge;
 
--- Keep this column dimension-agnostic.  EMBED_DIMENSIONS is validated by the
--- configured embedding provider and pgvector accepts the provider's vector;
--- this lets a deployment use its chosen compatible model without editing DDL.
+-- The P2-A reference embedding service is BAAI/bge-m3 (512 dimensions).
+-- A deployed collection must use one vector dimension. Switching models for
+-- an existing collection requires a re-embedding migration (P2-B), not mixed
+-- dimensions in one table.
 CREATE TABLE IF NOT EXISTS knowledge.kb_chunks (
     langchain_id UUID PRIMARY KEY,
     content TEXT NOT NULL,
-    embedding vector,
+    embedding vector(512),
     tenant_id TEXT NOT NULL,
     chunk_id TEXT NOT NULL,
     doc_id TEXT NOT NULL,
