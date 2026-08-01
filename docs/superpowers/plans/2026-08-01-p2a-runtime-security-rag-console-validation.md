@@ -107,7 +107,8 @@ python scripts/import_scan_rag_engines.py
 Push-Location apps/web; npm ci; npm run build; Pop-Location
 ```
 
-5. 在验收记录中保存提交 SHA、Python/Node/npm 版本、测试通过/跳过数量和既有警告；不得把 skip 写成 pass。
+5. 运行一次全仓 `ruff check packages/core/src apps/api scripts` 并将既有问题数记录为基线；P2-A 不批量格式化未触及文件。每个 P2-A 提交必须对其新增/修改的 Python 路径运行 Ruff 并保持零错误；全仓 Ruff 清零移交 P3 发布工程。
+6. 在验收记录中保存提交 SHA、Python/Node/npm 版本、测试通过/跳过数量、既有警告和 Ruff 债务数；不得把 skip 写成 pass。
 
 **Run:** 本任务依次运行上述环境准备和基线命令；任一命令失败即停止，不进入 A1。
 
@@ -386,7 +387,9 @@ python scripts/verify_p2a_console.py
 ```powershell
 $env:KNOWLEDGE_BACKEND='fake'
 python -m pytest packages/core/tests apps/api/tests -q
-python -m ruff check packages/core/src apps/api scripts
+$base = git merge-base origin/main HEAD
+$changedPython = git diff --name-only "$base...HEAD" -- '*.py'
+if ($changedPython) { python -m ruff check $changedPython }
 python -c "from importlinter.cli import lint_imports; raise SystemExit(lint_imports())"
 python scripts/import_scan_core.py
 python scripts/import_scan_rag_engines.py
@@ -399,7 +402,7 @@ git diff --check
 4. 独立审阅 base-to-head diff：重点检查权限绕过、租户泄露、秘密输出、adapter 组装位置、EventLog 顺序和审批幂等；Critical/Important 问题修复后重新审阅。
 5. 仅当 A1–A8 全部通过，文档才写 “P2-A 已完成、P2-B 延期”；M11/M12 仍保持发布验收未完全完成，技术预览和已知限制不变。
 
-**Expected:** 自动化门禁全绿、live 证据完整、无秘密泄露、工作区只包含本计划预期改动。
+**Expected:** pytest、架构扫描、Web 门禁和 P2-A 变更路径 Ruff 全绿；live 证据完整、无秘密泄露、工作区只包含本计划预期改动。全仓 Ruff 债务仅作为已记录的 P3 输入，不得伪称已清零。
 
 **Commit:** `docs: record p2a release validation`
 
