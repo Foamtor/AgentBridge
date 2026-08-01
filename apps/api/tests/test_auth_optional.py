@@ -116,3 +116,27 @@ def test_auth_required_rejects_missing_identity_claims(
 
     assert response.status_code == 401
     assert response.json()["detail"]["code"] == "unauthorized"
+
+
+def test_invalid_identity_token_creates_no_run_event_or_approval(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = "p2a-zero-side-effect-secret"
+    monkeypatch.setenv("AUTH_REQUIRED", "true")
+    monkeypatch.setenv("AUTH_DEV_STUB", "false")
+    monkeypatch.setenv("OIDC_JWT_SECRET", secret)
+    monkeypatch.setenv("AGENTBRIDGE_FAKE_RUNTIME", "1")
+    from testing.app_factory import create_test_app
+
+    app = create_test_app()
+    with TestClient(app) as client:
+        response = client.post(
+            "/chat/stream",
+            headers=bearer_headers(secret, tenant_id=""),
+            json={"query": "hi", "thread_id": "p2a-no-side-effect", "route": "echo"},
+        )
+
+    assert response.status_code == 401
+    assert app.state.run_store._runs == {}
+    assert app.state.event_log._by_run == {}
+    assert app.state.approval_store._by_id == {}

@@ -40,7 +40,7 @@ P2-B 仍需完成：干净环境部署、迁移与升级/回滚、备份恢复�
 |---|---|---|
 | A0 | complete | 分支、环境、联合门禁与 Web build 已完成 |
 | A1 | complete | 证据契约测试、脱敏检查与新增路径 Ruff 已通过 |
-| A2 | pending | JWT / JWKS middleware |
+| A2 | complete | HS256、受控 JWKS、身份声明拒绝与零副作用测试通过 |
 | A3 | pending | 授权、租户隔离、审批与审计 |
 | A4 | pending | pgvector 与只读 RAG-Agent；需要安全注入测试连接 |
 | A5 | pending | external RAG HTTP contract |
@@ -61,4 +61,5 @@ P2-B 仍需完成：干净环境部署、迁移与升级/回滚、备份恢复�
 |---|---|---|
 | A0 环境与门禁 | pass | Codex / 2026-08-01 |
 | A1 证据契约 | pass | Codex / 2026-08-01 |
-| A2–A9 | pending | 待实施 |
+| A2 JWT / JWKS middleware | pass | Codex / 2026-08-01 |
+| A3–A9 | pending | 待实施 |
