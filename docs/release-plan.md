@@ -96,11 +96,11 @@ P2 分两段执行：**P2-A** 先验证运行、安全、RAG 契约与控制台�
 | 多机 | 两实例同会话互斥、Redis 锁与跨实例限流（若作为首发宣称） |
 | 控制台 | Web build、管理员/普通用户权限、调试→回放→审计闭环 |
 
-**P2-A 当前范围：** 认证与权限、跨租户、审批/审计、pgvector 与只读 RAG-Agent、external HTTP 契约、取消/EventLog、单机限流/readiness、Web build 与控制台权限。验收记录见 `docs/release-validation/`。
+**P2-A 状态：已完成（2026-08-01）。** 已验证认证与权限、跨租户、审批/审计、pgvector 与只读 RAG-Agent、external HTTP 契约、取消/EventLog、单机限流/readiness、Web build 与控制台权限。验收记录见 `docs/release-validation/`。
 
 **P2-B 延期范围：** 全新环境部署、迁移/升级/回滚、备份恢复、具体身份提供方现场登录、厂商 external RAG 联调、双实例 Redis 锁与跨实例限流。
 
-**完成标准：** P2-A 与 P2-B 均须有自动化测试、脚本或人工验收记录；失败项和环境前提进入已知限制，而不是从文档中消失。
+**完成标准：** P2-A 与 P2-B 均须有自动化测试、脚本或人工验收记录；P2-A 已完成，但 P2-B 仍是 P2 与稳定版发布的未完成门槛。失败项和环境前提进入已知限制，而不是从文档中消失。
 
 ### P3：发布工程与社区入口
 
