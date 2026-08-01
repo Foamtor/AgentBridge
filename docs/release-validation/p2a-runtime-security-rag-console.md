@@ -21,8 +21,8 @@ P2-B 仍需完成：干净环境部署、迁移与升级/回滚、备份恢复�
 | 分支与基线提交 | `codex/p2a-release-validation`；待 A9 汇总最终 SHA |
 | Python | 3.12.13（本地 `.venv`） |
 | Node / npm | 22.14.0 / 10.9.2 |
-| PostgreSQL 测试库 | `agentbridge_test`；专用角色存在；连接信息未记录 |
-| Embedding 服务 | 本地 TEI 端口可达；模型/维度待 A4 记录 |
+| PostgreSQL 测试库 | 独立可销毁 pgvector 容器；连接信息未记录 |
+| Embedding 服务 | 本地兼容服务可达；`BAAI/bge-m3`，512 维 |
 | RAG-Agent | 只读探针待 A4；连接信息未记录 |
 
 ## 命令与结果
@@ -33,6 +33,8 @@ P2-B 仍需完成：干净环境部署、迁移与升级/回滚、备份恢复�
 | A0 | 架构门禁 | pass | import-linter、core scan、RAG scan 均通过 |
 | A0 | Web build | pass | Node 22.14.0 下 `npm ci` 与 `npm run build` 通过 |
 | A0 | 全仓 Ruff 基线 | recorded | 61 条既有债务；P2-A 仅要求变更路径为零，清零移交 P3 |
+| A4 | 平台 pgvector live | pass | 独立容器；同租户 citation、跨租户零命中；不记录文档或向量 |
+| A9（预检） | 全量 Python/架构/Web 门禁 | pass | 354 passed，7 skipped；变更路径 Ruff、架构扫描、Web test/build 均通过 |
 
 ## 任务状态
 
