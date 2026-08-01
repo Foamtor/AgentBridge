@@ -20,6 +20,7 @@
 | **6** | **① 多知识后端** | [plan6](./2026-07-27-plan6-rag-production.md) · **[R-A 详单](./2026-07-27-platform-ra.md)** | **M11** | → **v2.1** |
 | **7** | **② AI 控制台 C0** | [plan7](./2026-07-27-plan7-ai-console-c0.md) | **M12** | 与 6 可并行 |
 | — | 文档 P1 门面 | [docs-p1](./2026-07-28-docs-p1-gate.md) | 人类 guide | 文档 |
+| — | P2-A 运行、安全、RAG、控制台验证 | [p2-a](./2026-08-01-p2a-runtime-security-rag-console-validation.md) | 发布 P2-A | 待执行；部署/多机留给 P2-B |
 | — | 全面审阅记录 | [full-review](./2026-07-28-full-review.md) | 代码+文档抽查 | 文档 |
 
 > 三类划分说明见入门文：[为什么用它 · 三块东西](../../guide/01-why.md)  
