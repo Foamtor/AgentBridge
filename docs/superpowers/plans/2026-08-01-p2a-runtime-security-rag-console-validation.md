@@ -6,7 +6,7 @@
 
 **Architecture:** 验证只通过公开 HTTP/SSE、既有 ports、lifespan 组装后的应用和可控协议服务观察行为。测试不得绕过 middleware 注入 claims，不得直接修改 domain 状态，不得为测试破坏 Port/Adapter 分层。真实 RAG-Agent 始终只读；写入型 RAG/审批测试仅使用 AgentBridge 专用测试库。
 
-**Tech Stack:** Python 3.12+、FastAPI/TestClient、pytest/pytest-asyncio、python-jose、httpx MockTransport、PostgreSQL/pgvector、TEI、Node 20、Vite、Vitest、React Testing Library、GitHub Actions。
+**Tech Stack:** Python 3.12+、FastAPI/TestClient、pytest/pytest-asyncio、python-jose、httpx MockTransport、PostgreSQL/pgvector、TEI、Node 22.14、Vite、Vitest、React Testing Library、GitHub Actions。
 
 ## 1. 发布边界
 
@@ -94,7 +94,7 @@ node --version
 npm --version
 ```
 
-Node 主验证版本为 20；其它版本只能用于辅助检查，不能替代 CI 的 Node 20 证据。若 `node`/`npm` 不存在，A8 标记 blocked，先补本机工具链或在受控 CI 中执行，不能跳过 Web 门禁。
+Node 主验证版本为 22.14；其它版本只能用于辅助检查，不能替代 CI 的 Node 22.14 证据。若 `node`/`npm` 不存在，A8 标记 blocked，先补本机工具链或在受控 CI 中执行，不能跳过 Web 门禁。
 
 4. 在不注入真实凭证的环境运行基线：
 
@@ -349,7 +349,7 @@ python scripts/verify_p2a_readiness.py
 3. `App.test.tsx`/页面测试验证管理员与普通用户的导航和禁止页表现。API 权限仍由 A3 验证，前端隐藏不得被当作安全边界。
 4. `DebugPage.test.tsx` 使用受控 fetch/SSE fixture 验证发起 run、终端事件、回放入口和错误状态；不得 mock 掉事件解析本身。
 5. `verify_p2a_console.py` 使用 TestClient 与 A2/A3 的临时 token 完成 API 闭环：stream run → GET events/replay → audit export；只输出 run/event/audit 数量和状态。
-6. CI 新增 `web-tests` job，Node 20 下依次执行 `npm ci`、`npm test`、`npm run build`，缓存键使用 `apps/web/package-lock.json`。
+6. CI 新增 `web-tests` job，Node 22.14 下依次执行 `npm ci`、`npm test`、`npm run build`，缓存键使用 `apps/web/package-lock.json`。
 
 **Run:**
 
@@ -421,7 +421,7 @@ git diff --check
 - [ ] `AGENTBRIDGE_TEST_KB_DSN` 指向可销毁的 AgentBridge pgvector 测试库。
 - [ ] TEI `127.0.0.1:8080` 可达，模型和维度已确认。
 - [ ] `RAG_AGENT_*` 可由安全环境提供，且数据库账号只读。
-- [ ] Node 20/npm 可用；允许通过 lockfile 安装 Vitest/Testing Library 依赖。
+- [ ] Node 22.14/npm 可用；允许通过 lockfile 安装 Vitest/Testing Library 依赖。
 
 除 A4 live 环境外，其余任务不依赖生产部署或多机资源。若 A4 的专用测试库或只读 RAG 凭证不可用，可先完成其他任务，但不得完成 A9。
 
