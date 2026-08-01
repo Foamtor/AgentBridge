@@ -6,6 +6,11 @@ It demonstrates tenant-scoped lists, statistics, ECharts options, RAG
 citations, an immutable approval draft, and atomic work-order plus ledger
 creation.
 
+P1 hardening design and acceptance record:
+[`2026-07-30-p1-hardening-rag-agent-integration-design.md`](../../../../docs/superpowers/specs/2026-07-30-p1-hardening-rag-agent-integration-design.md)
+and
+[`2026-07-30-p1-hardening-rag-agent-integration.md`](../../../../docs/superpowers/plans/2026-07-30-p1-hardening-rag-agent-integration.md).
+
 ## Setup
 
 Apply migrations in order:
