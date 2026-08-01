@@ -60,7 +60,14 @@ async def run() -> dict[str, Any]:
 
 
 def main() -> int:
-    print(json.dumps(asyncio.run(run()), ensure_ascii=True))
+    try:
+        summary = asyncio.run(run())
+    except Exception:  # noqa: BLE001
+        # A connection or provider error may contain a DSN or downstream body.
+        # The acceptance probe is intentionally a redacted operator signal.
+        print(json.dumps({"status": "failed"}, ensure_ascii=True))
+        return 1
+    print(json.dumps(summary, ensure_ascii=True))
     return 0
 
 

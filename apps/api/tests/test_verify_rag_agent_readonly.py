@@ -37,3 +37,22 @@ def test_acceptance_summary_redacts_knowledge_and_credentials() -> None:
     rendered = json.dumps(summary)
     for forbidden in ("text", "embedding", "dsn", "password", document):
         assert forbidden not in rendered
+
+
+def test_probe_failure_does_not_print_connection_error(
+    monkeypatch, capsys
+) -> None:
+    script = Path(__file__).resolve().parents[3] / "scripts" / "verify_rag_agent_readonly.py"
+    spec = importlib.util.spec_from_file_location("verify_rag_agent_readonly", script)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    secret = "postgresql://readonly:credential@db/rag"
+
+    async def broken_run() -> dict:
+        raise RuntimeError(secret)
+
+    monkeypatch.setattr(module, "run", broken_run)
+    assert module.main() == 1
+    assert secret not in capsys.readouterr().out
