@@ -6,7 +6,6 @@ import logging
 from typing import Any
 
 import httpx
-
 from agentbridge_core.protocol.knowledge import (
     KnowledgeHit,
     doc_to_knowledge_hit,
@@ -116,9 +115,11 @@ class ExternalRagRetriever:
                 return {"status": "degraded", "message": "invalid health payload"}
             status = str(body.get("status") or "ok")
             return {"status": status, "detail": body.get("detail")}
-        except Exception as exc:  # noqa: BLE001
+        except Exception:
             logger.warning("external RAG health check failed", exc_info=True)
-            return {"status": "fail", "message": str(exc)}
+            # The downstream exception can contain a URL, response body, or credentials.
+            # Status endpoints are an operator-facing contract, not a diagnostic dump.
+            return {"status": "fail", "message": "external RAG health check failed"}
 
     async def similarity_search(
         self,
@@ -145,7 +146,7 @@ class ExternalRagRetriever:
             body = resp.json()
         except Exception as exc:
             if self._failure_policy == "fail_run":
-                raise
+                raise RuntimeError("external RAG retrieval failed") from exc
             logger.warning(
                 "external RAG retrieve failed; returning empty hits",
                 exc_info=True,

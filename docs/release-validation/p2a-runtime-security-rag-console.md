@@ -43,7 +43,7 @@ P2-B 仍需完成：干净环境部署、迁移与升级/回滚、备份恢复�
 | A2 | complete | HS256、受控 JWKS、身份声明拒绝与零副作用测试通过 |
 | A3 | complete | 权限、租户隔离、审批、审计矩阵与脱敏摘要脚本通过 |
 | A4 | pending | pgvector 与只读 RAG-Agent；需要安全注入测试连接 |
-| A5 | pending | external RAG HTTP contract |
+| A5 | complete | MockTransport 协议、失败策略、501 与 citation 矩阵通过；厂商现场联调仍属 P2-B |
 | A6 | pending | 取消、EventLog 与审批投递 |
 | A7 | pending | 单机限流与 readiness |
 | A8 | pending | Vitest、控制台与 CI |
@@ -63,4 +63,5 @@ P2-B 仍需完成：干净环境部署、迁移与升级/回滚、备份恢复�
 | A1 证据契约 | pass | Codex / 2026-08-01 |
 | A2 JWT / JWKS middleware | pass | Codex / 2026-08-01 |
 | A3 授权与审计 | pass | Codex / 2026-08-01 |
-| A4–A9 | pending | 待实施 |
+| A5 external RAG contract | pass | Codex / 2026-08-01；18 passed，vendor-live deferred to P2-B |
+| A4、A6–A9 | pending | 待实施 |

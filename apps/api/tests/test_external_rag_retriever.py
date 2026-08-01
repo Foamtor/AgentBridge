@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import httpx
 import pytest
-
 from adapters.external_rag_retriever import ExternalRagRetriever, map_external_hits
 
 
@@ -84,6 +83,29 @@ async def test_external_retriever_calls_protocol_endpoint() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("status", [401, 429, 503])
+async def test_external_retriever_empty_hits_for_http_failures(status: int) -> None:
+    transport = httpx.MockTransport(lambda _: httpx.Response(status, text="secret body"))
+    async with httpx.AsyncClient(transport=transport, base_url="http://mock") as client:
+        retriever = ExternalRagRetriever(base_url="http://mock", client=client)
+        hits = await retriever.similarity_search("x", tenant_id="acme")
+    assert hits == []
+
+
+@pytest.mark.asyncio
+async def test_external_retriever_fail_run_uses_safe_error() -> None:
+    transport = httpx.MockTransport(
+        lambda _: httpx.Response(503, text="downstream secret body")
+    )
+    async with httpx.AsyncClient(transport=transport, base_url="http://mock") as client:
+        retriever = ExternalRagRetriever(
+            base_url="http://mock", failure_policy="fail_run", client=client
+        )
+        with pytest.raises(RuntimeError, match="^external RAG retrieval failed$"):
+            await retriever.similarity_search("x", tenant_id="acme")
+
+
+@pytest.mark.asyncio
 async def test_external_retriever_empty_hits_on_failure() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(504, json={"error": "timeout"})
@@ -111,3 +133,16 @@ async def test_external_health_check() -> None:
         retriever = ExternalRagRetriever(base_url="http://mock", client=client)
         health = await retriever.health_check()
     assert health["status"] == "ok"
+
+
+@pytest.mark.asyncio
+async def test_external_health_check_hides_downstream_details() -> None:
+    transport = httpx.MockTransport(
+        lambda _: httpx.Response(503, text="downstream secret body")
+    )
+    async with httpx.AsyncClient(transport=transport, base_url="http://mock") as client:
+        health = await ExternalRagRetriever(base_url="http://mock", client=client).health_check()
+    assert health == {
+        "status": "fail",
+        "message": "external RAG health check failed",
+    }
