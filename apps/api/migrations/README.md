@@ -13,7 +13,7 @@ Checkpointer / schema migrations.
 ## Knowledge (R-A)
 
 1. Start Postgres with pgvector: `docker compose --profile rag up -d`
-2. Apply `003_knowledge_pgvector.sql` (vector size must match `EMBED_DIMENSIONS`; default **1024**)
+2. Apply `003_knowledge_pgvector.sql`, then `004_knowledge_unbounded_vector.sql` for an existing pre-P2-A installation. The vector column accepts the configured embedding model's native dimension.
 3. Install `pip install -e "apps/api[rag]"` and set `KNOWLEDGE_BACKEND=langchain_pg` + `EMBED_*`
 4. Seed: `python scripts/ingest_demo_rag.py`
 

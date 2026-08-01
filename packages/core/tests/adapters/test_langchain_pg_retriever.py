@@ -5,9 +5,20 @@ from __future__ import annotations
 import logging
 
 import pytest
+from agentbridge_core.adapters.langchain_pg_retriever import (
+    LangchainPgRetriever,
+    _sqlalchemy_dsn,
+)
 from langchain_core.documents import Document
 
-from agentbridge_core.adapters.langchain_pg_retriever import LangchainPgRetriever
+
+def test_sqlalchemy_dsn_uses_installed_asyncpg_dialect() -> None:
+    assert _sqlalchemy_dsn("postgresql://user:pass@db/knowledge") == (
+        "postgresql+asyncpg://user:pass@db/knowledge"
+    )
+    assert _sqlalchemy_dsn("postgresql+asyncpg://user:pass@db/knowledge") == (
+        "postgresql+asyncpg://user:pass@db/knowledge"
+    )
 
 
 class _FakeStore:

@@ -15,6 +15,16 @@ from agentbridge_core.protocol.knowledge import (
 logger = logging.getLogger(__name__)
 
 
+def _sqlalchemy_dsn(dsn: str) -> str:
+    """Use SQLAlchemy's asyncpg dialect for a normal PostgreSQL DSN."""
+
+    if dsn.startswith("postgresql://"):
+        return "postgresql+asyncpg://" + dsn.removeprefix("postgresql://")
+    if dsn.startswith("postgres://"):
+        return "postgresql+asyncpg://" + dsn.removeprefix("postgres://")
+    return dsn
+
+
 class LangchainPgRetriever:
     """Retriever backed by a LangChain vector store.
 
@@ -61,7 +71,7 @@ class LangchainPgRetriever:
             base_url=embed_api_base.rstrip("/"),
             dimensions=embed_dimensions,
         )
-        engine = PGEngine.from_connection_string(url=dsn)
+        engine = PGEngine.from_connection_string(url=_sqlalchemy_dsn(dsn))
         # Table must already exist (migration 003). Do NOT init_vectorstore_table.
         store = await PGVectorStore.create(
             engine=engine,
@@ -112,7 +122,7 @@ class LangchainPgRetriever:
             pairs = await self._store.asimilarity_search_with_score(
                 query, k=k, filter={"tenant_id": tid}
             )
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.warning(
                 "langchain_pg similarity_search failed; returning empty hits",
                 exc_info=True,

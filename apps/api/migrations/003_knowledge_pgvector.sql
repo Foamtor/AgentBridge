@@ -5,12 +5,13 @@ CREATE EXTENSION IF NOT EXISTS vector;
 
 CREATE SCHEMA IF NOT EXISTS knowledge;
 
--- embedding vector size must match EMBED_DIMENSIONS at runtime; default 1024.
--- If your TEI model uses another size, edit vector(N) before first apply.
+-- Keep this column dimension-agnostic.  EMBED_DIMENSIONS is validated by the
+-- configured embedding provider and pgvector accepts the provider's vector;
+-- this lets a deployment use its chosen compatible model without editing DDL.
 CREATE TABLE IF NOT EXISTS knowledge.kb_chunks (
     langchain_id UUID PRIMARY KEY,
     content TEXT NOT NULL,
-    embedding vector(1024),
+    embedding vector,
     tenant_id TEXT NOT NULL,
     chunk_id TEXT NOT NULL,
     doc_id TEXT NOT NULL,
