@@ -9,6 +9,19 @@ from starlette.responses import JSONResponse, Response
 from auth.oidc import decode_bearer_token
 
 
+def has_required_identity(claims: dict[str, object]) -> bool:
+    """Require stable actor and tenant identity before routes see a token."""
+
+    subject = claims.get("sub")
+    tenant = claims.get("tenant_id") or claims.get("tid")
+    return (
+        isinstance(subject, str)
+        and bool(subject.strip())
+        and isinstance(tenant, str)
+        and bool(tenant.strip())
+    )
+
+
 class OptionalOidcMiddleware(BaseHTTPMiddleware):
     """When settings.auth_required is True, require Authorization: Bearer."""
 
@@ -32,8 +45,8 @@ class OptionalOidcMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:
         path = request.url.path
         if path in {"/health", "/ready", "/metrics"} or path.startswith(
-            "/docs"
-        ) or path.startswith("/openapi"):
+            ("/docs", "/openapi")
+        ):
             return await call_next(request)
 
         if not self.auth_required:
@@ -60,6 +73,16 @@ class OptionalOidcMiddleware(BaseHTTPMiddleware):
                 auth_dev_stub=self.auth_dev_stub,
             )
         except ValueError:
+            return JSONResponse(
+                status_code=401,
+                content={
+                    "detail": {
+                        "code": "unauthorized",
+                        "message": "invalid bearer token",
+                    }
+                },
+            )
+        if not has_required_identity(claims):
             return JSONResponse(
                 status_code=401,
                 content={
