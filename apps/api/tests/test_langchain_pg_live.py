@@ -22,7 +22,10 @@ pytestmark = pytest.mark.skipif(
 )
 
 ROOT = Path(__file__).resolve().parents[3]
-MIGRATION = ROOT / "apps" / "api" / "migrations" / "003_knowledge_pgvector.sql"
+MIGRATIONS = (
+    ROOT / "apps" / "api" / "migrations" / "003_knowledge_pgvector.sql",
+    ROOT / "apps" / "api" / "migrations" / "004_knowledge_unbounded_vector.sql",
+)
 
 
 @pytest.mark.asyncio
@@ -38,7 +41,8 @@ async def test_langchain_pg_live_tenant_isolation() -> None:
 
     connection = await asyncpg.connect(LIVE_DSN)
     try:
-        await connection.execute(MIGRATION.read_text(encoding="utf-8"))
+        for migration in MIGRATIONS:
+            await connection.execute(migration.read_text(encoding="utf-8"))
         vector_type = await connection.fetchval(
             """
             SELECT format_type(a.atttypid, a.atttypmod)
@@ -48,7 +52,7 @@ async def test_langchain_pg_live_tenant_isolation() -> None:
               AND NOT a.attisdropped
             """
         )
-        assert vector_type == f"vector({embed_dimensions})"
+        assert vector_type == "vector"
     finally:
         await connection.close()
 

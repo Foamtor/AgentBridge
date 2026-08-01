@@ -112,7 +112,7 @@ pip install -e "packages/core[postgres]"
 | `KNOWLEDGE_BACKEND` | `fake`（默认）\| `langchain_pg`（R-A）\| `external` / `product`（R-C） |
 | `KB_DSN` | 知识库 PG（可省略则用 `PG_DSN`）；需 pgvector |
 | `EMBED_API_BASE` / `EMBED_MODEL` / `EMBED_API_KEY` | Embedding（OpenAI 兼容；本机 TEI） |
-| `EMBED_DIMENSIONS` | 向量维数，须与模型及 `003_knowledge_pgvector.sql` 一致 |
+| `EMBED_DIMENSIONS` | 向量维数，须与 embedding 模型输出一致 |
 | `KB_EXTERNAL_BASE_URL` | 仅 `external`（R-C） |
 
 安装：`pip install -e "apps/api[rag]"`。  

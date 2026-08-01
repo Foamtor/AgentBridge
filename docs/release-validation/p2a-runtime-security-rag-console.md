@@ -42,7 +42,7 @@ P2-B 仍需完成：干净环境部署、迁移与升级/回滚、备份恢复�
 | A1 | complete | 证据契约测试、脱敏检查与新增路径 Ruff 已通过 |
 | A2 | complete | HS256、受控 JWKS、身份声明拒绝与零副作用测试通过 |
 | A3 | complete | 权限、租户隔离、审批、审计矩阵与脱敏摘要脚本通过 |
-| A4 | pending | live pgvector 测例已就绪；当前容器缺 pgvector 扩展，且只读 RAG-Agent DSN 未安全注入 |
+| A4 | pending | 独立 pgvector live 检索、同租户 citation 与跨租户零命中已通过；只读 RAG-Agent DSN 仍未安全注入 |
 | A5 | complete | MockTransport 协议、失败策略、501 与 citation 矩阵通过；厂商现场联调仍属 P2-B |
 | A6 | complete | 取消、EventLog 顺序、投递失败与审批幂等矩阵通过（43 passed，1 skipped） |
 | A7 | complete | 单机限流、窗口恢复与 readiness/status 安全矩阵通过（10 passed） |
@@ -51,7 +51,7 @@ P2-B 仍需完成：干净环境部署、迁移与升级/回滚、备份恢复�
 
 ## 阻塞项与已知限制
 
-- A4 的专用测试库所在容器缺少 pgvector 扩展，且只读 RAG-Agent 连接尚未由安全环境注入；不能以 fake 结果替代。
+- A4 的独立 pgvector 测试容器已完成平台真检索验收；只读 RAG-Agent 连接尚未由安全环境注入，不能以 fake 结果替代该 probe。
 - P2-B 延期项不计入 P2-A 完成，也不改变技术预览口径。
 - 全仓 Ruff 债务未清零；每个 P2-A 变更路径仍必须通过 Ruff。
 
@@ -67,4 +67,5 @@ P2-B 仍需完成：干净环境部署、迁移与升级/回滚、备份恢复�
 | A6 lifecycle and delivery | pass | Codex / 2026-08-01；43 passed，1 skipped |
 | A7 single-node readiness | pass | Codex / 2026-08-01；10 passed；不含 Redis/多机结论 |
 | A8 web console | pass | Codex / 2026-08-01；Vitest 6 passed、build 通过、闭环仅输出状态与数量 |
-| A4、A9 | pending | 待实施 |
+| A4 platform pgvector | pass | Codex / 2026-08-01；独立容器、512 维本机 embedding、同租户 citation/跨租户隔离通过 |
+| A4 RAG-Agent probe、A9 | pending | 待实施 |
