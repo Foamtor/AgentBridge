@@ -23,7 +23,7 @@ P2-B 仍需完成：干净环境部署、迁移与升级/回滚、备份恢复�
 | Node / npm | 22.14.0 / 10.9.2 |
 | PostgreSQL 测试库 | 独立可销毁 pgvector 容器；连接信息未记录 |
 | Embedding 服务 | 本地兼容服务可达；`BAAI/bge-m3`，512 维 |
-| RAG-Agent | 只读探针待 A4；连接信息未记录 |
+| RAG-Agent | 只读探针已通过；连接信息未记录 |
 
 ## 命令与结果
 
@@ -34,6 +34,8 @@ P2-B 仍需完成：干净环境部署、迁移与升级/回滚、备份恢复�
 | A0 | Web build | pass | Node 22.14.0 下 `npm ci` 与 `npm run build` 通过 |
 | A0 | 全仓 Ruff 基线 | recorded | 61 条既有债务；P2-A 仅要求变更路径为零，清零移交 P3 |
 | A4 | 平台 pgvector live | pass | 独立容器；同租户 citation、跨租户零命中；不记录文档或向量 |
+| A4（复核） | 平台 pgvector live | pass | 当前 512 维迁移在独立容器重跑通过 |
+| A6（复核） | PostgreSQL 审批恢复 | pass | 独立可销毁 PostgreSQL；提交后恢复不重复创建业务结果，零 skip |
 | A9（预检） | 全量 Python/架构/Web 门禁 | pass | 354 passed，7 skipped；变更路径 Ruff、架构扫描、Web test/build 均通过 |
 | A9（最终） | 全量 Python/架构/Web 门禁 | pass | 356 passed，8 skipped；A4 live 27 passed；变更路径 Ruff、架构扫描、证据检查、Web test/build 均通过 |
 
@@ -47,9 +49,9 @@ P2-B 仍需完成：干净环境部署、迁移与升级/回滚、备份恢复�
 | A3 | complete | 权限、租户隔离、审批、审计矩阵与脱敏摘要脚本通过 |
 | A4 | complete | 独立 pgvector live 检索、同租户 citation 与跨租户零命中通过；RAG-Agent 只读 probe 通过 |
 | A5 | complete | MockTransport 协议、失败策略、501 与 citation 矩阵通过；厂商现场联调仍属 P2-B |
-| A6 | complete | 取消、EventLog 顺序、投递失败与审批幂等矩阵通过（43 passed，1 skipped） |
+| A6 | complete | 取消、EventLog 顺序、投递失败与审批幂等矩阵通过；持久化恢复测试已在专用 PostgreSQL 补跑（零 skip） |
 | A7 | complete | 单机限流、窗口恢复与 readiness/status 安全矩阵通过（10 passed） |
-| A8 | complete | Node 22.14 下 Vitest（6 tests）、build、控制台 stream→replay→audit 闭环与 CI job 通过 |
+| A8 | complete | Node 22.14 下 Vitest（9 tests）、管理员/普通用户权限、stream→replay→audit 闭环与 CI job 通过 |
 | A9 | complete | 全量门禁、独立 diff 审阅、脱敏扫描与发布口径更新完成 |
 
 ## 阻塞项与已知限制
@@ -73,3 +75,4 @@ P2-B 仍需完成：干净环境部署、迁移与升级/回滚、备份恢复�
 | A4 platform pgvector | pass | Codex / 2026-08-01；独立容器、512 维本机 embedding、同租户 citation/跨租户隔离通过 |
 | A4 RAG-Agent readonly probe | pass | Codex / 2026-08-01；demo tenant 5 citations，other tenant 0；输出采用固定 allowlist |
 | A9 final review | pass | Codex / 2026-08-01；全量门禁与 base-to-head 审阅通过，无 Critical/Important 问题 |
+| A9 review-fix verification | pass | Codex / 2026-08-01；迁移、控制台权限/回放、证据状态与 PostgreSQL 恢复缺口已修订并复核 |

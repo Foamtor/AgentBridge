@@ -30,3 +30,11 @@ def test_p2a_evidence_validation_does_not_echo_secret_values() -> None:
     errors = module.validate_evidence(f"# P2-A\n{secret}")
     assert errors
     assert all(secret not in error for error in errors)
+
+
+def test_p2a_evidence_rejects_invalid_task_status() -> None:
+    module = _load_module()
+    text = _EVIDENCE.read_text(encoding="utf-8").replace(
+        "| A0 | complete |", "| A0 | shipped |", 1
+    )
+    assert "invalid-or-missing-task-status" in module.validate_evidence(text)

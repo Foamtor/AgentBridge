@@ -1,4 +1,5 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { apiBase } from "../../lib/apiBase";
 import { streamChatSse, type StreamEvent } from "../../lib/sseClient";
 import { getToken, setToken } from "../auth/token";
@@ -11,6 +12,7 @@ function newThreadId(): string {
 }
 
 export function DebugPage() {
+  const [searchParams] = useSearchParams();
   const [threadId, setThreadId] = useState(newThreadId);
   const [route, setRoute] = useState("echo");
   const [token, setTokenState] = useState(getToken);
@@ -22,6 +24,20 @@ export function DebugPage() {
 
   const streamUrl = useMemo(() => `${apiBase()}/chat/stream`, []);
   const cancelUrl = useMemo(() => `${apiBase()}/chat/cancel`, []);
+  const replayRunId = searchParams.get("run_id");
+
+  useEffect(() => {
+    if (!replayRunId) return;
+    const headers: Record<string, string> = {};
+    if (token.trim()) headers.Authorization = `Bearer ${token.trim()}`;
+    void fetch(`${apiBase()}/runs/${encodeURIComponent(replayRunId)}/events`, { headers })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`replay failed HTTP ${response.status}`);
+        const replay = (await response.json()) as StreamEvent[];
+        setEvents(replay);
+      })
+      .catch((err) => setError(String(err)));
+  }, [replayRunId, token]);
 
   function updateToken(v: string) {
     setTokenState(v);
@@ -134,6 +150,7 @@ export function DebugPage() {
           发送到 /chat/stream。route 可选 echo / demo_tools；扩展事件 x.* 在时间线中默认折叠。
         </p>
       </header>
+      {replayRunId ? <p className="muted">回放 run：{replayRunId}</p> : null}
       <SessionBar
         threadId={threadId}
         route={route}
