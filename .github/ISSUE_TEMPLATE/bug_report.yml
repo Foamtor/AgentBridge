@@ -1,0 +1,24 @@
+name: Bug report
+description: Report a reproducible problem without sensitive data.
+title: "bug: "
+labels: [bug]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Describe expected and actual behavior. Do not include credentials or customer data.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction
+      description: Include redacted steps, route, environment, and relevant version/commit.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Safe evidence
+      description: Paste redacted logs and tests only. Security issues belong in SECURITY.md's private channel.

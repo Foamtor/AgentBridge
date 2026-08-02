@@ -36,6 +36,18 @@ Fake 档：直接装 pip + 启动 uvicorn。
 完整 RAG 档：`docker compose --profile rag up -d` 起 pgvector 实例，再装 `[rag]` extra，配置 `KNOWLEDGE_BACKEND=langchain_pg`，跑迁移脚本。  
 详见 README Quick Start。
 
+## v0.1.0 Compose demo
+
+在仓库根目录执行：
+
+```bash
+docker compose up --build
+```
+
+打开 `http://127.0.0.1:8080`。默认服务为 Web、API 和 pgvector PostgreSQL；Web 通过同源 `/api` 访问 API，PostgreSQL 不映射宿主机端口。默认使用离线 FakeChatModel、fake knowledge、`dev` 管理员上下文和脱敏工单数据，适合验证 `work_order_ops` 的查询、图表、草稿和审批。
+
+停止：`docker compose down`。如需**删除所有本地演示数据**再初始化，执行 `docker compose down --volumes`；这只应对本项目演示 volume 使用。Redis 与 Authentik 分别用 `--profile redis` 与 `--profile auth` 按需启动。
+
 ---
 
 ## 本地（内存会话）

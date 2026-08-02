@@ -1,9 +1,11 @@
 # Plan7 — AI 控制台 C0（升级 apps/web）
 
-> **状态：** 待实施  
+> **状态：** 历史计划；AI 控制台基础能力已实现，当前首发以 [v0.1.0 Plan](./2026-08-01-p3a-open-source-release-preparation.md) 的黄金案例呈现为准。
+>
 > **设计稿：** [../specs/2026-07-27-ai-admin-console-design.md](../specs/2026-07-27-ai-admin-console-design.md)  
 > **契约真源：** [../specs/2026-07-27-admin-backend-final-spec.md](../specs/2026-07-27-admin-backend-final-spec.md)  
-> **归属：** 设计三类之 **② 管理后台**（见 [design-tracks.md](../../design-tracks.md)）  
+> **归属：** 历史管理后台设计记录。
+>
 > **依赖：** Plan1–5（部分管理 API、调试台已有）；与 Plan6 **软并行**（C0 不依赖真知识后端）  
 > **策略：** **升级现有 `apps/web`**，不另起 `apps/admin`
 

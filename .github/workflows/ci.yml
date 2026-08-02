@@ -34,6 +34,9 @@ jobs:
         shell: bash
         run: bash scripts/check_ai_instructions.sh
 
+      - name: Check release documentation entry points
+        run: python scripts/check_release_docs.py
+
       - name: pytest core
         run: python -m pytest packages/core/tests -v
 
@@ -92,7 +95,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22.14.0"
           cache: npm
           cache-dependency-path: packages/sdk/package-lock.json
 
@@ -121,3 +124,16 @@ jobs:
           npm ci
           npm test
           npm run build
+
+  compose-golden-smoke:
+    name: compose golden smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build and verify the offline golden case
+        run: python scripts/verify_compose_stack.py --golden-case --remove-demo-volume

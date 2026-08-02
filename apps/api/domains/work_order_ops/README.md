@@ -1,27 +1,29 @@
 # Work-order operations reference domain
 
-`work_order_ops` is the P1 golden reference for converting a traditional
+`work_order_ops` is the v0.1.0 golden reference for converting a traditional
 business workflow into an AI conversation. All bundled records are synthetic.
 It demonstrates tenant-scoped lists, statistics, ECharts options, RAG
 citations, an immutable approval draft, and atomic work-order plus ledger
 creation.
 
-P1 hardening design and acceptance record:
-[`2026-07-30-p1-hardening-rag-agent-integration-design.md`](../../../../docs/superpowers/specs/2026-07-30-p1-hardening-rag-agent-integration-design.md)
-and
-[`2026-07-30-p1-hardening-rag-agent-integration.md`](../../../../docs/superpowers/plans/2026-07-30-p1-hardening-rag-agent-integration.md).
+The default Compose experience uses the `dev` tenant, Postgres demo data, and
+fake knowledge. The RAG-Agent backend is an optional, read-only advanced path;
+it is never required to run this case.
 
 ## Setup
 
-Apply migrations in order:
+For the default experience, run `docker compose up --build`; a new database
+volume applies all numbered migrations including the `dev` tenant seed.
+
+For manual setup, apply migrations in order:
 
 ```powershell
 psql $env:PG_DSN -f apps/api/migrations/004_approval_execution.sql
 psql $env:PG_DSN -f apps/api/migrations/005_work_order_ops.sql
 ```
 
-Use `APPROVAL_STORE_BACKEND=postgres` for P1 restart-safe acceptance.
-`APPROVAL_STORE_BACKEND=memory` is only for CI and local demonstrations.
+Use `APPROVAL_STORE_BACKEND=postgres` for restart-safe approval execution.
+`APPROVAL_STORE_BACKEND=memory` remains useful for CI-only demonstrations.
 Configure `KNOWLEDGE_BACKEND=langchain_pg` for the real RAG path, or
 `KNOWLEDGE_BACKEND=external` for a remote retrieval service.
 

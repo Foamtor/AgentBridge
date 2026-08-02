@@ -21,6 +21,7 @@
    - 理解最小形态：读 `apps/api/domains/echo/`（无工具、不调模型）  
    - 动手时优先：复制 `apps/api/domains/_scaffold/` → `apps/api/domains/<你的名字>/`  
    - 需要工具示例时再对照：`apps/api/domains/demo_tools/`
+   - 要看真实业务闭环时再参考：`apps/api/domains/work_order_ops/`（查询、图表、引用、审批；不是脚手架）
 
 2. **改自己的目录**  
    至少会碰到：流程（`graph`）、工具（`tools`）、状态（`state`）、本目录注册（`bootstrap`）。
