@@ -1,24 +1,60 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: change-me
       POSTGRES_DB: agentbridge
-    ports:
-      - "5432:5432"
+    volumes:
+      - agentbridge-postgres:/var/lib/postgresql/data
+      - ./apps/api/migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d agentbridge"]
       interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      AUTH_REQUIRED: "false"
+      AGENTBRIDGE_FAKE_RUNTIME: "0"
+      KNOWLEDGE_BACKEND: fake
+      ENABLE_DATA_SOURCE: "true"
+      APPROVAL_STORE_BACKEND: postgres
+      PG_HOST: postgres
+      PG_PORT: "5432"
+      PG_DATABASE: agentbridge
+      PG_USER: postgres
+      PG_PASSWORD: change-me
+      USE_MEMORY_CHECKPOINTER: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_API_BASE: /api
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      api:
+        condition: service_healthy
 
   redis:
+    profiles: ["redis"]
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
 
-  # Optional IdP — not required for local smoke
   authentik-server:
     profiles: ["auth"]
     image: ghcr.io/goauthentik/server:2024.8.3
@@ -34,3 +70,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+
+volumes:
+  agentbridge-postgres:

@@ -1,6 +1,6 @@
 # P1 Hardening and RAG-Agent Read-Only Integration Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **状态：** 历史实施记录，相关代码已合入；请勿按本文件执行。当前首发范围以 [v0.1.0 Plan](./2026-08-01-p3a-open-source-release-preparation.md) 为准。
 
 **Goal:** 修复 P1 审批恢复和工单黄金案例的正确性缺陷，并以固定演示租户只读接入现有 RAG-Agent PostgreSQL/pgvector 与 embedding 服务。
 

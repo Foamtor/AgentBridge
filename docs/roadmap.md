@@ -1,6 +1,6 @@
 # 路线图（AgentBridge）
 
-> 与 [00-AgentBridge完整方案.md](./00-AgentBridge完整方案.md) 对齐。当前发布节奏见[发布规划](./release-plan.md)。
+> 当前首发范围见 [v0.1.0 开源发布 Spec](./superpowers/specs/2026-08-01-p3a-open-source-release-readiness-design.md) 与[实施 Plan](./superpowers/plans/2026-08-01-p3a-open-source-release-preparation.md)。本路线图保留长期能力地图，不替代首发计划。
 > 这里按「能力做到哪一步」划分，不按人天估工期。  
 > 实施记录：[superpowers/plans/README.md](./superpowers/plans/README.md)
 
@@ -75,7 +75,7 @@
 | 标签 | 含义 |
 |------|------|
 | v0.1 | M0–M1 |
-| **v0.1.0** | 技术预览：P1 黄金案例已实现并完成真实 PG/RAG 验收；P2/P3 尚未完成，不承诺生产稳定或默认多机 |
+| **v0.1.0** | 首次开源技术预览：源码可读、AI 可按规则扩展、Compose 可运行黄金案例；不承诺生产稳定、默认多机或真实 IdP/RAG 环境 |
 | v0.2 | +M2a +M2b |
 | v0.3 | +M3 |
 | v0.4 | +M4 |

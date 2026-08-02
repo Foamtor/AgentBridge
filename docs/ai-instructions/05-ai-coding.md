@@ -34,6 +34,8 @@
 我的任务：<在这里写具体需求>
 ```
 
+首发黄金案例：`apps/api/domains/work_order_ops/`。它是查询、图表、台账和审批的真实模式参考；新业务先从 `_scaffold` 开始，不能把 `work_order_ops` 的业务名或数据模型写入 core。
+
 ---
 
 ## 场景对话示例
@@ -85,6 +87,31 @@ docs/ai-instructions/01-architecture-rules.md 改到 lifespan 注入。
 ```text
 按 docs/ai-instructions/03-common-tasks.md，在本机起 API，用 echo 冒烟。
 我是 Windows / macOS（选一个）。不要改业务代码，只给命令与成功标准。
+```
+
+### E. 新增只读查询 tool
+
+```text
+为 <你的业务> 新增一个只读查询 tool。先读 AGENTS.md、02-domain-development.md，
+从 _scaffold 起步；声明输入、required_permissions、结构化返回与 API 冒烟测试。
+数据访问只使用 lifespan 注入的 DataSource/Port，不在 domain 创建 adapter；
+无权限工具不可进入 LLM tools 列表，调用时仍须再鉴权。
+```
+
+### F. 新增列表、图表或台账输出
+
+```text
+参考 work_order_ops 的扩展事件模式，为 <你的业务> 输出列表、统计图表和/或台账预览。
+事件使用 x.<你的业务>.* 与 OUTBOUND_EXTENSIONS_KEY；后端返回纯 JSON 数据，
+前端不得执行事件中携带的脚本。不要把业务展示语义写进 packages/core。
+```
+
+### G. 新增需人工确认的写 tool
+
+```text
+为 <你的业务> 的写操作设计审批闭环：先定义版本化 payload、required permissions、
+审批前预览、approval_id 幂等键、批准/拒绝后的结构化结果和测试。
+批准后的 handler 返回 OutboundFragment；domain 不直接推 SSE，adapter 仍由 lifespan 组装。
 ```
 
 ---

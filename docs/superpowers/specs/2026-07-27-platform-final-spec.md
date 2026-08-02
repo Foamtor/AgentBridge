@@ -1,10 +1,13 @@
 # AgentBridge 底座最终形态 Spec（开源可发布级）
 
-> **状态：** 设计定稿（待实现对齐）  
+> **状态：** 历史架构设计；实现状态与当前首发范围以 [v0.1.0 Spec](./2026-08-01-p3a-open-source-release-readiness-design.md) 为准。
+>
 > **日期：** 2026-07-27  
 > **读者：** 集成开发者 · 平台管理员 · 开源贡献者  
-> **归属：** 设计三类之 **① 底座**（见 [design-tracks.md](../../design-tracks.md)）  
-> **拍板依据：** [方案收敛](./2026-07-27-scheme-convergence.md)  
+> **归属：** 历史底座设计记录。
+>
+> **拍板依据：** 已收敛到根目录完整方案与当前首发 Spec。
+>
 > **冲突时：** 契约以 [contracts.md](../../contracts.md) + `protocol/events.py` 为准；排期以本 Spec + roadmap 为准
 
 ---

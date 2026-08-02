@@ -25,6 +25,7 @@
 - `echo` — 最小流程，没有工具
 - `demo_tools` — 无真实大模型；演示工具调用和扩展事件 `x.demo_tools.*`
 - `demo_rag` — 演示检索与引用事件 `x.bridge.citation`
+- `work_order_ops` — 黄金案例：脱敏查询、列表/图表、台账草稿和审批写入；只参考模式，不复制业务模型
 
 ## 扩展事件怎么发
 

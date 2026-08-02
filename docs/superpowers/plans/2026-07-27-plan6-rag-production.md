@@ -1,10 +1,10 @@
 # Plan6 — 多知识后端（底座①）
 
-> **状态：** 待实施（已按 [方案收敛](../specs/2026-07-27-scheme-convergence.md) 收窄）  
-> **设计稿：** [../specs/2026-07-27-rag-production-design.md](../specs/2026-07-27-rag-production-design.md) · [R-A 切片设计](../specs/2026-07-27-platform-ra-design.md)  
-> **R-A 详细实施计划：** [./2026-07-27-platform-ra.md](./2026-07-27-platform-ra.md)（优先按该文档执行 T1–T8）  
-> **external 协议：** [../specs/2026-07-27-external-rag-protocol.md](../specs/2026-07-27-external-rag-protocol.md)  
-> **归属：** [design-tracks.md](../../design-tracks.md) **① 底座**  
+> **状态：** 历史计划；RAG 后端能力已实现并完成 P2-A 验证，当前不得按本计划继续执行。
+>
+> **说明：** 当前首发只要求 fake knowledge 的零密钥体验；RAG-Agent 为可选只读后端。详见 [v0.1.0 Spec](../specs/2026-08-01-p3a-open-source-release-readiness-design.md)。
+>
+> **归属：** 历史底座设计记录。
 > **依赖：** Plan1–5；M7 Retriever + `demo_rag`  
 > **版本目标：** v2.1  
 > **R-A 钉死：** 只做 **`langchain_pg`**（不做并行 product）

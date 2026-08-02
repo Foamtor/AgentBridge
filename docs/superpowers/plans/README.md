@@ -1,6 +1,9 @@
 # AgentBridge 实施计划索引
 
-> **归档说明：** 本目录是**历史分期怎么干活**的记录，不是新人入门文档。  
+> **当前执行入口：** [v0.1.0 首次开源发布计划](./2026-08-01-p3a-open-source-release-preparation.md)。
+>
+> 除明确标记“当前”的文件外，本目录是**历史分期怎么干活**的记录，不得从旧编号继续执行。
+>
 > 新人请先看：[文档目录](../../INDEX.md) → [guide 快速开始](../../guide/02-quickstart.md)。  
 > 产品约定以 [完整方案](../../00-AgentBridge完整方案.md) 为准；与下文冲突时以完整方案为准。
 
@@ -8,7 +11,7 @@
 > 路线图：[../../roadmap.md](../../roadmap.md)  
 > 依赖关系：[DEPENDENCIES.md](./DEPENDENCIES.md)
 
-按依赖顺序做完即可。推荐用分任务执行的方式推进。
+下表保留历史依赖关系以便追溯；当前工作只按“当前”行所链接的 Spec/Plan 推进。
 
 | 顺序 | 计划 | 文件 | 能力 | 版本含义 |
 |------|------|------|------|----------|
@@ -20,7 +23,8 @@
 | **6** | **① 多知识后端** | [plan6](./2026-07-27-plan6-rag-production.md) · **[R-A 详单](./2026-07-27-platform-ra.md)** | **M11** | → **v2.1** |
 | **7** | **② AI 控制台 C0** | [plan7](./2026-07-27-plan7-ai-console-c0.md) | **M12** | 与 6 可并行 |
 | — | 文档 P1 门面 | [docs-p1](./2026-07-28-docs-p1-gate.md) | 人类 guide | 文档 |
-| — | P2-A 运行、安全、RAG、控制台验证 | [p2-a](./2026-08-01-p2a-runtime-security-rag-console-validation.md) | 发布 P2-A | 待执行；部署/多机留给 P2-B |
+| — | P2-A 运行、安全、RAG、控制台验证 | [p2-a](./2026-08-01-p2a-runtime-security-rag-console-validation.md) | 发布 P2-A | 已完成；部署/多机留给 P2-B |
+| **当前** | **v0.1.0 首次开源发布** | **[active plan](./2026-08-01-p3a-open-source-release-preparation.md)** | 双语首页、AI 读仓、黄金案例、全栈 Compose | 已复核，待实施；不做公共包发布 |
 | — | 全面审阅记录 | [full-review](./2026-07-28-full-review.md) | 代码+文档抽查 | 文档 |
 
 > 三类划分说明见入门文：[为什么用它 · 三块东西](../../guide/01-why.md)  
@@ -47,4 +51,4 @@ M0 → Plan1(M2a) → Plan2 ─┐
 | **Plan6** | **Plan1–5；M7 Retriever（硬）** | external/product 可分期；MinerU 软 |
 | **Plan7** | **Plan1–5（admin/调试台）** | **不硬依赖 Plan6** |
 
-**下一步：** 按路线图与完整方案推进；新人入口见 [文档目录](../../INDEX.md)。
+**下一步：** 执行表中“当前”计划；新人入口见 [文档目录](../../INDEX.md)。

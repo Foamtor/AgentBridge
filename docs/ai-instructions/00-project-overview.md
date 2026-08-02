@@ -23,6 +23,8 @@
 | 业务插件 | `apps/api/domains/<名字>/` | 一个文件夹 ≈ 一个请求里的 `route` |
 | 调试台 | `apps/web` | 集成方调试用，**不是**客户业务前端 |
 
+首发黄金参考：`apps/api/domains/work_order_ops/`。它演示查询、图表、引用、台账预览与审批写入；新业务从 `_scaffold` 起步，只在需要真实模式时参考它，不整目录复制。
+
 `apps/api` 里既有平台服务，也有 `domains/`。改业务优先只动 `domains/`。
 
 ## 目录速查

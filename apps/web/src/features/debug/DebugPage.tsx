@@ -4,6 +4,7 @@ import { apiBase } from "../../lib/apiBase";
 import { streamChatSse, type StreamEvent } from "../../lib/sseClient";
 import { getToken, setToken } from "../auth/token";
 import { EventTimeline } from "./EventTimeline";
+import { GoldenCasePanel } from "./GoldenCasePanel";
 import { SendPanel } from "./SendPanel";
 import { SessionBar } from "./SessionBar";
 
@@ -18,6 +19,7 @@ export function DebugPage() {
   const [token, setTokenState] = useState(getToken);
   const [query, setQuery] = useState("hello");
   const [events, setEvents] = useState<StreamEvent[]>([]);
+  const [extra, setExtra] = useState<Record<string, unknown>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -62,7 +64,7 @@ export function DebugPage() {
         {
           method: "POST",
           headers,
-          body: JSON.stringify({ query, thread_id: tid, route }),
+          body: JSON.stringify({ query, thread_id: tid, route, extra }),
         },
         {
           onEvent: (e) => setEvents((prev) => [...prev, e]),
@@ -85,6 +87,20 @@ export function DebugPage() {
 
   async function onSend() {
     await sendOnce(threadId);
+  }
+
+  function applyGoldenPreset(preset: "list" | "chart" | "draft") {
+    setRoute("work_order_ops");
+    if (preset === "list") {
+      setQuery("show work orders");
+      setExtra({});
+    } else if (preset === "chart") {
+      setQuery("show work orders as a pie chart");
+      setExtra({});
+    } else {
+      setQuery("create a synthetic work order for the demo");
+      setExtra({ work_order_draft: { title: "Synthetic demo follow-up", priority: "medium", assignee_id: "assignee-dev-a", ledger_summary: "Created from the AgentBridge v0.1 demo" } });
+    }
   }
 
   async function onCancel() {
@@ -147,7 +163,7 @@ export function DebugPage() {
       <header>
         <h1>AgentBridge 调试台</h1>
         <p className="lede">
-          发送到 /chat/stream。route 可选 echo / demo_tools；扩展事件 x.* 在时间线中默认折叠。
+          发送到 /chat/stream。黄金案例展示结构化 x.* 事件；未知扩展事件仍在时间线中折叠。
         </p>
       </header>
       {replayRunId ? <p className="muted">回放 run：{replayRunId}</p> : null}
@@ -167,6 +183,7 @@ export function DebugPage() {
         onCancel={() => void onCancel()}
         onDoubleFire={() => void onDoubleFire()}
       />
+      <GoldenCasePanel events={events} token={token} onPreset={applyGoldenPreset} />
       {error ? <p className="error">{error}</p> : null}
       <EventTimeline events={events} />
     </main>
