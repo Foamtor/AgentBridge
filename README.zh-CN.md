@@ -1,141 +1,164 @@
+<div align="center">
+
 # AgentBridge
 
-[English](README.md) · [文档目录](docs/INDEX.md) · [架构规则](AGENTS.md)
+🔌 **给你的业务系统加上 Agent 能力——知识检索、数据分析、结构化输出、人工审批——不改一行现有代码。**
+
+面向 [Vibe Coding](#-用-vibe-coding-方式接入你的业务系统)：让 AI 编程助手帮你写插件，几分钟接好。
+
+[English](README.md) · [文档](docs/INDEX.md) · [架构规则](AGENTS.md) · [Vibe Coding 接入指南](SKILL.md)
 
 [![CI](https://github.com/Foamtor/AgentBridge/actions/workflows/ci.yml/badge.svg)](https://github.com/Foamtor/AgentBridge/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)](packages/core/pyproject.toml)
 
-## 让 AI 按规则为现有业务系统编写工具与工作流
+</div>
 
-AgentBridge 是面向 Vibe Coding 的自托管业务 AI 开发底座。你和 AI 编程助手编写业务自己的 `domain` 与 `tools`；平台统一处理 JSON/SSE 契约、会话生命周期、权限、审批、审计和 RAG Port。
+---
 
-它是源码优先的底座：不是云端 Studio，不是已经完成的行业业务系统，也不会在不了解你的业务时自动生成可上线产品。
+> 不管你的业务系统是政务平台、企业 ERP、设备管理还是内部运营工具，只要它有 API 或数据库，AgentBridge 就能在它旁边加一层 Agent 能力：用户用自然语言描述需求，Agent 根据业务数据动态生成表格、图表、分析报告，需要写操作时走人工审批。
+>
+> **不动现有系统，不迁移数据，不依赖云服务。** 装在你自己的机器上，MIT 开源。
 
-<!-- Compose 黄金案例落地后在此加入真实控制台截图。 -->
+<!-- TODO: 录 GIF demo → docker compose up → 浏览器 → 输入需求 → 动态生成结果 -->
+<!--
+<p align="center">
+  <img src="docs/assets/demo.gif" alt="AgentBridge Demo" width="700" />
+</p>
+-->
 
-## 为什么需要 AgentBridge
+## 🏗️ 怎么做到不改现有代码
 
-给 ERP、工单、设备、客服或内部运营系统接入 AI 时，往往反复遇到同一批高风险公共问题：
+AgentBridge 不碰你的业务系统。它在你现有接口旁边加一层适配——你写一个插件描述你的 API 能做什么，AgentBridge 负责让 Agent 能调用它，并管好权限、审批、审计这些公共的事。
 
-- 流式输出如何保持顺序、可回放；
-- 租户和权限上下文如何不被工具绕过；
-- 写操作如何经过人工确认；
-- RAG 如何进入真实业务流程；
-- 平台公共代码和客户业务代码如何不互相污染。
+<p align="center">
+  <img src="docs/assets/architecture.png" alt="AgentBridge 分层架构" width="800" />
+</p>
 
-AgentBridge 把这些问题统一收在平台层，业务代码则保留在插件式 domain 中。
+你写插件，平台管剩下的事：
 
-| 你和 AI 编写 | AgentBridge 统一提供 |
-| --- | --- |
-| 业务流程、tools、权限、结构化返回 | JSON/SSE 信封、生命周期、取消、会话互斥 |
-| 查询、表单、图表、台账数据 | 工具列表过滤与执行时再次鉴权 |
-| 业务适配与展示消费者 | 审批、审计、租户上下文、RAG/DataSource Port |
+| ✏️ 你写的 | 🔧 平台管的 |
+|-----------|------------|
+| 你的 API 有哪些能力、要什么参数、返回什么格式 | 对话管理、流式输出、会话状态 |
+| 业务数据怎么查、怎么分析 | 权限校验、租户隔离、工具过滤 |
+| 知识库挂哪里、结构化结果长什么样 | 人工审批、操作审计、取消和恢复 |
 
-## 工作方式
+## 🤖 用 Vibe Coding 方式接入你的业务系统
 
-```text
-现有业务系统
-      │
-      ├── AI 编写的 domain / tools / tests
-      │
-      ▼
-AgentBridge API ── JSON + SSE ── 集成调试台 / 你的客户端
-      │
-      ├── 权限 · 审计 · 审批 · 生命周期
-      └── DataSource / Retriever / LLM Gateway Port
+AgentBridge 是为 Vibe Coding 设计的。你不需要自己写代码——让 Cursor、Codex、Claude Code 等 AI 编程助手帮你写插件。
+
+**三个步骤：**
+
+1. Clone 仓库，用你的 AI 编程助手打开
+2. 把 [`SKILL.md`](SKILL.md) 的内容喂给助手（或让助手自己读）
+3. 告诉助手你的业务系统有什么接口，它帮你写好插件
+
+```
+读 SKILL.md，然后帮我接入业务系统。
+
+我的系统：<一句话描述你的系统是做什么的>
+我的接口：<列出你的 API 或数据库表>
+用户会问什么：<举几个实际的例子>
 ```
 
-架构刻意不让业务名称进入 `packages/core`。适配器只在 `apps/api/lifespan.py` 组装；domain 使用已注入的 Port，返回业务扩展事件，不直接推 SSE。
+详细的接入指南和可复制的提示词见 [`SKILL.md`](SKILL.md)。
 
-## 黄金案例：工单运营助手
+## 🎯 适合什么时候用
 
-[`work_order_ops`](apps/api/domains/work_order_ops/) 是真实业务闭环的参考实现，内置数据均为脱敏模拟数据。
+你已经有 API 或数据库，想给系统加上 Agent 能力验证效果——不管是做个原型给领导看，还是真的上线给业务人员用。
 
-1. 查询当前租户的工单；
-2. 返回结构化列表、ECharts 配置和知识引用；
-3. 填写工单与台账草稿并指派处理人；
-4. 人工确认后才创建工单和台账；
-5. 审批后的创建结果保持幂等。
+- 🔍 **产品验证**：快速让老板/客户看到"我们的系统能用 AI 做数据分析"
+- ⚡ **内部提效**：给已有的审批、查询、报表系统加一个自然语言入口
+- 🔗 **能力复用**：多个业务系统共用一套权限、审批、审计，不用每个系统单独做
 
-控制台会展示 `x.work_order_ops.list`、`x.work_order_ops.chart`、`x.bridge.citation`、`x.bridge.approval_required` 等扩展事件的参考渲染方式。它不是客户最终使用的工单业务前端。
+## ⚠️ 不适合什么时候用
 
-## 快速开始
+- 🚫 从零造一个 AI 产品（没有现有 API）→ 直接用 LangGraph、CrewAI 这类框架
+- 🚫 高频实时交易（Agent 有 1-3 秒推理延迟）→ 传统 API 网关更合适
+- 🚫 替代整套账号体系 → AgentBridge 能对接你已有的登录系统，但不替代它
+- 🚫 开箱即用的多机扩展 → 需要按文档配置，不是默认支持
 
-v0.1.0 的主路径只有一条 Compose 命令：
+简单判断：你的系统有 API，你想让 AI 能调用这些 API 并且需要权限和审批——用 AgentBridge。你从零开始造 AI 产品——不需要。
+
+## 🚀 跑起来看效果
 
 ```bash
+git clone https://github.com/Foamtor/AgentBridge.git
+cd AgentBridge
 docker compose up --build
 ```
 
-启动后打开集成调试台，选择 `work_order_ops`。默认环境使用离线模型 Stub、fake knowledge、脱敏演示数据和开发租户；不要求模型密钥、外部 RAG 服务或 IdP。端口、重置说明和本地开发替代方式见[快速开始](docs/guide/02-quickstart.md)。
+打开 `http://localhost:8080`，选 `work_order_ops`，开始体验。
+如设置了 `WEB_PORT`，请使用对应端口。
 
-> 全栈 Compose 是 v0.1.0 的发布工作内容。其落地前，请使用现有的[本地开发指南](docs/guide/02-quickstart.md)。
+> 💡 跑起来不需要 API Key，不需要外部数据库，不需要云服务。内置了离线模型和脱敏的演示数据，纯粹为了让你看到效果。
+>
+> 详细说明见[快速开始指南](docs/guide/02-quickstart.md)。
 
-## 用 AI 开发业务工具
+## 📋 一个完整的例子
 
-在仓库根目录打开项目后，向 AI 编程助手发送：
+仓库里有一个叫 `work_order_ops` 的参考实现，展示了一个完整的业务闭环：从查数据到审批后创建记录。
 
-```text
-你在修改 AgentBridge。先读 AGENTS.md，再读
-docs/ai-instructions/00-project-overview.md 与 01-architecture-rules.md。
-新增业务能力时读 02-domain-development.md，并参考
-apps/api/domains/work_order_ops 的真实模式，但不能把它的业务名复制进 packages/core。
+| 👤 用户 | 🤖 系统 |
+|---------|---------|
+| "查一下本月工单" | 查询业务数据库，动态生成表格和图表 |
+| "搜一下处理规范" | 从知识库检索相关内容，标注来源 |
+| "帮我建一个工单" | 根据对话内容生成工单草稿，等你确认 |
+| — | 弹出审批提示，等你决定 |
+| "批准" | 执行创建，结果幂等——不会重复建 |
 
-实现前先定义输入、权限、结构化结果、审批/幂等需求和测试。domain 内不得创建
-adapter，也不得直接推 SSE。没有权限的工具不能进入模型工具列表，调用时仍须再鉴权。
+用的都是脱敏的模拟数据。它不是最终产品——是你写自己业务插件时可以照着改的模板。
 
-我的任务：<描述要新增的 domain 或 tool>
+## 📦 平台做了什么
+
+| 能力 | 具体做了什么 |
+|------|-------------|
+| 🤖 Agent 运行时 | 理解用户意图，决定调哪些接口，把结果组织成用户能看懂的格式 |
+| 📚 知识检索 | 业务知识库接入，回答问题时引用来源 |
+| 🔒 权限控制 | 不同用户看到不同数据，工具调用前再次校验权限 |
+| ✅ 人工审批 | 涉及写操作时必须人工确认，确认后幂等执行 |
+| 📋 操作审计 | 每次调用都有记录，可追溯 |
+| 📊 结构化输出 | 动态生成表格、图表、台账、审批单——不是只有文字 |
+| 🧩 插件隔离 | 你的业务代码和平台代码各管各的，互不干扰 |
+
+## 🗂️ 仓库结构
+
+```
+packages/core/          平台核心：生命周期、协议、适配器
+apps/api/               服务入口：路由、组装
+│   └── domains/        业务插件放这里
+│       ├── _scaffold/  插件模板
+│       └── work_order_ops/  参考实现
+apps/web/               调试控制台
+packages/sdk/           TypeScript 客户端
+docs/                   文档
+SKILL.md                Vibe Coding 接入指南（喂给 AI 助手用）
 ```
 
-更多可复制配方（只读查询、列表/图表/台账、人工审批写操作）见[AI 编程手册](docs/ai-instructions/05-ai-coding.md)。
+## 📊 当前状态
 
-## 已有能力
+- 🚧 v0.1.0 技术预览准备中
+- ✅ 默认 Compose 黄金流程已完成本地验收
+- ✅ 包含可运行的 `work_order_ops` 参考实现
+- ⚠️ CI 遗留问题正在清理
+- 🚧 生产 IdP、多机验证、迁移恢复和包发布尚未完成
 
-| 领域 | 底座能力 |
-| --- | --- |
-| 对话运行 | FastAPI、LangGraph、稳定 SSE、取消、同会话协调 |
-| 治理 | 租户上下文、工具列表过滤、执行期策略检查、审计、审批 |
-| 业务接入 | domain 注册、DataSource/Retriever Port、结构化扩展事件 |
-| 知识 | fake、pgvector、external 与可选只读 RAG-Agent 兼容后端 |
-| 开发体验 | 集成调试台、TypeScript SDK、AI 可读规则、黄金案例 |
+## 🤝 参与贡献
 
-## 仓库结构
+1. Fork → 创建分支 → 提交 PR
+2. 阅读 [CONTRIBUTING.md](CONTRIBUTING.md) 了解代码规范
+3. 只使用脱敏示例数据，不提交真实业务数据
 
-```text
-packages/core/       可复用生命周期、Port、协议与适配器
-apps/api/            FastAPI 宿主、组装根、路由和 domains
-apps/api/domains/    业务插件；从 _scaffold 或 work_order_ops 开始
-apps/web/            集成/调试控制台，不是客户业务前端
-packages/sdk/        TypeScript 客户端
-docs/                指南、契约、架构与 AI 手册
-```
+## 📄 许可证
 
-## 文档
+MIT © [Foamtor](https://github.com/Foamtor)
 
-- [快速开始](docs/guide/02-quickstart.md)
-- [基本概念](docs/guide/03-concepts.md)
-- [第一个 domain](docs/guide/04-first-plugin.md)
-- [JSON 与 SSE 契约](docs/contracts.md)
-- [不可违反的架构规则](AGENTS.md)
-- [完整产品架构](docs/00-AgentBridge完整方案.md)
-- [v0.1.0 首发范围](docs/superpowers/specs/2026-08-01-p3a-open-source-release-readiness-design.md)
+---
 
-## 状态与限制
+<div align="center">
 
-AgentBridge 正在准备 **v0.1.0 技术预览**。它面向要在已有系统上构建 AI 层的开发者与团队。
+**觉得有用？点个 ⭐ Star 支持一下！**
 
-- 默认演示故意离线，并只使用脱敏数据。
-- 真实 LLM、外部 RAG、OIDC、多实例、部署迁移、备份恢复和生产稳定性仍是按需能力或延期工作。
-- 可选 RAG-Agent 集成仅只读，并映射到固定演示租户；默认 Compose 不依赖它。
-- 本次技术预览不发布 PyPI、npm、GHCR、签名镜像或企业供应链制品。
+[![Star History Chart](https://api.star-history.com/svg?repos=Foamtor/AgentBridge&type=Date)](https://star-history.com/#Foamtor/AgentBridge&Date)
 
-具体范围与延期的 P2-B 验证见[发布规划](docs/release-plan.md)。
-
-## 贡献与安全
-
-贡献必须遵守架构规则，并只提交脱敏示例数据。v0.1.0 社区文件落地后见 [CONTRIBUTING.md](CONTRIBUTING.md) 与 [SECURITY.md](SECURITY.md)。
-
-## 许可证
-
-MIT，见 [LICENSE](LICENSE)。
+</div>

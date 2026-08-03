@@ -1,144 +1,164 @@
+<div align="center">
+
 # AgentBridge
 
-[简体中文](README.zh-CN.md) · [Documentation](docs/INDEX.md) · [Architecture rules](AGENTS.md)
+🔌 **Add Agent capabilities to your business systems — knowledge retrieval, data analysis, structured output, human-in-the-loop approval — without changing a single line of existing code.**
+
+Built for [Vibe Coding](#-vibe-coding-integration): let AI coding assistants write your plugins.
+
+[简体中文](README.zh-CN.md) · [Documentation](docs/INDEX.md) · [Architecture rules](AGENTS.md) · [Vibe Coding Guide](SKILL.md)
 
 [![CI](https://github.com/Foamtor/AgentBridge/actions/workflows/ci.yml/badge.svg)](https://github.com/Foamtor/AgentBridge/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)](packages/core/pyproject.toml)
 
-## Build governed AI workflows on top of your existing business systems
+</div>
 
-AgentBridge is a self-hosted, AI-readable foundation for Vibe Coding business tools. It lets an AI and your developers write the business-specific `domain` and `tools`, while the platform owns the difficult shared behavior: JSON/SSE contracts, session lifecycle, permissions, approvals, audit, and RAG ports.
+---
 
-It is a source-first foundation—not a hosted Studio, not a finished industry application, and not a package that can understand your business without customization.
+> Whether your system is a government service platform, enterprise ERP, device management tool, or internal ops dashboard — if it has APIs or a database, AgentBridge can add an Agent layer alongside it. Users describe what they need in natural language. The Agent pulls from your business data and dynamically generates tables, charts, and reports. Write operations go through human approval.
+>
+> **No changes to existing systems. No data migration. No cloud dependency.** Runs on your own machines, MIT licensed.
 
-<!-- A real work-order golden-case screenshot is added once the Compose UI flow lands. -->
+<!-- TODO: Record GIF demo → docker compose up → browser → describe a need → dynamic result appears -->
+<!--
+<p align="center">
+  <img src="docs/assets/demo.gif" alt="AgentBridge Demo" width="700" />
+</p>
+-->
 
-## Why AgentBridge
+## 🏗️ How it works without changing your code
 
-Adding AI to an existing ERP, support, device, or operations system tends to repeat the same risky work:
+AgentBridge doesn't touch your business systems. It adds an adapter layer next to your existing APIs — you write a plugin that describes what your APIs can do, and AgentBridge handles everything else.
 
-- streaming output that remains ordered and replayable;
-- tenant and permission context that tools cannot bypass;
-- a human approval boundary before a write takes effect;
-- a safe way to bring retrieval into a real business flow;
-- a clear boundary between reusable platform code and customer-specific code.
+<p align="center">
+  <img src="docs/assets/architecture.png" alt="AgentBridge Architecture" width="800" />
+</p>
 
-AgentBridge makes these shared concerns platform responsibilities. Your business code stays in a plugin-like domain.
+You write the plugin, the platform handles the rest:
 
-| You and your coding AI build | AgentBridge provides |
-| --- | --- |
-| Business flow, tools, permissions, structured results | JSON/SSE envelopes, lifecycle, cancellation, session locking |
-| Queries, forms, charts, ledger data | Tool visibility filtering and invoke-time authorization |
-| Business-specific adapters and UI consumers | Approval, audit, tenant context, RAG/DataSource ports |
+| ✏️ You write | 🔧 The platform handles |
+|-------------|----------------------|
+| What your APIs can do, what parameters they need, what format they return | Conversation management, streaming output, session state |
+| How to query and analyze business data | Permission checks, tenant isolation, tool filtering |
+| Where the knowledge base lives, what structured results look like | Human approval, operation audit, cancel and resume |
 
-## How it works
+## 🤖 Vibe Coding Integration
 
-```text
-Existing business system
-        │
-        ├── AI-written domain / tools / tests
-        │
-        ▼
-AgentBridge API ── JSON + SSE ── Integration Console / your client
-        │
-        ├── permissions · audit · approval · lifecycle
-        └── DataSource / Retriever / LLM Gateway ports
+AgentBridge is built for Vibe Coding. You don't need to write code yourself — let Cursor, Codex, Claude Code, or other AI assistants write the plugin for you.
+
+**Three steps:**
+
+1. Clone the repo, open it in your AI coding assistant
+2. Point the assistant to [`SKILL.md`](SKILL.md)
+3. Describe your business system — the assistant writes the plugin
+
+```
+Read SKILL.md, then help me integrate my business system.
+
+My system: <one sentence about what it does>
+My APIs: <list your endpoints or database tables>
+What users will ask: <a few real examples>
 ```
 
-The architecture deliberately keeps business names out of `packages/core`. Adapters are assembled in `apps/api/lifespan.py`; domains consume injected ports and return business fragments instead of pushing SSE directly.
+Detailed guide and copy-ready prompts in [`SKILL.md`](SKILL.md).
 
-## Golden use case: work-order operations
+## 🎯 When to use it
 
-[`work_order_ops`](apps/api/domains/work_order_ops/) is the reference implementation for a realistic business loop. Its bundled data is synthetic and redacted.
+You already have APIs or databases and want to add Agent capabilities — whether it's a prototype for stakeholders or a real tool for your team.
 
-1. Query tenant-scoped work orders.
-2. Return a structured list, an ECharts option, and knowledge citations.
-3. Prepare a work-order and ledger draft with an assignee.
-4. Require a human decision before creating the work order and ledger.
-5. Produce an idempotent creation result after approval.
+- 🔍 **Product validation**: Quickly show "our system can do AI-powered data analysis"
+- ⚡ **Internal efficiency**: Add a natural language entry point to existing systems
+- 🔗 **Shared governance**: Multiple systems sharing one set of permissions, approvals, and audit
 
-The console renderer is a reference for consuming extension events such as `x.work_order_ops.list`, `x.work_order_ops.chart`, `x.bridge.citation`, and `x.bridge.approval_required`. It is not a customer-facing work-order system.
+## ⚠️ When NOT to use it
 
-## Quick start
+- 🚫 Building an AI product from scratch (no existing APIs) → Use LangGraph, CrewAI, or similar
+- 🚫 High-frequency real-time trading (Agent adds 1–3s latency) → Use a traditional API gateway
+- 🚫 Replacing your entire auth system → AgentBridge integrates with your login, but doesn't replace it
+- 🚫 Multi-node scaling out of the box → Requires explicit configuration
 
-The v0.1.0 primary path is a single Compose command:
+Simple test: your system has APIs, you want AI to call them with permission and approval controls — use AgentBridge. You're building an AI product from scratch — you don't need it.
+
+## 🚀 Run it and see for yourself
 
 ```bash
+git clone https://github.com/Foamtor/AgentBridge.git
+cd AgentBridge
 docker compose up --build
 ```
 
-Then open the integration console and choose `work_order_ops`. The default stack uses an offline model stub, fake knowledge, redacted demo data, and a development tenant; it needs no model key, external RAG service, or IdP. Detailed ports, reset behavior, and local development alternatives are in the [quick-start guide](docs/guide/02-quickstart.md).
+Open `http://localhost:8080`, select `work_order_ops`, and start exploring.
+If you set `WEB_PORT`, use that port instead.
 
-> The full-stack Compose stack is part of the v0.1.0 release work. Until it lands, use the existing [local development guide](docs/guide/02-quickstart.md).
+> 💡 No API key needed. No external database. No cloud services. Ships with an offline model and synthetic demo data — just run it and see what it does.
+>
+> Details in the [quick-start guide](docs/guide/02-quickstart.md).
 
-## Build with AI
+## 📋 A complete example
 
-Open this repository at its root and give your coding assistant this prompt:
+The repo includes a reference implementation called `work_order_ops` that walks through a full business loop.
 
-```text
-You are modifying AgentBridge. Read AGENTS.md first, then
-docs/ai-instructions/00-project-overview.md and 01-architecture-rules.md.
-For a new business capability, read 02-domain-development.md and use
-apps/api/domains/work_order_ops as a realistic reference, without copying its
-business name into packages/core.
+| 👤 User | 🤖 System |
+|---------|----------|
+| "Show me this month's tickets" | Queries the business database, dynamically generates tables and charts |
+| "Search the handling guidelines" | Retrieves from the knowledge base, cites sources |
+| "Create a work order for me" | Generates a draft based on the conversation, waits for confirmation |
+| — | Shows an approval prompt, waits for decision |
+| "Approve" | Executes the creation — idempotent, won't duplicate records |
 
-Define inputs, permissions, structured results, approval/idempotency needs,
-and tests before implementation. Do not create adapters inside a domain and do
-not emit SSE directly from a domain. Keep unauthorized tools out of the model
-tool list and rely on invoke-time authorization as well.
+All demo data is synthetic. It's not a finished product — it's a template for building your own plugin.
 
-My task: <describe the domain or tool to add>
+## 📦 What the platform does
+
+| Capability | What it actually does |
+|-----------|----------------------|
+| 🤖 Agent runtime | Understands user intent, decides which APIs to call, organizes results |
+| 📚 Knowledge retrieval | Connects your knowledge base, cites sources when answering |
+| 🔒 Permission control | Different users see different data, checked before every API call |
+| ✅ Human approval | Write operations require confirmation, execution is idempotent |
+| 📋 Operation audit | Every invocation logged, fully traceable |
+| 📊 Structured output | Dynamically generates tables, charts, ledgers, approval forms |
+| 🧩 Plugin isolation | Your code and the platform code stay out of each other's way |
+
+## 🗂️ Repository structure
+
+```
+packages/core/          Platform core: lifecycle, protocols, adapters
+apps/api/               Service entry: routes, composition
+│   └── domains/        Your business plugins go here
+│       ├── _scaffold/  Plugin template
+│       └── work_order_ops/  Reference implementation
+apps/web/               Debug console
+packages/sdk/           TypeScript client
+docs/                   Documentation
+SKILL.md                Vibe Coding integration guide (for AI assistants)
 ```
 
-More ready-to-copy recipes—for read tools, list/chart/ledger output, and approval-gated writes—are in [AI coding instructions](docs/ai-instructions/05-ai-coding.md).
+## 📊 Current status
 
-## Capabilities
+- 🚧 v0.1.0 Technical Preview preparation
+- ✅ Default Compose golden flow verified locally
+- ✅ Reference `work_order_ops` implementation included
+- ⚠️ CI cleanup is in progress
+- 🚧 Production IdP, multi-instance validation, migration/recovery, and package publishing are deferred
 
-| Area | Included foundation |
-| --- | --- |
-| Conversation runtime | FastAPI, LangGraph, stable SSE, cancellation, per-thread coordination |
-| Governance | Tenant context, tool-list filtering, invoke-time policy checks, audit, approval |
-| Business integration | Domain registry, DataSource and Retriever ports, structured extension events |
-| Knowledge | Fake, pgvector, external, and optional read-only RAG-Agent-compatible retrieval backends |
-| Developer experience | Integration console, TypeScript SDK, AI-readable rules, golden domain |
+## 🤝 Contributing
 
-## Repository map
+1. Fork → Branch → PR
+2. Read [CONTRIBUTING.md](CONTRIBUTING.md) for code standards
+3. Use only redacted example data — never commit real business data
 
-```text
-packages/core/       reusable lifecycle, ports, protocols, and adapters
-apps/api/            FastAPI host, composition root, routes, and domains
-apps/api/domains/    business plugins; start with _scaffold or work_order_ops
-apps/web/            integration/debug console, not a customer business UI
-packages/sdk/        TypeScript client
-docs/                guides, contracts, architecture, and AI instructions
-```
+## 📄 License
 
-## Documentation
+MIT © [Foamtor](https://github.com/Foamtor)
 
-- [Get started](docs/guide/02-quickstart.md)
-- [Understand the concepts](docs/guide/03-concepts.md)
-- [Create your first domain](docs/guide/04-first-plugin.md)
-- [JSON and SSE contracts](docs/contracts.md)
-- [Architecture and non-negotiable rules](AGENTS.md)
-- [Full product architecture](docs/00-AgentBridge完整方案.md)
-- [v0.1.0 release scope](docs/superpowers/specs/2026-08-01-p3a-open-source-release-readiness-design.md)
+---
 
-## Status and limitations
+<div align="center">
 
-AgentBridge is preparing its **v0.1.0 Technical Preview**. The preview is intended for developers and teams building an AI layer over an existing system.
+**Find it useful? Give us a ⭐ Star!**
 
-- The default demo is deliberately offline and uses redacted data.
-- Real LLMs, external RAG, OIDC, multi-instance operation, deployment migration, backup/recovery, and production hardening remain opt-in or deferred work.
-- The optional RAG-Agent integration is read-only and mapped to a fixed demonstration tenant; it is not required by the default stack.
-- No PyPI, npm, GHCR, signed-image, or enterprise supply-chain release is part of this preview.
+[![Star History Chart](https://api.star-history.com/svg?repos=Foamtor/AgentBridge&type=Date)](https://star-history.com/#Foamtor/AgentBridge&Date)
 
-See the [release plan](docs/release-plan.md) for the boundary and deferred P2-B production validation.
-
-## Contributing and security
-
-Contributions should preserve the architecture rules and use only redacted example data. See [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md) once the v0.1.0 community files land.
-
-## License
-
-MIT. See [LICENSE](LICENSE).
+</div>
