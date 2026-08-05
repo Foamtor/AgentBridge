@@ -20,6 +20,8 @@ from routes.admin_usage import router as admin_usage_router
 from routes.ingest import router as ingest_router
 from routes.prompts import router as prompts_router
 from routes.approvals import router as approvals_router
+from routes.auth import router as auth_router
+from routes.console import router as console_router
 from routes.chat import router as chat_router
 from routes.health import router as health_router
 from routes.metrics import router as metrics_router
@@ -30,12 +32,14 @@ from routes.threads import router as threads_router
 
 def create_app() -> FastAPI:
     settings = get_settings()
-    validate_auth_settings(
-        auth_required=settings.auth_required,
-        auth_dev_stub=settings.auth_dev_stub,
-        oidc_issuer=settings.oidc_issuer,
-        oidc_jwt_secret=settings.oidc_jwt_secret,
-    )
+    settings.validate_auth_mode()
+    if settings.resolved_auth_mode == "oidc":
+        validate_auth_settings(
+            auth_required=settings.auth_required,
+            auth_dev_stub=settings.auth_dev_stub,
+            oidc_issuer=settings.oidc_issuer,
+            oidc_jwt_secret=settings.oidc_jwt_secret,
+        )
     redis_client = None
     if settings.lock_backend == "redis" or settings.rate_limit_backend == "redis":
         redis_client = _build_redis(settings)
@@ -49,6 +53,7 @@ def create_app() -> FastAPI:
         audience=settings.oidc_audience,
         jwt_secret=settings.oidc_jwt_secret,
         auth_dev_stub=settings.auth_dev_stub,
+        auth_mode=settings.resolved_auth_mode,
     )
     app.add_middleware(
         RateLimitMiddleware,
@@ -57,6 +62,8 @@ def create_app() -> FastAPI:
     )
     app.include_router(health_router)
     app.include_router(ready_router)
+    app.include_router(auth_router)
+    app.include_router(console_router)
     app.include_router(metrics_router)
     app.include_router(chat_router)
     app.include_router(approvals_router)

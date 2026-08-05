@@ -43,6 +43,30 @@ You write the plugin, the platform handles the rest:
 | How to query and analyze business data | Permission checks, tenant isolation, tool filtering |
 | Where the knowledge base lives, what structured results look like | Human approval, operation audit, cancel and resume |
 
+## 🔩 Under the hood
+
+AgentBridge is a source-first Python platform with explicit boundaries between reusable runtime code, host wiring, and business plugins.
+
+| Layer | Implementation | Responsibility |
+|-------|----------------|----------------|
+| Client | React + Vite debug console, TypeScript SDK, or your own frontend | Sends chat requests and renders text, tables, charts, citations, drafts, and approval states |
+| API host | FastAPI in `apps/api`; Nginx provides the same-origin `/api` proxy in Compose | HTTP routes, authentication middleware, request context, health endpoints, and dependency wiring |
+| Runtime core | Python package in `packages/core`; LangGraph runtime behind platform interfaces | Run lifecycle, ordered streaming, per-thread coordination, cancellation, checkpoints, tool execution, and event logging |
+| Governance | Policy engine, tool guard, approval store/action registry, audit hooks | Filters tools before the model sees them, authorizes again at invocation, and gates writes behind human approval |
+| Business plugins | `apps/api/domains/<name>` registered by the API composition root | Business tools, state, workflow graph, permissions, and structured extension events |
+| Integration ports | DataSource, Retriever, LLM Gateway, stores, locks, and checkpointers | Keeps database, knowledge, model, and infrastructure implementations replaceable |
+
+The request path is:
+
+```text
+Client → FastAPI route → RunLifecycle → registered business graph/tools
+       ← Nginx / SSE ← recorded outbound events and structured extensions
+```
+
+`apps/api/lifespan.py` is the production composition root: it creates adapters, registers plugins, and injects implementations into the runtime. `packages/core` never imports a concrete business plugin, and plugins do not create infrastructure adapters or emit SSE directly. See [the architecture summary](docs/architecture.md), [event contracts](docs/contracts.md), and [non-negotiable rules](AGENTS.md).
+
+The default Compose stack starts the React console, FastAPI service, and PostgreSQL with pgvector. Redis and Authentik are optional profiles. The technical preview deliberately uses an offline model stub and fake knowledge backend, while Postgres-backed business data and approval execution exercise the complete demo flow.
+
 ## 🤖 Vibe Coding Integration
 
 AgentBridge is built for Vibe Coding. You don't need to write code yourself — let Cursor, Codex, Claude Code, or other AI assistants write the plugin for you.
@@ -88,10 +112,18 @@ cd AgentBridge
 docker compose up --build
 ```
 
-Open `http://localhost:8080`, select `work_order_ops`, and start exploring.
+The Compose demo defaults to the DaoCloud registry mirror for China. To use official Docker Hub paths instead, set `IMAGE_REGISTRY=docker.io` in `.env`.
+
+Open `http://localhost:8080`. On the first start, retrieve the one-time administrator password from the API log:
+
+```bash
+docker compose logs api
+```
+
+Sign in as `admin`, set a strong new password, then use the Verification Workbench to run `work_order_ops`.
 If you set `WEB_PORT`, use that port instead.
 
-> 💡 No API key needed. No external database. No cloud services. Ships with an offline model and synthetic demo data — just run it and see what it does.
+> 💡 No API key or cloud service needed. The Compose demo includes PostgreSQL, an offline model, and synthetic demo data. The initial password is never committed or fixed in the image.
 >
 > Details in the [quick-start guide](docs/guide/02-quickstart.md).
 
@@ -158,7 +190,5 @@ MIT © [Foamtor](https://github.com/Foamtor)
 <div align="center">
 
 **Find it useful? Give us a ⭐ Star!**
-
-[![Star History Chart](https://api.star-history.com/svg?repos=Foamtor/AgentBridge&type=Date)](https://star-history.com/#Foamtor/AgentBridge&Date)
 
 </div>

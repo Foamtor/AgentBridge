@@ -43,6 +43,30 @@ AgentBridge 不碰你的业务系统。它在你现有接口旁边加一层适�
 | 业务数据怎么查、怎么分析 | 权限校验、租户隔离、工具过滤 |
 | 知识库挂哪里、结构化结果长什么样 | 人工审批、操作审计、取消和恢复 |
 
+## 🔩 底层架构
+
+AgentBridge 是一个源码优先的 Python 平台，刻意把可复用运行时、宿主组装和业务插件分开。
+
+| 层次 | 实现 | 职责 |
+|------|------|------|
+| 客户端 | React + Vite 调试台、TypeScript SDK，或你的业务前端 | 发起对话请求，渲染文字、表格、图表、引用、草稿和审批状态 |
+| API 宿主 | `apps/api` 中的 FastAPI；Compose 中由 Nginx 提供同源 `/api` 代理 | HTTP 路由、认证中间件、请求上下文、健康检查和依赖组装 |
+| 平台运行时 | `packages/core` Python 包；通过平台接口使用 LangGraph 运行时 | 运行生命周期、有序流式输出、同会话协调、取消、检查点、工具执行和事件记录 |
+| 治理层 | 权限策略、工具守卫、审批存储/执行注册表、审计钩子 | 模型看见工具前先过滤，调用时再次鉴权，写操作必须经过人工审批 |
+| 业务插件 | 由 API 组装根注册的 `apps/api/domains/<名字>` | 业务工具、状态、流程图、权限声明和结构化扩展事件 |
+| 集成接口 | DataSource、Retriever、LLM Gateway、存储、锁和检查点接口 | 让数据库、知识库、模型和基础设施实现可以替换 |
+
+一次请求的主链路是：
+
+```text
+客户端 → FastAPI 路由 → RunLifecycle → 已注册的业务流程和工具
+       ← Nginx / SSE ← 已记录的出站事件和结构化扩展结果
+```
+
+`apps/api/lifespan.py` 是生产组装根：负责创建适配器、注册插件，并把实现注入运行时。`packages/core` 不导入任何具体业务插件；业务插件也不自行创建基础设施适配器或直接发送 SSE。详细说明见[架构摘要](docs/architecture.md)、[事件契约](docs/contracts.md)和[不可违反的规则](AGENTS.md)。
+
+默认 Compose 会启动 React 调试台、FastAPI 服务和带 pgvector 的 PostgreSQL；Redis 与 Authentik 是可选 profile。技术预览默认使用离线模型桩和 fake 知识后端，同时以 PostgreSQL 业务数据和审批执行跑通完整演示闭环。
+
 ## 🤖 用 Vibe Coding 方式接入你的业务系统
 
 AgentBridge 是为 Vibe Coding 设计的。你不需要自己写代码——让 Cursor、Codex、Claude Code 等 AI 编程助手帮你写插件。
@@ -88,10 +112,18 @@ cd AgentBridge
 docker compose up --build
 ```
 
-打开 `http://localhost:8080`，选 `work_order_ops`，开始体验。
+Compose 默认使用 DaoCloud 国内镜像代理。若当前网络可以直接访问 Docker Hub，可在 `.env` 中设置 `IMAGE_REGISTRY=docker.io` 切回官方镜像地址。
+
+打开 `http://localhost:8080`。首次启动时，从 API 日志取得一次性管理员密码：
+
+```bash
+docker compose logs api
+```
+
+使用 `admin` 登录，先设置一个强密码；随后在验证工作台运行 `work_order_ops`。
 如设置了 `WEB_PORT`，请使用对应端口。
 
-> 💡 跑起来不需要 API Key，不需要外部数据库，不需要云服务。内置了离线模型和脱敏的演示数据，纯粹为了让你看到效果。
+> 💡 跑起来不需要 API Key 或云服务。Compose 自带 PostgreSQL、离线模型和脱敏演示数据；初始密码不会写入仓库或镜像。
 >
 > 详细说明见[快速开始指南](docs/guide/02-quickstart.md)。
 
@@ -158,7 +190,5 @@ MIT © [Foamtor](https://github.com/Foamtor)
 <div align="center">
 
 **觉得有用？点个 ⭐ Star 支持一下！**
-
-[![Star History Chart](https://api.star-history.com/svg?repos=Foamtor/AgentBridge&type=Date)](https://star-history.com/#Foamtor/AgentBridge&Date)
 
 </div>

@@ -5,11 +5,13 @@ import { init, use, type EChartsCoreOption } from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
 import { apiBase } from "../../lib/apiBase";
 import type { StreamEvent } from "../../lib/sseClient";
+import { useI18n } from "../../i18n";
 
 type Props = {
   events: StreamEvent[];
   token: string;
   onPreset: (preset: "list" | "chart" | "draft") => void;
+  showPresets?: boolean;
 };
 
 use([BarChart, LineChart, PieChart, GridComponent, LegendComponent, TitleComponent, TooltipComponent, CanvasRenderer]);
@@ -48,7 +50,8 @@ function Chart({ option }: { option: unknown }) {
   return <div className="golden-chart" ref={node} aria-label="Work-order chart" />;
 }
 
-export function GoldenCasePanel({ events, token, onPreset }: Props) {
+export function GoldenCasePanel({ events, token, onPreset, showPresets = true }: Props) {
+  const { t } = useI18n();
   const list = eventData(events, "x.work_order_ops.list");
   const chart = eventData(events, "x.work_order_ops.chart");
   const citation = eventData(events, "x.bridge.citation");
@@ -64,7 +67,7 @@ export function GoldenCasePanel({ events, token, onPreset }: Props) {
 
   async function decide(decision: "approve" | "deny") {
     if (!approvalId) return;
-    setApprovalState("Submitting decision…");
+    setApprovalState(t("submitApproval"));
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (token.trim()) headers.Authorization = `Bearer ${token.trim()}`;
     try {
@@ -75,9 +78,9 @@ export function GoldenCasePanel({ events, token, onPreset }: Props) {
       });
       const body = (await response.json()) as { approval?: { status?: string; result?: unknown } };
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      setApprovalState(`Approval ${body.approval?.status ?? decision}`);
+      setApprovalState(`${t("approvalStatus")}：${body.approval?.status ?? decision}`);
     } catch (error) {
-      setApprovalState(`Approval failed: ${String(error)}`);
+      setApprovalState(`${t("approvalFailed")}：${String(error)}`);
     }
   }
 
@@ -85,19 +88,19 @@ export function GoldenCasePanel({ events, token, onPreset }: Props) {
     <section className="golden-case" aria-label="Work-order golden case">
       <div className="golden-heading">
         <div>
-          <h2>Work-order golden case</h2>
-          <p className="muted">Redacted data · structured events · human-approved write</p>
+          <h2>{t("workOrderCase")}</h2>
+          <p className="muted">{t("workOrderCaseDescription")}</p>
         </div>
-        <div className="actions">
-          <button type="button" onClick={() => onPreset("list")}>View work orders</button>
-          <button type="button" onClick={() => onPreset("chart")}>Show chart</button>
-          <button type="button" onClick={() => onPreset("draft")}>Create draft</button>
-        </div>
+        {showPresets ? <div className="actions">
+          <button type="button" onClick={() => onPreset("list")}>{t("list")}</button>
+          <button type="button" onClick={() => onPreset("chart")}>{t("chart")}</button>
+          <button type="button" onClick={() => onPreset("draft")}>{t("draft")}</button>
+        </div> : null}
       </div>
 
       {rows.length ? (
         <div className="golden-card">
-          <h3>Work orders</h3>
+          <h3>{t("workOrders")}</h3>
           <div className="table-scroll"><table><thead><tr>{columns.map((column) => {
             const key = String(column.key ?? "");
             return <th key={key}>{String(column.label ?? key)}</th>;
@@ -108,15 +111,15 @@ export function GoldenCasePanel({ events, token, onPreset }: Props) {
         </div>
       ) : null}
 
-      {chart ? <div className="golden-card"><h3>Statistics</h3><Chart option={chart.echarts_option} /></div> : null}
+      {chart ? <div className="golden-card"><h3>{t("statistics")}</h3><Chart option={chart.echarts_option} /></div> : null}
 
-      {citations.length ? <div className="golden-card"><h3>Knowledge citations</h3><ul>{citations.map((hit, index) => <li key={String(hit.id ?? index)}>{String(hit.title ?? hit.source ?? "Knowledge source")}</li>)}</ul></div> : null}
+      {citations.length ? <div className="golden-card"><h3>{t("citations")}</h3><ul>{citations.map((hit, index) => <li key={String(hit.id ?? index)}>{String(hit.title ?? hit.source ?? t("citations"))}</li>)}</ul></div> : null}
 
-      {draft ? <div className="golden-card"><h3>Ledger preview</h3><pre>{JSON.stringify(draft, null, 2)}</pre></div> : null}
+      {draft ? <div className="golden-card"><h3>{t("ledgerPreview")}</h3><pre>{JSON.stringify(draft, null, 2)}</pre></div> : null}
 
-      {approval ? <div className="golden-card approval-card"><h3>Human approval required</h3><p>Approval id: <code>{approvalId || "pending"}</code></p><div className="actions"><button type="button" disabled={!approvalId} onClick={() => void decide("approve")}>Approve</button><button type="button" className="secondary" disabled={!approvalId} onClick={() => void decide("deny")}>Deny</button></div>{approvalState ? <p className="muted">{approvalState}</p> : null}</div> : null}
+      {approval ? <div className="golden-card approval-card"><h3>{t("approvalRequired")}</h3><p>{t("approvalStatus")}：<code>{approvalId || t("approvalPending")}</code></p><div className="actions"><button type="button" disabled={!approvalId} onClick={() => void decide("approve")}>{t("approve")}</button><button type="button" className="secondary" disabled={!approvalId} onClick={() => void decide("deny")}>{t("deny")}</button></div>{approvalState ? <p className="muted">{approvalState}</p> : null}</div> : null}
 
-      {created ? <div className="golden-card success-card"><h3>Created</h3><pre>{JSON.stringify(created, null, 2)}</pre></div> : null}
+      {created ? <div className="golden-card success-card"><h3>{t("created")}</h3><pre>{JSON.stringify(created, null, 2)}</pre></div> : null}
     </section>
   );
 }

@@ -32,6 +32,33 @@ class ApprovalDecisionResponse(BaseModel):
     approval: ApprovalPublic
 
 
+@router.get(
+    "/{approval_id}",
+    response_model=ApprovalDecisionResponse,
+    response_model_exclude_none=True,
+)
+async def get_approval(approval_id: str, request: Request) -> ApprovalDecisionResponse:
+    ctx = _ctx(request)
+    tenant_id = ctx.tenant_id or "default"
+    record = await request.app.state.approval_store.get(
+        approval_id, tenant_id=tenant_id
+    )
+    if record is None:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "approval_not_found", "message": "approval not found"},
+        )
+    requester = record.get("requester_context") or {}
+    requester_id = str(requester.get("user_id") or "")
+    may_decide = "approval:decide" in ctx.permissions or "*" in ctx.permissions
+    if not may_decide and requester_id != ctx.user_id:
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "forbidden", "message": "approval access denied"},
+        )
+    return ApprovalDecisionResponse(approval=ApprovalPublic.model_validate(record))
+
+
 def _ctx(request: Request):
     settings = request.app.state.settings
     claims = getattr(request.state, "auth_claims", None)

@@ -38,15 +38,17 @@ Fake 档：直接装 pip + 启动 uvicorn。
 
 ## v0.1.0 Compose demo
 
-在仓库根目录执行：
+在仓库根目录执行。默认使用国内 DaoCloud 镜像代理拉取基础镜像；如网络环境可以直接访问 Docker Hub，可在 `.env` 中设置 `IMAGE_REGISTRY=docker.io`：
 
 ```bash
 docker compose up --build
 ```
 
-打开 `http://127.0.0.1:8080`。默认服务为 Web、API 和 pgvector PostgreSQL；Web 通过同源 `/api` 访问 API，PostgreSQL 不映射宿主机端口。默认使用离线 FakeChatModel、fake knowledge、`dev` 管理员上下文和脱敏工单数据，适合验证 `work_order_ops` 的查询、图表、草稿和审批。
+打开 `http://127.0.0.1:8080`。默认服务为 Web、API 和 pgvector PostgreSQL；Web 通过同源 `/api` 访问 API，PostgreSQL 不映射宿主机端口。默认使用离线 FakeChatModel、fake knowledge、脱敏工单数据和本地管理员登录，适合验证 `work_order_ops` 的查询、图表、草稿和审批。
 
-停止：`docker compose down`。如需**删除所有本地演示数据**再初始化，执行 `docker compose down --volumes`；这只应对本项目演示 volume 使用。Redis 与 Authentik 分别用 `--profile redis` 与 `--profile auth` 按需启动。
+首次启动时 API 会在容器日志中仅打印一次 `admin` 的一次性密码：`docker compose logs api`。登录后必须设置至少 12 位的强密码才能访问工作台。密码只保存为 Argon2id 哈希，浏览器仅保存 HttpOnly 会话 Cookie。若丢失初始密码且尚未改密，可仅对演示环境执行 `docker compose down --volumes` 后重新启动；这会删除该 Compose 演示数据。
+
+停止：`docker compose down`。如需**删除所有本地演示数据**再初始化，执行 `docker compose down --volumes`；这只应对本项目演示 volume 使用。Redis 与 Authentik 分别用 `--profile redis` 与 `--profile auth` 按需启动；Authentik 默认也走 DaoCloud 的 GHCR 代理，可通过 `AUTHENTIK_IMAGE` 覆盖。
 
 ---
 
@@ -89,7 +91,7 @@ pip install -e "packages/core[postgres]"
 | `permissions` / `perms` | `permissions` |
 
 会话落库键为 `{tenant_id}::{thread_id}`。  
-`AUTH_REQUIRED=false` 时，开发环境默认相当于管理员。
+验证工作台默认使用 `AUTH_MODE=local`：首次启动从 API 容器日志读取一次性管理员密码，登录后先设置强密码。仅测试 fixture 可使用 `AUTH_MODE=disabled`；生产环境禁止关闭认证。
 
 ## 单机上线前检查
 

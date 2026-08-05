@@ -14,6 +14,17 @@ class Settings(BaseSettings):
     )
 
     auth_required: bool = False
+    auth_mode: str = Field(default="", validation_alias="AUTH_MODE")
+    environment: str = Field(default="development", validation_alias="ENVIRONMENT")
+    auth_cookie_name: str = Field(default="agentbridge_session", validation_alias="AUTH_COOKIE_NAME")
+    auth_cookie_secure: bool = Field(default=False, validation_alias="AUTH_COOKIE_SECURE")
+    auth_session_idle_seconds: int = Field(default=43200, validation_alias="AUTH_SESSION_IDLE_SECONDS")
+    auth_session_absolute_seconds: int = Field(default=86400, validation_alias="AUTH_SESSION_ABSOLUTE_SECONDS")
+    auth_password_change_seconds: int = Field(default=900, validation_alias="AUTH_PASSWORD_CHANGE_SECONDS")
+    auth_password_min_length: int = Field(default=12, validation_alias="AUTH_PASSWORD_MIN_LENGTH")
+    auth_password_max_length: int = Field(default=128, validation_alias="AUTH_PASSWORD_MAX_LENGTH")
+    auth_login_failure_window_seconds: int = Field(default=300, validation_alias="AUTH_LOGIN_FAILURE_WINDOW_SECONDS")
+    auth_initial_password_ttl_seconds: int = Field(default=86400, validation_alias="AUTH_INITIAL_PASSWORD_TTL_SECONDS")
     auth_dev_stub: bool = Field(default=False, validation_alias="AUTH_DEV_STUB")
     pg_dsn: str = Field(default="", validation_alias="PG_DSN")
     pg_host: str = "localhost"
@@ -95,6 +106,21 @@ class Settings(BaseSettings):
     kb_external_failure_policy: str = Field(
         default="empty_hits", validation_alias="KB_EXTERNAL_FAILURE_POLICY"
     )
+
+    def validate_auth_mode(self) -> None:
+        mode = self.resolved_auth_mode
+        if mode not in {"local", "oidc", "disabled"}:
+            raise ValueError("unsupported AUTH_MODE")
+        if mode == "disabled" and self.environment.lower() == "production":
+            raise ValueError("AUTH_MODE=disabled is not allowed in production")
+        if mode == "local" and self.environment.lower() == "production" and not self.auth_cookie_secure:
+            raise ValueError("AUTH_COOKIE_SECURE=true is required for local auth in production")
+
+    @property
+    def resolved_auth_mode(self) -> str:
+        if self.auth_mode:
+            return self.auth_mode
+        return "oidc" if self.auth_required else "disabled"
 
 
 def get_settings() -> Settings:

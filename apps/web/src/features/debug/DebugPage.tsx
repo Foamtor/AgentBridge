@@ -1,24 +1,27 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { apiBase } from "../../lib/apiBase";
 import { streamChatSse, type StreamEvent } from "../../lib/sseClient";
 import { getToken, setToken } from "../auth/token";
-import { EventTimeline } from "./EventTimeline";
-import { GoldenCasePanel } from "./GoldenCasePanel";
+import { PlatformEvidence } from "../verification/PlatformEvidence";
+import { BusinessResults } from "../verification/BusinessResults";
 import { SendPanel } from "./SendPanel";
 import { SessionBar } from "./SessionBar";
+import { useI18n } from "../../i18n";
+import { initialVerificationState, verificationReducer } from "../verification/reducer";
 
 function newThreadId(): string {
   return `t-${crypto.randomUUID().slice(0, 8)}`;
 }
 
-export function DebugPage() {
+export function DebugPage({ workbench = false }: { workbench?: boolean }) {
   const [searchParams] = useSearchParams();
+  const { t } = useI18n();
   const [threadId, setThreadId] = useState(newThreadId);
-  const [route, setRoute] = useState("echo");
+  const [route, setRoute] = useState(workbench ? "work_order_ops" : "echo");
   const [token, setTokenState] = useState(getToken);
-  const [query, setQuery] = useState("hello");
-  const [events, setEvents] = useState<StreamEvent[]>([]);
+  const [query, setQuery] = useState(workbench ? "show work orders as a pie chart" : "hello");
+  const [verification, dispatchVerification] = useReducer(verificationReducer, initialVerificationState);
   const [extra, setExtra] = useState<Record<string, unknown>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +39,7 @@ export function DebugPage() {
       .then(async (response) => {
         if (!response.ok) throw new Error(`replay failed HTTP ${response.status}`);
         const replay = (await response.json()) as StreamEvent[];
-        setEvents(replay);
+        dispatchVerification({ type: "hydrate", events: replay });
       })
       .catch((err) => setError(String(err)));
   }, [replayRunId, token]);
@@ -56,7 +59,7 @@ export function DebugPage() {
     abortRef.current = ctrl;
     setBusy(true);
     setError(null);
-    setEvents([]);
+    dispatchVerification({ type: "start" });
 
     try {
       await streamChatSse(
@@ -67,7 +70,7 @@ export function DebugPage() {
           body: JSON.stringify({ query, thread_id: tid, route, extra }),
         },
         {
-          onEvent: (e) => setEvents((prev) => [...prev, e]),
+          onEvent: (e) => dispatchVerification({ type: "event", event: e }),
           onError: (err) => setError(String(err)),
         },
         ctrl.signal,
@@ -158,23 +161,18 @@ export function DebugPage() {
     }
   }
 
+  const advancedMode = searchParams.get("mode") === "advanced";
+
   return (
-    <main className="page">
+    <main className={`page ${workbench ? "verification-workbench" : "advanced-debug"}`}>
       <header>
-        <h1>AgentBridge 调试台</h1>
-        <p className="lede">
-          发送到 /chat/stream。黄金案例展示结构化 x.* 事件；未知扩展事件仍在时间线中折叠。
-        </p>
+        <p className="eyebrow">{t("product")} / {t("preview")}</p>
+        <h1>{workbench ? t("verifyTitle") : t("advancedTitle")}</h1>
+        <p className="lede">{workbench ? t("verifyDescription") : t("advancedDescription")}</p>
       </header>
       {replayRunId ? <p className="muted">回放 run：{replayRunId}</p> : null}
-      <SessionBar
-        threadId={threadId}
-        route={route}
-        token={token}
-        onThreadId={setThreadId}
-        onRoute={setRoute}
-        onToken={updateToken}
-      />
+      {workbench ? <div className="context-strip"><span>{t("route")}</span><code>work_order_ops</code><span>{t("data")}</span><strong>synthetic_redacted</strong><span>{t("tenant")}</span><code>dev</code></div> : <SessionBar threadId={threadId} route={route} token={token} onThreadId={setThreadId} onRoute={setRoute} onToken={updateToken} />}
+      {workbench ? <div className="scenario-hint"><strong>{t("chooseScenario")}</strong><span>{t("scenarioHint")}</span></div> : null}
       <SendPanel
         query={query}
         busy={busy}
@@ -183,9 +181,9 @@ export function DebugPage() {
         onCancel={() => void onCancel()}
         onDoubleFire={() => void onDoubleFire()}
       />
-      <GoldenCasePanel events={events} token={token} onPreset={applyGoldenPreset} />
+      <BusinessResults events={verification.events} token={token} onPreset={applyGoldenPreset} />
       {error ? <p className="error">{error}</p> : null}
-      <EventTimeline events={events} />
+      <details className="technical-evidence" open={!workbench || advancedMode}><summary>{t("technicalEvidence")}</summary><PlatformEvidence events={verification.events} /></details>
     </main>
   );
 }
