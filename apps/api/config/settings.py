@@ -50,6 +50,9 @@ class Settings(BaseSettings):
     approval_store_backend: str = Field(
         default="memory", validation_alias="APPROVAL_STORE_BACKEND"
     )
+    observability_store_backend: str = Field(
+        default="postgres", validation_alias="OBSERVABILITY_STORE_BACKEND"
+    )
     approval_execution_lease_seconds: float = Field(
         default=60.0, validation_alias="APPROVAL_EXECUTION_LEASE_SECONDS"
     )

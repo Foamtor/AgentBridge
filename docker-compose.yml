@@ -35,12 +35,13 @@ services:
       KB_EXTERNAL_BASE_URL: ${KB_EXTERNAL_BASE_URL:-}
       KB_EXTERNAL_API_KEY: ${KB_EXTERNAL_API_KEY:-}
       APPROVAL_STORE_BACKEND: postgres
+      OBSERVABILITY_STORE_BACKEND: postgres
       PG_HOST: postgres
       PG_PORT: "5432"
       PG_DATABASE: agentbridge
       PG_USER: postgres
       PG_PASSWORD: change-me
-      USE_MEMORY_CHECKPOINTER: "true"
+      USE_MEMORY_CHECKPOINTER: "false"
     depends_on:
       postgres:
         condition: service_healthy

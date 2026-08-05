@@ -5,10 +5,14 @@
 ## What it provides
 
 - P0: editable route/thread/model/request JSON, real-time SSE, cancel, 409 concurrency check, request replay, curl copy, timing, tool trace, contract checks, and JSONL export.
-- P1: tenant-scoped thread/run browser, turn selection, persisted event replay, run/thread/trace filtering, and run-level structured evidence.
-- P2: generic run annotations and badcases, plus route/tool/contract aggregate diagnostics. The console never queries PostgreSQL directly.
+- P1: tenant-scoped thread/run browser, turn selection, PostgreSQL-persisted event replay, run/thread/trace filtering, and run-level structured evidence.
+- P2: PostgreSQL-persisted generic run annotations and badcases, plus route/tool/contract aggregate diagnostics. The console never queries PostgreSQL directly.
 
 The run inspector is intentionally protocol-first. It projects stable events, extension events, timing, and tools from committed event data; it does not contain a `work_order_ops` dependency. A domain may expose its own structured renderer through extension events.
+
+Compose configures `OBSERVABILITY_STORE_BACKEND=postgres` and a PostgreSQL checkpointer. This is the required acceptance path for P1/P2: restart the API and replay the same run, thread messages, JSONL evidence, and annotations. `OBSERVABILITY_STORE_BACKEND=memory` is only for isolated tests or an explicitly selected offline demo; it is not acceptance evidence.
+
+`RAG_Agent`'s `/api/v1/chat` is an application-facing SSE API, not an OpenAI-compatible model endpoint or the `external` retriever protocol. To reuse its configured upstream model, configure AgentBridge separately with the same OpenAI-compatible provider values. To reuse its knowledge, either expose `POST /v1/retrieve` plus `GET /v1/health` with the external Retriever contract, or use the read-only `rag_agent_pg` backend with a reachable RAG-Agent PostgreSQL instance. Do not label either integration as verified until its service and database health checks pass.
 
 ## Reference case modes
 

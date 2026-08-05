@@ -21,10 +21,16 @@ async def _check_data_source(ds: Any, *, enabled: bool) -> dict[str, Any]:
 
 
 async def _check_event_log(event_log: Any) -> dict[str, Any]:
-    # MemoryEventLog has no network; treat presence as ok.
     if event_log is None:
         return {"status": "skipped", "reason": "no event_log"}
-    return {"status": "ok"}
+    health_check = getattr(event_log, "health_check", None)
+    if health_check is None:
+        return {"status": "ok"}
+    try:
+        await health_check()
+        return {"status": "ok"}
+    except Exception as exc:  # noqa: BLE001
+        return {"status": "fail", "error": str(exc)}
 
 
 async def _check_checkpointer(checkpointers: Any) -> dict[str, Any]:

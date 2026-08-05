@@ -7,7 +7,7 @@
 
 | 模式 | 会话锁 | 限流 | 事件存储 | 说明 |
 |------|--------|------|----------|------|
-| 本地开发 | 本进程内存 | 可选 | 内存或 Postgres | 默认 |
+| 本地开发 | 本进程内存 | 可选 | Postgres（Compose 默认） | 默认 |
 | 单机生产 | 本进程内存 | 本进程或 Redis | Postgres | 主承诺 |
 | 多机 | Redis（或数据库锁） | Redis | 集中式 Postgres | 需显式配置 |
 
@@ -20,7 +20,7 @@
 | 单机生产验收候选 | 必须真实 Postgres；RAG 另需 pgvector | 进程内或 Redis | 必须启用 | 必须配置真实出口 | 按下方支持矩阵 | 仍须完成 P1/P2/P3 发布门槛 |
 | 双实例验证 | 集中式 Postgres | 必须 Redis 锁与限流 | 必须启用 | 必须配置真实出口 | 按下方支持矩阵 | P2 验收项，尚非默认承诺 |
 
-- `fake` 仅本地/CI，不能作为生产证据。
+- `fake` 仅本地/CI，不能作为生产证据；`OBSERVABILITY_STORE_BACKEND=memory` 同样不能作为 P1/P2 验收证据。
 - `langchain_pg` 需要 pgvector、`[rag]` extra 和兼容 embedding 服务。
 - `external` 支持检索；不支持摄取时 `POST /ingest` 返回 501。
 - 多实例必须设置 Redis 锁和限流；未演练前仅技术预览。
@@ -70,12 +70,14 @@ KB_EXTERNAL_BASE_URL=https://your-rag-service
 
 ---
 
-## 本地（内存会话）
+## 本地（隔离内存会话）
 
 ```bash
 pip install -e "packages/core[dev]" -e "apps/api[dev]"
 cp .env.example .env
+# 仅限隔离测试或离线 Fake 演示；P1/P2 验收使用 false。
 # USE_MEMORY_CHECKPOINTER=true
+# OBSERVABILITY_STORE_BACKEND=memory
 cd apps/api && uvicorn main:app --reload --port 8000
 ```
 
@@ -113,7 +115,7 @@ pip install -e "packages/core[postgres]"
 
 ## 单机上线前检查
 
-- [ ] 需要会话持久化时：关闭内存 checkpointer，确认 Postgres 可达  
+- [ ] P1/P2 验收：关闭内存 checkpointer、使用 `OBSERVABILITY_STORE_BACKEND=postgres`，确认 Postgres 可达
 - [ ] `AUTH_REQUIRED=true`，关闭 `AUTH_DEV_STUB`  
 - [ ] 确认是单实例，或已接受「无分布式锁」的风险；多机请按多机文档配置  
 - [ ] 验证 `/health`、`/ready`、`/metrics`；限流打开时超限返回 `code=rate_limited`  

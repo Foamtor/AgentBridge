@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { apiBase } from "../../lib/apiBase";
 import type { StreamEvent } from "../../lib/sseClient";
 import { formatDuration } from "./analysis";
 import type { PlaygroundCopy } from "./copy";
@@ -13,6 +12,7 @@ type Props = {
   annotations: RunAnnotation[];
   onCreateAnnotation: (body: { category: string; rating: string; reason: string; expected_behavior: string; tags: string[] }) => Promise<void>;
   onDeleteAnnotation: (id: string) => Promise<void>;
+  onExportEvents: () => Promise<void>;
 };
 
 export function RunInspector(props: Props) {
@@ -38,7 +38,7 @@ export function RunInspector(props: Props) {
       {tab === "timing" ? <Timing copy={copy} diagnostics={diagnostics} /> : null}
       {tab === "tools" ? <Tools copy={copy} diagnostics={diagnostics} /> : null}
       {tab === "contract" ? <Contract copy={copy} diagnostics={diagnostics} /> : null}
-      {tab === "raw" ? <Raw copy={copy} run={run} events={props.events} /> : null}
+      {tab === "raw" ? <Raw copy={copy} events={props.events} onExport={props.onExportEvents} /> : null}
       {tab === "notes" ? <div className="annotation-panel">
         <div className="annotation-form"><label><span>{copy.category}</span><select value={category} onChange={(event) => setCategory(event.target.value)}><option value="note">{copy.note}</option><option value="badcase">{copy.badcase}</option></select></label><label><span>{copy.reason}</span><textarea rows={3} value={reason} onChange={(event) => setReason(event.target.value)} /></label><label><span>{copy.expected}</span><textarea rows={2} value={expected} onChange={(event) => setExpected(event.target.value)} /></label><label><span>{copy.tags}</span><input value={tags} onChange={(event) => setTags(event.target.value)} /></label><button type="button" onClick={() => void save()} disabled={!reason.trim()}>{copy.addNote}</button></div>
         <ol className="annotation-list">{props.annotations.map((item) => <li key={item.annotation_id}><div><strong>{item.category}</strong><time>{new Date(item.created_at).toLocaleString()}</time></div><p>{item.reason}</p>{item.expected_behavior ? <small>{item.expected_behavior}</small> : null}<button type="button" className="text-command" onClick={() => void props.onDeleteAnnotation(item.annotation_id)}>{copy.delete}</button></li>)}</ol>
@@ -65,6 +65,6 @@ function Contract({ copy, diagnostics }: { copy: PlaygroundCopy; diagnostics: Ru
   return <ul className="contract-checks">{diagnostics.assertions.map((item) => <li key={item.key} data-pass={item.passed}><span aria-hidden="true">{item.passed ? "✓" : "×"}</span><div><strong>{item.key}</strong><small>{item.detail}</small></div><em>{item.passed ? copy.passed : copy.failed}</em></li>)}</ul>;
 }
 
-function Raw({ copy, run, events }: { copy: PlaygroundCopy; run: RunRecord; events: StreamEvent[] }) {
-  return <div className="raw-events"><a className="download-command" href={`${apiBase()}/runs/${encodeURIComponent(run.run_id)}/events.jsonl`} download>{copy.export}</a>{events.length ? events.map((event, index) => <details key={event.event_id ?? index}><summary><code>#{event.sequence ?? "-"} {event.type}</code></summary><pre>{JSON.stringify(event, null, 2)}</pre></details>) : <p>{copy.noEvents}</p>}</div>;
+function Raw({ copy, events, onExport }: { copy: PlaygroundCopy; events: StreamEvent[]; onExport: () => Promise<void> }) {
+  return <div className="raw-events"><button type="button" className="download-command" onClick={() => void onExport()}>{copy.export}</button>{events.length ? events.map((event, index) => <details key={event.event_id ?? index}><summary><code>#{event.sequence ?? "-"} {event.type}</code></summary><pre>{JSON.stringify(event, null, 2)}</pre></details>) : <p>{copy.noEvents}</p>}</div>;
 }

@@ -91,6 +91,35 @@ def _build_console_auth_store(settings: Settings) -> Any:
     return PostgresConsoleAuthStore(_resolve_postgres_dsn(settings))
 
 
+def _build_observability_stores(settings: Settings) -> tuple[Any, Any, Any, Any]:
+    """Build durable run evidence stores at the application composition root."""
+    if settings.observability_store_backend == "memory":
+        from observability.annotation_store import MemoryRunAnnotationStore
+
+        return (
+            MemoryEventLog(),
+            MemoryMessageStore(),
+            MemoryRunStore(),
+            MemoryRunAnnotationStore(),
+        )
+    if settings.observability_store_backend == "postgres":
+        from adapters.postgres_observability_store import (
+            PostgresEventLog,
+            PostgresMessageStore,
+            PostgresRunAnnotationStore,
+            PostgresRunStore,
+        )
+
+        dsn = _resolve_postgres_dsn(settings)
+        return (
+            PostgresEventLog(dsn),
+            PostgresMessageStore(dsn),
+            PostgresRunStore(dsn),
+            PostgresRunAnnotationStore(dsn),
+        )
+    raise ValueError("unsupported observability store backend")
+
+
 def _build_llm_gateway(settings: Settings) -> Any:
     """Build the configured model gateway; fake remains an explicit offline mode."""
     from agentbridge_core.adapters.alias_llm_gateway import AliasLLMGateway
@@ -184,9 +213,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     policy = RolePolicyEngine()
     audit = MemoryAuditLogger()
-    event_log = MemoryEventLog()
-    message_store = MemoryMessageStore()
-    run_store = MemoryRunStore()
+    event_log, message_store, run_store, run_annotation_store = (
+        _build_observability_stores(settings)
+    )
     config_provider = MemoryConfigProvider()
     platform_prompt_registry = MemoryPromptRegistry()
     prompt_runtime = LayeredPromptRegistry(
@@ -250,13 +279,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         )
         llm_gateway = _build_llm_gateway(settings)
         from adapters.prometheus_metrics import PrometheusMetrics
-        from observability.annotation_store import MemoryRunAnnotationStore
         from observability.tracing import make_run_span_factory
 
         metrics = PrometheusMetrics()
         span_factory = make_run_span_factory(enabled=settings.otel_enabled)
-        run_annotation_store = MemoryRunAnnotationStore()
-
         lifecycle = RunLifecycle(
             locks=locks,
             checkpointers=checkpointers,
@@ -366,6 +392,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 close_console_auth_store = getattr(console_auth_store, "close", None)
                 if close_console_auth_store is not None:
                     result = close_console_auth_store()
+                    if hasattr(result, "__await__"):
+                        await result
+            for store in (
+                event_log,
+                message_store,
+                run_store,
+                run_annotation_store,
+            ):
+                close_store = getattr(store, "close", None)
+                if close_store is not None:
+                    result = close_store()
                     if hasattr(result, "__await__"):
                         await result
             await checkpointers.teardown()
