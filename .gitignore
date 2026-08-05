@@ -13,3 +13,6 @@ dist/
 .DS_Store
 apps/web/pnpm-lock.yaml
 .worktrees/
+# Internal planning artifacts are kept locally but are not part of the public repository.
+docs/superpowers/
+docs/prototypes/
