@@ -55,6 +55,7 @@ def test_run_annotations_are_generic_and_deletable(client) -> None:
     annotation = created.json()
     assert annotation["run_id"] == run_id
     assert annotation["tags"] == ["quality", "regression"]
+    assert client.app.state.audit.records[-1]["action"] == "console.run_annotation_create"
 
     listed = client.get(f"/runs/{run_id}/annotations")
     assert listed.status_code == 200
@@ -66,6 +67,7 @@ def test_run_annotations_are_generic_and_deletable(client) -> None:
         f"/runs/{run_id}/annotations/{annotation['annotation_id']}"
     )
     assert deleted.status_code == 204
+    assert client.app.state.audit.records[-1]["action"] == "console.run_annotation_delete"
     assert client.get(f"/runs/{run_id}/annotations").json() == []
 
 

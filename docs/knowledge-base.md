@@ -1,10 +1,7 @@
 # 知识库与 RAG 使用说明
 
 > **归属：** 底座①（多知识后端）。  
-> **R-A 设计（历史切片，部分表述已过时）：** [superpowers/specs/2026-07-27-platform-ra-design.md](./superpowers/specs/2026-07-27-platform-ra-design.md) — 其中「无 HTTP `/ingest`」已被后续实现取代，**以本文与代码为准**  
-> **R-A 实施计划：** [superpowers/plans/2026-07-27-platform-ra.md](./superpowers/plans/2026-07-27-platform-ra.md)  
-> **相关分期计划：** [superpowers/plans/2026-07-27-plan6-rag-production.md](./superpowers/plans/2026-07-27-plan6-rag-production.md)  
-> 冲突时以 [完整方案](./00-AgentBridge完整方案.md) 与代码为准。
+> 历史内部设计与实施资料不随开源仓库发布。冲突时以 [完整方案](./00-AgentBridge完整方案.md) 与代码为准。
 
 ---
 

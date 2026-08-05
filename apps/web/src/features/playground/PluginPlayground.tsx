@@ -6,7 +6,7 @@ import { streamChatSse, type StreamEvent } from "../../lib/sseClient";
 import { getToken } from "../auth/token";
 import { BusinessResults } from "../verification/BusinessResults";
 import { analyzeEvents, mergeAnswer } from "./analysis";
-import { playgroundFetch } from "./api";
+import { downloadRunEvents, playgroundFetch } from "./api";
 import { playgroundCopy } from "./copy";
 import { HistoryRail } from "./HistoryRail";
 import { RequestComposer } from "./RequestComposer";
@@ -188,6 +188,15 @@ export function PluginPlayground() {
     void refreshHistory();
   }
 
+  async function exportEvents() {
+    if (!selectedRun) return;
+    try {
+      await downloadRunEvents(selectedRun.run_id);
+    } catch (reason) {
+      setError(`${copy.requestFailed}: ${String(reason)}`);
+    }
+  }
+
   const answer = messages.find((message) => message.role === "assistant")?.content || mergeAnswer(events);
   const extensionEvents = events.filter((event) => event.type.startsWith("x.") && event.data && Object.keys(event.data).length);
 
@@ -202,7 +211,7 @@ export function PluginPlayground() {
           {extensionEvents.length ? <details className="structured-extensions"><summary>{copy.extensions} ({extensionEvents.length})</summary>{extensionEvents.map((event, index) => <div key={event.event_id ?? index}><code>{event.type}</code><pre>{JSON.stringify(event.data, null, 2)}</pre></div>)}</details> : null}
         </section>
       </div>
-      <RunInspector copy={copy} run={selectedRun} events={events} diagnostics={diagnostics} annotations={annotations} onCreateAnnotation={createAnnotation} onDeleteAnnotation={deleteAnnotation} />
+      <RunInspector copy={copy} run={selectedRun} events={events} diagnostics={diagnostics} annotations={annotations} onCreateAnnotation={createAnnotation} onDeleteAnnotation={deleteAnnotation} onExportEvents={exportEvents} />
     </div>
   </main>;
 }

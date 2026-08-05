@@ -31,6 +31,7 @@ _CONFIG_MANIFEST: list[ConfigItemSpec] = [
     ConfigItemSpec("LLM_API_BASE", "llm_api_base", "B", "模型 HTTP 基址"),
     ConfigItemSpec("LLM_TEMPERATURE", "llm_temperature", "B", "模型温度"),
     ConfigItemSpec("KNOWLEDGE_BACKEND", "knowledge_backend", "B", "知识后端类型"),
+    ConfigItemSpec("OBSERVABILITY_STORE_BACKEND", "observability_store_backend", "B", "运行证据存储"),
     ConfigItemSpec("AUTH_REQUIRED", "auth_required", "B", "是否强制鉴权"),
     ConfigItemSpec("LOCK_BACKEND", "lock_backend", "B", "线程锁后端"),
     ConfigItemSpec("RATE_LIMIT_BACKEND", "rate_limit_backend", "B", "限流后端"),

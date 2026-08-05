@@ -105,7 +105,7 @@ async def create_run_annotation(
     run_id: str, body: AnnotationRequest, request: Request
 ) -> dict[str, Any]:
     ctx, tenant_id, _ = await _require_run(run_id, request)
-    return await request.app.state.run_annotation_store.create(
+    annotation = await request.app.state.run_annotation_store.create(
         {
             "annotation_id": f"ann-{uuid4().hex}",
             "tenant_id": tenant_id,
@@ -119,17 +119,38 @@ async def create_run_annotation(
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
     )
+    await request.app.state.audit.log(
+        user_id=ctx.user_id or "anonymous",
+        tenant_id=tenant_id,
+        action="console.run_annotation_create",
+        resource=f"run:{run_id}",
+        detail={
+            "annotation_id": annotation["annotation_id"],
+            "category": annotation["category"],
+            "rating": annotation["rating"],
+        },
+        result="ok",
+    )
+    return annotation
 
 
 @router.delete("/{run_id}/annotations/{annotation_id}", status_code=204)
 async def delete_run_annotation(
     run_id: str, annotation_id: str, request: Request
 ) -> Response:
-    _, tenant_id, _ = await _require_run(run_id, request)
+    ctx, tenant_id, _ = await _require_run(run_id, request)
     deleted = await request.app.state.run_annotation_store.delete(tenant_id, annotation_id)
     if not deleted:
         raise HTTPException(
             status_code=404,
             detail={"code": "annotation_not_found", "message": "annotation not found"},
         )
+    await request.app.state.audit.log(
+        user_id=ctx.user_id or "anonymous",
+        tenant_id=tenant_id,
+        action="console.run_annotation_delete",
+        resource=f"run:{run_id}",
+        detail={"annotation_id": annotation_id},
+        result="ok",
+    )
     return Response(status_code=204)

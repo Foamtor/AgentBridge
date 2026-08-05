@@ -12,6 +12,7 @@ ensure_api_on_path()
 
 # Ensure Settings picks up fake runtime before create_app/lifespan.
 os.environ.setdefault("AGENTBRIDGE_FAKE_RUNTIME", "1")
+os.environ.setdefault("OBSERVABILITY_STORE_BACKEND", "memory")
 
 
 @pytest.fixture(autouse=True)

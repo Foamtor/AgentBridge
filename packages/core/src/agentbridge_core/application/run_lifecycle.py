@@ -375,18 +375,6 @@ class RunLifecycle:
                 graph_input = {"messages": [query]}
 
             sequence += 1
-            await self._emit(
-                sink,
-                build_event(
-                    "start",
-                    run_id=run_id,
-                    sequence=sequence,
-                    trace_id=trace_id,
-                    data={"thread_id": thread_id, "route": route},
-                ),
-                tenant_id=tenant_id,
-                agent_id=agent_id,
-            )
             if self._run_store is not None:
                 await self._run_store.upsert(
                     {
@@ -406,6 +394,18 @@ class RunLifecycle:
                         "status": "pending",
                     }
                 )
+            await self._emit(
+                sink,
+                build_event(
+                    "start",
+                    run_id=run_id,
+                    sequence=sequence,
+                    trace_id=trace_id,
+                    data={"thread_id": thread_id, "route": route},
+                ),
+                tenant_id=tenant_id,
+                agent_id=agent_id,
+            )
 
             checkpointer = await self._checkpointers.get()
 
