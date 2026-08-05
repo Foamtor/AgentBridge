@@ -41,6 +41,7 @@ export const zhCN = {
   scenarioHint: "结果会显示在下方，技术证据可展开查看。",
   route: "路由",
   data: "数据",
+  persistence: "持久化",
   tenant: "租户",
   technicalEvidence: "技术证据（SSE 事件）",
   workOrderCase: "工单验证案例",

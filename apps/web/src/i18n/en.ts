@@ -43,6 +43,7 @@ export const en: Record<TranslationKey, string> = {
   scenarioHint: "Results appear below; expand technical evidence when needed.",
   route: "Route",
   data: "Data",
+  persistence: "Persistence",
   tenant: "Tenant",
   technicalEvidence: "Technical evidence (SSE events)",
   workOrderCase: "Work-order verification case",
