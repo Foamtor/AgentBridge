@@ -21,6 +21,8 @@
 | GET | `/runs/{id}/events` | 事件回放 | 已有 |
 | GET | `/metrics` | Prometheus | 已有 |
 | GET/POST | `/approvals/*` | 人工审批 | 已有 |
+| GET | `/console/bootstrap` | 控制台公开运行时摘要（不含密钥） | 已有 |
+| GET/POST | `/auth/session`、`/auth/login`、`/auth/change-password`、`/auth/logout` | 本地管理员会话 | 已有 |
 | POST | `/ingest` | 文档摄取（需 `knowledge:write`；后端不支持时 501） | **已有** |
 | GET/POST | `/admin/*`、`/prompts/*` | 管理接口 | **已有 C0–C4**（见 §1.3） |
 

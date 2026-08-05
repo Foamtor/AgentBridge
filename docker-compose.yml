@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: pgvector/pgvector:pg16
+    image: ${IMAGE_REGISTRY:-docker.m.daocloud.io}/pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: change-me
@@ -18,7 +18,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        IMAGE_REGISTRY: ${IMAGE_REGISTRY:-docker.m.daocloud.io}
     environment:
+      AUTH_MODE: local
       AUTH_REQUIRED: "false"
       AGENTBRIDGE_FAKE_RUNTIME: "0"
       KNOWLEDGE_BACKEND: fake
@@ -45,6 +48,7 @@ services:
       dockerfile: apps/web/Dockerfile
       args:
         VITE_API_BASE: /api
+        IMAGE_REGISTRY: ${IMAGE_REGISTRY:-docker.m.daocloud.io}
     ports:
       - "${WEB_PORT:-8080}:80"
     depends_on:
@@ -53,11 +57,11 @@ services:
 
   redis:
     profiles: ["redis"]
-    image: redis:7-alpine
+    image: ${IMAGE_REGISTRY:-docker.m.daocloud.io}/library/redis:7-alpine
 
   authentik-server:
     profiles: ["auth"]
-    image: ghcr.io/goauthentik/server:2024.8.3
+    image: ${AUTHENTIK_IMAGE:-docker.m.daocloud.io/ghcr.io/goauthentik/server:2024.8.3}
     command: server
     environment:
       AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:-change-me-please-use-long-random}

@@ -73,6 +73,23 @@ def test_demo_approval_write_and_resume(monkeypatch: pytest.MonkeyPatch) -> None
         assert run.json()["status"] == "done"
 
 
+def test_approval_get_is_tenant_scoped_and_read_only(client: TestClient) -> None:
+    approval_id = asyncio.run(client.app.state.approval_store.create({
+        "approval_id": "ap-read-only",
+        "tenant_id": "dev",
+        "status": "pending",
+        "requester_context": {"user_id": "dev", "tenant_id": "dev"},
+        "run_id": "run-read-only",
+        "thread_id": "thread-read-only",
+    }))
+    response = client.get(f"/approvals/{approval_id}")
+    assert response.status_code == 200
+    assert response.json()["approval"]["status"] == "pending"
+    stored = asyncio.run(client.app.state.approval_store.get(approval_id, tenant_id="dev"))
+    assert stored is not None and stored["status"] == "pending"
+    assert client.get("/approvals/missing-approval").status_code == 404
+
+
 def test_chat_injects_token_map(client: TestClient) -> None:
     seen: dict = {}
     orig = client.app.state.pipeline.handle

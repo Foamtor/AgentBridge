@@ -49,7 +49,9 @@ export async function streamChatSse(
   handlers: SseHandlers,
   signal?: AbortSignal,
 ): Promise<void> {
-  const res = await fetch(url, { ...init, signal });
+  // The local console uses an HttpOnly session cookie.  Keep this explicit so
+  // the stream has the same identity as the rest of the workbench.
+  const res = await fetch(url, { ...init, credentials: "include", signal });
   if (!res.ok) {
     let detail: unknown = res.statusText;
     try {

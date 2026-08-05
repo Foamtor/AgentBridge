@@ -1,6 +1,6 @@
-# Authentik (optional)
+# Authentik (optional OIDC mode)
 
-Local smoke does **not** require Authentik. Default API runs with `AUTH_REQUIRED=false`.
+The default Compose stack uses `AUTH_MODE=local` and does not require Authentik. Use this profile only when connecting AgentBridge to an existing OIDC identity provider.
 
 ## Start (optional)
 
@@ -11,6 +11,7 @@ docker compose --profile auth up -d
 Then set in `.env`:
 
 ```text
+AUTH_MODE=oidc
 AUTH_REQUIRED=true
 OIDC_ISSUER=http://localhost:9000/application/o/<app>/
 OIDC_AUDIENCE=<client-id>

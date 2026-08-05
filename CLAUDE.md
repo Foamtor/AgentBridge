@@ -66,3 +66,26 @@ python scripts/import_scan_core.py
 知识相关自测：优先 `KNOWLEDGE_BACKEND=fake`（避免本机 `.env` 指到 `external` / `langchain_pg` 把平台测搞怪）。
 
 细则：`docs/ai-instructions/`。人类门面：`README.md`、`docs/guide/`。
+
+## Design Context
+
+### Users
+
+The primary user is an open-source developer who has just cloned AgentBridge and wants to verify that the platform works before investing in an integration. Their first job is to run the bundled `work_order_ops` flow, understand what the platform handled, and inspect enough technical evidence to trust the result. After that, the same surface should help them test their own plugin without pretending to be a customer-facing business application.
+
+### Brand Personality
+
+Restrained, trustworthy, precise. The interface should feel like a dependable developer instrument: calm under repeated use, explicit about state and boundaries, and honest about what is demo data versus platform behavior.
+
+### Aesthetic Direction
+
+Light-first, utilitarian, and editorially structured. Use quiet neutral surfaces, strong typographic hierarchy, compact controls, and a small number of semantic status colors. Avoid marketing-page composition, decorative gradients, card-heavy dashboards, playful AI imagery, glass effects, oversized headings, and dark neon "AI console" styling.
+
+### Design Principles
+
+1. Prove value in the first three minutes: make the golden validation path the obvious first action.
+2. Separate platform evidence from business output: results, approval state, and protocol events should be distinct but connected.
+3. Reveal complexity progressively: keep tokens, thread IDs, raw events, and admin controls available without making them the first screen.
+4. Make every state explicit: connection, running, waiting for approval, succeeded, failed, and cancelled must be unambiguous without relying on color alone.
+5. Treat bilingual support as a product capability: one global language choice, complete translations, and no mixed-language primary workflows.
+6. Stay truthful to the open-source scope: label synthetic data, offline model behavior, optional production capabilities, and the debug console's non-customer-facing role.

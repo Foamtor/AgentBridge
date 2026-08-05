@@ -1,42 +1,51 @@
 import { Link, useLocation } from "react-router-dom";
-import { hasConsoleAdminAccess } from "./features/auth/adminAccess";
-import { getToken } from "./features/auth/token";
+import { AuthProvider, useAuth } from "./features/auth/session";
+import { I18nProvider, useI18n } from "./i18n";
 import { AppRoutes } from "./routes";
 
 const ADMIN_NAV = [
-  { to: "/", label: "总览" },
-  { to: "/domains", label: "插件" },
-  { to: "/config", label: "配置" },
-  { to: "/tools", label: "Tools" },
-  { to: "/runs", label: "Runs" },
-  { to: "/prompts", label: "Prompts" },
-  { to: "/usage", label: "用量" },
-  { to: "/knowledge", label: "知识" },
-];
+  { to: "/admin", key: "admin" },
+  { to: "/domains", key: "plugins" },
+  { to: "/config", key: "config" },
+  { to: "/tools", key: "tools" },
+  { to: "/runs", key: "runs" },
+  { to: "/prompts", key: "prompts" },
+  { to: "/usage", key: "usage" },
+  { to: "/knowledge", key: "knowledge" },
+] as const;
 
 export function App() {
+  return <I18nProvider><AuthProvider><AppFrame /></AuthProvider></I18nProvider>;
+}
+
+function AppFrame() {
   const location = useLocation();
-  const canUseAdmin = hasConsoleAdminAccess(getToken());
+  const { session, logout } = useAuth();
+  const { t, toggleLocale } = useI18n();
+  const authenticated = session?.status === "authenticated";
+
+  if (!authenticated) return <AppRoutes />;
 
   return (
     <div className="shell">
       <nav className="nav">
-        <strong>AI Console</strong>
-        <Link to="/debug" aria-current={location.pathname === "/debug" ? "page" : undefined}>
-          调试
+        <strong>{t("product")}</strong>
+        <Link to="/" aria-current={location.pathname === "/" ? "page" : undefined}>
+          {t("verify")}
         </Link>
-        {canUseAdmin
-          ? ADMIN_NAV.map((item) => (
+        {ADMIN_NAV.map((item) => (
           <Link
             key={item.to}
             to={item.to}
             aria-current={location.pathname === item.to ? "page" : undefined}
           >
-            {item.label}
+            {t(item.key)}
           </Link>
-            ))
-          : null}
-        <Link to="/contracts">契约</Link>
+        ))}
+        <Link to="/contracts">{t("contracts")}</Link>
+        <span className="nav-spacer" />
+        <button className="nav-button" type="button" onClick={toggleLocale}>{t("language")}</button>
+        <button className="nav-button" type="button" onClick={() => void logout()}>{t("logout")}</button>
       </nav>
       <AppRoutes />
     </div>

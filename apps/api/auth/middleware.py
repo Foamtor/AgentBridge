@@ -34,6 +34,7 @@ class OptionalOidcMiddleware(BaseHTTPMiddleware):
         audience: str = "",
         jwt_secret: str = "",
         auth_dev_stub: bool = False,
+        auth_mode: str = "oidc",
     ):
         super().__init__(app)
         self.auth_required = auth_required
@@ -41,6 +42,7 @@ class OptionalOidcMiddleware(BaseHTTPMiddleware):
         self.audience = audience
         self.jwt_secret = jwt_secret
         self.auth_dev_stub = auth_dev_stub
+        self.auth_mode = auth_mode
 
     async def dispatch(self, request: Request, call_next) -> Response:
         path = request.url.path
@@ -49,7 +51,27 @@ class OptionalOidcMiddleware(BaseHTTPMiddleware):
         ):
             return await call_next(request)
 
-        if not self.auth_required:
+        if self.auth_mode == "local":
+            if path.startswith("/auth/"):
+                return await call_next(request)
+            service = getattr(request.app.state, "console_auth_service", None)
+            token = request.cookies.get(request.app.state.settings.auth_cookie_name)
+            if service is None or not token:
+                return JSONResponse(status_code=401, content={"detail": {"code": "unauthorized", "message": "missing session"}})
+            session = await service.get_session(token)
+            if session is None:
+                return JSONResponse(status_code=401, content={"detail": {"code": "unauthorized", "message": "invalid session"}})
+            if session.get("kind") != "authenticated":
+                return JSONResponse(status_code=403, content={"detail": {"code": "password_change_required", "message": "password change required"}})
+            request.state.auth_claims = {
+                "sub": session["username"],
+                "tenant_id": "dev",
+                "roles": ["admin"],
+                "permissions": ["*"],
+            }
+            return await call_next(request)
+
+        if self.auth_mode == "disabled" or not self.auth_required:
             return await call_next(request)
 
         header = request.headers.get("authorization") or ""

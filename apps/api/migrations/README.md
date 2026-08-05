@@ -10,6 +10,7 @@ Checkpointer / schema migrations.
 | `006_approval_hardening.sql` | Approval fencing, sequence, expiry and terminal projection fields |
 | `007_work_order_demo_tenant.sql` | Synthetic `rag-agent-demo` work-order reference data |
 | `008_v01_demo.sql` | Synthetic `dev` tenant data for the default v0.1.0 Compose demo |
+| `009_console_auth.sql` | Local console administrator, opaque sessions and login throttling state |
 
 ## Knowledge (R-A)
 
@@ -31,7 +32,9 @@ PostgreSQL backend is required for restart-safe approval execution.
 ## Default Compose demo
 
 The root `docker-compose.yml` mounts all numbered SQL files into a **new**
-PostgreSQL volume. `008_v01_demo.sql` supplies the `dev` tenant used when
-authentication is disabled. Existing volumes are intentionally not migrated by
+PostgreSQL volume. `008_v01_demo.sql` supplies the `dev` tenant used by the
+default local-auth demo. `009_console_auth.sql` creates empty auth tables; the
+API creates the administrator and one-time password on first startup. Existing
+volumes are intentionally not migrated by
 the entrypoint; remove only the AgentBridge demo volume when you explicitly
 want to reset synthetic data.

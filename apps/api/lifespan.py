@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
 from datetime import datetime, timezone
@@ -47,6 +48,8 @@ from config.settings import Settings, get_settings
 from domains.bootstrap import DOMAIN_META_MAP, register_all
 from fastapi import FastAPI
 
+logger = logging.getLogger(__name__)
+
 
 def _resolve_postgres_dsn(settings: Settings) -> str:
     if settings.pg_dsn:
@@ -74,6 +77,18 @@ def _build_approval_store(settings: Settings) -> Any:
 
         return PostgresApprovalStore(_resolve_postgres_dsn(settings))
     raise ValueError("unsupported approval store backend")
+
+
+def _build_console_auth_store(settings: Settings) -> Any:
+    if settings.resolved_auth_mode != "local":
+        return None
+    if settings.fake_runtime:
+        from testing.fake_console_auth import FakeConsoleAuthStore
+
+        return FakeConsoleAuthStore()
+    from adapters.postgres_console_auth import PostgresConsoleAuthStore
+
+    return PostgresConsoleAuthStore(_resolve_postgres_dsn(settings))
 
 
 def _build_llm_gateway(settings: Settings) -> Any:
@@ -160,6 +175,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
     usage_store = MemoryUsageStore()
     approval_store = _build_approval_store(settings)
+    console_auth_store = _build_console_auth_store(settings)
+    console_auth_service: Any | None = None
     from adapters.approval_action_registry import ApprovalActionRegistry
 
     approval_actions = ApprovalActionRegistry()
@@ -184,6 +201,26 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             getattr(app.state, "bootstrap_data_source", None)
             or _build_data_source(settings)
         )
+        if console_auth_store is not None:
+            from auth.local_admin import ConsoleAdminService
+
+            console_auth_service = ConsoleAdminService(
+                console_auth_store,
+                session_idle_seconds=settings.auth_session_idle_seconds,
+                session_absolute_seconds=settings.auth_session_absolute_seconds,
+                password_change_seconds=settings.auth_password_change_seconds,
+                    password_min_length=settings.auth_password_min_length,
+                    password_max_length=settings.auth_password_max_length,
+                    login_failure_window_seconds=settings.auth_login_failure_window_seconds,
+                    initial_password_ttl_seconds=settings.auth_initial_password_ttl_seconds,
+                )
+            bootstrap = await console_auth_service.ensure_admin()
+            if bootstrap is not None:
+                logger.warning(
+                    "AGENTBRIDGE_INITIAL_ADMIN_PASSWORD username=%s password=%s",
+                    bootstrap.username,
+                    bootstrap.initial_password,
+                )
         register_all(
             graphs,
             tools,
@@ -256,6 +293,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.message_store = message_store
         app.state.run_store = run_store
         app.state.approval_store = approval_store
+        app.state.console_auth_service = console_auth_service
         app.state.approval_actions = approval_actions
         app.state.policy = policy
         app.state.config_provider = config_provider
@@ -301,6 +339,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 result = close_approval_store()
                 if hasattr(result, "__await__"):
                     await result
+            if console_auth_store is not None:
+                close_console_auth_store = getattr(console_auth_store, "close", None)
+                if close_console_auth_store is not None:
+                    result = close_console_auth_store()
+                    if hasattr(result, "__await__"):
+                        await result
             await checkpointers.teardown()
             if redis_client is not None:
                 close = getattr(redis_client, "aclose", None) or getattr(
