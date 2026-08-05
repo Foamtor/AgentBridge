@@ -9,8 +9,10 @@ dist/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.test-tmp/
 *.egg-info/
 .DS_Store
+.impeccable.md
 apps/web/pnpm-lock.yaml
 .worktrees/
 # Internal planning artifacts are kept locally but are not part of the public repository.
