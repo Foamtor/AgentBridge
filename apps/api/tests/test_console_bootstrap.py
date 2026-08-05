@@ -19,6 +19,8 @@ def test_bootstrap_requires_local_session_and_returns_safe_snapshot(monkeypatch)
         assert response.status_code == 200
         body = response.json()
         assert body["runtime"]["auth_mode"] == "local"
+        assert body["runtime"]["observability_backend"] == "memory"
+        assert body["runtime"]["checkpointer_backend"] == "memory"
         assert body["reference"]["route"] == "work_order_ops"
         assert "password" not in response.text.lower()
         assert "dsn" not in response.text.lower()

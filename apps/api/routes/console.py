@@ -36,6 +36,8 @@ async def bootstrap(request: Request) -> dict:
                 and settings.llm_api_key.strip()
             ),
             "knowledge_backend": settings.knowledge_backend,
+            "observability_backend": settings.observability_store_backend,
+            "checkpointer_backend": "memory" if settings.use_memory_checkpointer else "postgres",
         },
         "context": {"tenant_id": ctx.tenant_id},
         "reference": {
