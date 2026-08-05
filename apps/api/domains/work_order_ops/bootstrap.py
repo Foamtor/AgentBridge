@@ -27,11 +27,14 @@ def _build_input(
         if isinstance(raw_draft, dict)
         else (None if raw_draft is None else {})
     )
-    return {
+    result = {
         "messages": [{"role": "user", "content": query}],
         "model_alias": model,
         "structured_draft": structured_draft,
     }
+    if (extra or {}).get("case_mode") == "real":
+        result["use_model_planner"] = True
+    return result
 
 
 def register(

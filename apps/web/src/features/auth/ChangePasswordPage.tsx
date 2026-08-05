@@ -11,7 +11,7 @@ export function ChangePasswordPage() {
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
-  const strong = next.length >= 12 && !/admin/i.test(next) && !/password|123456|qwerty/i.test(next);
+  const strong = next.length >= 8 && /\p{L}/u.test(next) && /\d/.test(next);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

@@ -65,7 +65,7 @@ Client → FastAPI route → RunLifecycle → registered business graph/tools
 
 `apps/api/lifespan.py` is the production composition root: it creates adapters, registers plugins, and injects implementations into the runtime. `packages/core` never imports a concrete business plugin, and plugins do not create infrastructure adapters or emit SSE directly. See [the architecture summary](docs/architecture.md), [event contracts](docs/contracts.md), and [non-negotiable rules](AGENTS.md).
 
-The default Compose stack starts the React console, FastAPI service, and PostgreSQL with pgvector. Redis and Authentik are optional profiles. The technical preview deliberately uses an offline model stub and fake knowledge backend, while Postgres-backed business data and approval execution exercise the complete demo flow.
+The default Compose stack starts the React console, FastAPI service, and PostgreSQL with pgvector. Redis and Authentik are optional profiles. The technical preview deliberately uses an offline model stub and fake knowledge backend, while Postgres-backed business data and approval execution exercise the complete demo flow. Set `LLM_MODE=openai_compatible` with an OpenAI-compatible endpoint, model, and key to run the reference case through a real model; Fake remains available for deterministic demos.
 
 ## 🤖 Vibe Coding Integration
 
@@ -121,6 +121,8 @@ docker compose logs api
 ```
 
 Sign in as `admin`, set a strong new password, then use the Verification Workbench to run `work_order_ops`.
+
+For daily plugin work, open `/playground`: it keeps request composition, thread history, live SSE, timing, tool traces, contract checks, JSONL export, and badcase annotations together. See [Plugin Playground](docs/plugin-playground.md) for Fake versus real-model reference-case setup.
 If you set `WEB_PORT`, use that port instead.
 
 > 💡 No API key or cloud service needed. The Compose demo includes PostgreSQL, an offline model, and synthetic demo data. The initial password is never committed or fixed in the image.
@@ -170,7 +172,7 @@ SKILL.md                Vibe Coding integration guide (for AI assistants)
 ## 📊 Current status
 
 - 🚧 v0.1.0 Technical Preview preparation
-- ✅ Default Compose golden flow verified locally
+- 🚧 Real Docker Compose golden smoke still needs an environment with Docker Engine and registry access
 - ✅ Reference `work_order_ops` implementation included
 - ⚠️ CI cleanup is in progress
 - 🚧 Production IdP, multi-instance validation, migration/recovery, and package publishing are deferred

@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS console_admins (
     password_version INTEGER NOT NULL DEFAULT 1,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     password_changed_at TIMESTAMPTZ,
-    initial_password_issued_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    initial_password_issued_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS console_sessions (

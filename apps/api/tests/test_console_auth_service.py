@@ -26,18 +26,20 @@ async def test_ensure_admin_generates_once(service):
 
 
 @pytest.mark.asyncio
-async def test_password_policy_rejects_weak_candidates(service):
+async def test_password_policy_requires_eight_characters_with_letters_and_digits(service):
     with pytest.raises(PasswordPolicyError) as exc:
         service.validate_new_password("short", username="admin")
     assert exc.value.code == "password_too_short"
 
     with pytest.raises(PasswordPolicyError) as exc:
-        service.validate_new_password("admin-admin-admin", username="admin")
-    assert exc.value.code == "password_contains_username"
+        service.validate_new_password("abcdefgh", username="admin")
+    assert exc.value.code == "password_too_weak"
 
     with pytest.raises(PasswordPolicyError) as exc:
-        service.validate_new_password("passwordpassword", username="admin")
-    assert exc.value.code == "password_common"
+        service.validate_new_password("12345678", username="admin")
+    assert exc.value.code == "password_too_weak"
+
+    service.validate_new_password("admin123", username="admin")
 
 
 @pytest.mark.asyncio

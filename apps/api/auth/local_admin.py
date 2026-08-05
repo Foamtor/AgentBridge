@@ -17,20 +17,6 @@ from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatc
 
 from auth.ports import ConsoleAuthStore
 
-COMMON_PASSWORDS = frozenset(
-    {
-        "password",
-        "passwordpassword",
-        "123456",
-        "123456789",
-        "qwerty",
-        "admin123",
-        "letmein",
-        "welcome",
-    }
-)
-
-
 class PasswordPolicyError(ValueError):
     def __init__(self, code: str) -> None:
         super().__init__(code)
@@ -63,7 +49,7 @@ class ConsoleAdminService:
         session_idle_seconds: int = 43200,
         session_absolute_seconds: int = 86400,
         password_change_seconds: int = 900,
-        password_min_length: int = 12,
+        password_min_length: int = 8,
         password_max_length: int = 128,
         login_failure_window_seconds: int = 300,
         initial_password_ttl_seconds: int = 86400,
@@ -102,23 +88,7 @@ class ConsoleAdminService:
             raise PasswordPolicyError("password_too_short")
         if length > self.password_max_length:
             raise PasswordPolicyError("password_too_long")
-        lowered = candidate.casefold()
-        if username.casefold() in lowered:
-            raise PasswordPolicyError("password_contains_username")
-        if lowered in COMMON_PASSWORDS:
-            raise PasswordPolicyError("password_common")
-        if current_hash and self.verify_password(current_hash, candidate):
-            raise PasswordPolicyError("password_reused")
-        categories = sum(
-            bool(part)
-            for part in (
-                any(c.islower() for c in candidate),
-                any(c.isupper() for c in candidate),
-                any(c.isdigit() for c in candidate),
-                any(not c.isalnum() for c in candidate),
-            )
-        )
-        if length < 16 and categories < 3:
+        if not any(c.isalpha() for c in candidate) or not any(c.isdigit() for c in candidate):
             raise PasswordPolicyError("password_too_weak")
 
     def hash_password(self, password: str) -> str:

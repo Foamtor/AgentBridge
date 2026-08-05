@@ -1,5 +1,5 @@
 import { useI18n } from "../../i18n";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { BusinessResults } from "./BusinessResults";
 import { EnvironmentSummary } from "./EnvironmentSummary";
 import { PlatformEvidence } from "./PlatformEvidence";
@@ -20,11 +20,12 @@ export function VerificationWorkbench() {
   return <main className="page verification-workbench">
     <header className="workbench-header">
       <div><p className="eyebrow">{t("product")} / {t("preview")}</p><h1>{t("verifyTitle")}</h1><p className="lede">{t("verifyDescription")}</p></div>
-      <div className="workbench-meta"><span>{t("route")}</span><code>work_order_ops</code><span>{t("thread")}</span><code>{run.threadId}</code></div>
+      <div className="workbench-meta"><span>{t("route")}</span><code>work_order_ops</code><span>{t("thread")}</span><code>{run.threadId}</code><Link className="playground-link" to="/playground">{t("playground")} →</Link></div>
     </header>
     <EnvironmentSummary />
     <section className="workbench-section">
       <div className="section-heading"><div><h2>{t("chooseScenario")}</h2><p className="muted">{t("scenarioHint")}</p></div>{phaseLabel ? <span className={`run-status status-${run.verification.phase}`}>{phaseLabel}</span> : null}</div>
+      <div className="execution-mode" role="group" aria-label={t("executionMode")}><span>{t("executionMode")}</span><button type="button" className={run.mode === "fake" ? "selected" : ""} onClick={() => run.setMode("fake")} disabled={run.busy}>{t("fakeMode")}</button><button type="button" className={run.mode === "real" ? "selected" : ""} onClick={() => run.setMode("real")} disabled={run.busy}>{t("realMode")}</button><small>{run.mode === "real" ? t("realModeHint") : t("fakeModeHint")}</small></div>
       <ScenarioPicker value={run.scenario} disabled={run.busy} onChange={run.setScenario} />
       <div className="run-actions"><button type="button" className="primary" onClick={() => void run.run()} disabled={run.busy}>{run.busy ? t("running") : t("runScenario")}</button><button type="button" className="secondary" onClick={() => void run.cancel()} disabled={!run.busy}>{t("cancel")}</button></div>
     </section>

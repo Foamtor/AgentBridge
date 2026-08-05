@@ -153,6 +153,64 @@ def _plan_reads(
     }
 
 
+async def _plan_reads_model(
+    state: WorkOrderOpsState,
+    config: RunnableConfig,
+    *,
+    guarded_tools: list[Any],
+    available_names: frozenset[str],
+) -> dict[str, Any]:
+    """Let a configured model choose read tools for the real-case path.
+
+    The deterministic planner remains the fallback for Fake mode and for a
+    model response without tool calls. Permission filtering already happened
+    before this graph is built, so the model can only see guarded tools.
+    """
+    ctx = get_run_context(config)
+    if ctx.metadata.get("llm_mode") != "openai_compatible":
+        raise RuntimeError("real_model_not_configured")
+    gateway = ctx.metadata.get("llm_gateway")
+    read_tools = [
+        tool for tool in guarded_tools if _tool_name(tool) in _READ_TOOL_NAMES
+    ]
+    if gateway is None or not read_tools:
+        return _plan_reads(state, config, available_names=available_names)
+    response = await gateway.chat(
+        [{"role": "user", "content": _query_text(state)}],
+        ctx=ctx,
+        model=state.get("model_alias"),
+        tools=read_tools,
+    )
+    raw_calls = getattr(response, "tool_calls", None)
+    if not isinstance(raw_calls, list):
+        return _plan_reads(state, config, available_names=available_names)
+    tool_calls: list[dict[str, Any]] = []
+    call_ids: dict[str, str] = {}
+    for index, item in enumerate(raw_calls):
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name") or "")
+        if name not in available_names:
+            continue
+        call_id = str(item.get("id") or f"tc-{_run_id(config)}-{name}-{index}")
+        call_ids[name] = call_id
+        tool_calls.append(
+            {
+                "name": name,
+                "args": dict(item.get("args") or {}),
+                "id": call_id,
+                "type": "tool_call",
+            }
+        )
+    if not tool_calls:
+        return _plan_reads(state, config, available_names=available_names)
+    return {
+        "messages": [AIMessage(content="", tool_calls=tool_calls)],
+        "current_read_call_ids": call_ids,
+        "current_draft_call_id": None,
+    }
+
+
 def _draft_call(args: dict[str, Any], *, call_id: str) -> AIMessage:
     return AIMessage(
         content="",
@@ -444,7 +502,14 @@ def build_work_order_ops_graph(
     ) -> dict[str, Any]:
         return await _plan_draft(state, config, draft_tool=draft_tool)
 
-    def plan_reads(state: WorkOrderOpsState, config: RunnableConfig) -> dict[str, Any]:
+    async def plan_reads(state: WorkOrderOpsState, config: RunnableConfig) -> dict[str, Any]:
+        if state.get("use_model_planner"):
+            return await _plan_reads_model(
+                state,
+                config,
+                guarded_tools=guarded_tools,
+                available_names=available_names,
+            )
         return _plan_reads(
             state,
             config,

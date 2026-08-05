@@ -92,18 +92,38 @@ def _build_console_auth_store(settings: Settings) -> Any:
 
 
 def _build_llm_gateway(settings: Settings) -> Any:
-    """Build gateway; default FakeChatModel keeps CI offline."""
+    """Build the configured model gateway; fake remains an explicit offline mode."""
     from agentbridge_core.adapters.alias_llm_gateway import AliasLLMGateway
     from agentbridge_core.adapters.direct_llm_gateway import DirectLLMGateway
     from agentbridge_core.adapters.fake_chat_model import FakeChatModel
 
-    default_model = FakeChatModel(["direct-ok"])
+    if settings.llm_mode == "openai_compatible":
+        if not settings.llm_api_key.strip():
+            raise ValueError(
+                "LLM_MODE=openai_compatible requires LLM_API_KEY"
+            )
+        try:
+            from langchain_openai import ChatOpenAI
+        except ImportError as exc:  # pragma: no cover - packaging failure
+            raise RuntimeError(
+                "LLM_MODE=openai_compatible requires agentbridge-core[rag]"
+            ) from exc
+        default_model = ChatOpenAI(
+            api_key=settings.llm_api_key,
+            base_url=settings.llm_api_base.rstrip("/"),
+            model=settings.llm_model,
+            temperature=settings.llm_temperature,
+        )
+    elif settings.llm_mode == "fake":
+        default_model = FakeChatModel(["direct-ok"])
+    else:
+        raise ValueError("unsupported LLM_MODE; use fake or openai_compatible")
     if settings.llm_backend == "gateway":
         # Aliases are host-wired; domains only pass model= alias strings.
         return AliasLLMGateway(
             {
-                "default": FakeChatModel(["gateway-default"]),
-                "fast": FakeChatModel(["gateway-fast"]),
+                "default": default_model,
+                "fast": default_model,
             },
             default_alias="default",
         )
@@ -230,10 +250,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         )
         llm_gateway = _build_llm_gateway(settings)
         from adapters.prometheus_metrics import PrometheusMetrics
+        from observability.annotation_store import MemoryRunAnnotationStore
         from observability.tracing import make_run_span_factory
 
         metrics = PrometheusMetrics()
         span_factory = make_run_span_factory(enabled=settings.otel_enabled)
+        run_annotation_store = MemoryRunAnnotationStore()
 
         lifecycle = RunLifecycle(
             locks=locks,
@@ -292,6 +314,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.event_log = event_log
         app.state.message_store = message_store
         app.state.run_store = run_store
+        app.state.run_annotation_store = run_annotation_store
         app.state.approval_store = approval_store
         app.state.console_auth_service = console_auth_service
         app.state.approval_actions = approval_actions

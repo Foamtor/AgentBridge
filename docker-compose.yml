@@ -25,7 +25,15 @@ services:
       AUTH_REQUIRED: "false"
       AGENTBRIDGE_FAKE_RUNTIME: "0"
       KNOWLEDGE_BACKEND: fake
+      LLM_MODE: ${LLM_MODE:-fake}
+      LLM_API_BASE: ${LLM_API_BASE:-https://api.openai.com/v1}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0}
       ENABLE_DATA_SOURCE: "true"
+      DATA_SOURCE_DSN: ${DATA_SOURCE_DSN:-}
+      KB_EXTERNAL_BASE_URL: ${KB_EXTERNAL_BASE_URL:-}
+      KB_EXTERNAL_API_KEY: ${KB_EXTERNAL_API_KEY:-}
       APPROVAL_STORE_BACKEND: postgres
       PG_HOST: postgres
       PG_PORT: "5432"

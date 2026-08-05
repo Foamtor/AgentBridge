@@ -16,7 +16,11 @@ export function LoginPage() {
       const session = await login("admin", password);
       navigate(session.status === "password_change_required" ? "/setup-password" : "/");
     } catch (cause) {
-      setError((cause as { status?: number }).status === 429 ? t("loginRateLimited") : t("loginError"));
+      const failure = cause as { message?: string; status?: number };
+      if (failure.status === 429) setError(t("loginRateLimited"));
+      else if (failure.message === "cross_site_request") setError(t("loginOriginError"));
+      else if (failure.status === 401) setError(t("loginError"));
+      else setError(t("loginUnavailable"));
     }
   }
 

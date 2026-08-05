@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     auth_session_idle_seconds: int = Field(default=43200, validation_alias="AUTH_SESSION_IDLE_SECONDS")
     auth_session_absolute_seconds: int = Field(default=86400, validation_alias="AUTH_SESSION_ABSOLUTE_SECONDS")
     auth_password_change_seconds: int = Field(default=900, validation_alias="AUTH_PASSWORD_CHANGE_SECONDS")
-    auth_password_min_length: int = Field(default=12, validation_alias="AUTH_PASSWORD_MIN_LENGTH")
+    auth_password_min_length: int = Field(default=8, validation_alias="AUTH_PASSWORD_MIN_LENGTH")
     auth_password_max_length: int = Field(default=128, validation_alias="AUTH_PASSWORD_MAX_LENGTH")
     auth_login_failure_window_seconds: int = Field(default=300, validation_alias="AUTH_LOGIN_FAILURE_WINDOW_SECONDS")
     auth_initial_password_ttl_seconds: int = Field(default=86400, validation_alias="AUTH_INITIAL_PASSWORD_TTL_SECONDS")
@@ -36,6 +36,12 @@ class Settings(BaseSettings):
     oidc_audience: str = ""
     oidc_jwt_secret: str = Field(default="", validation_alias="OIDC_JWT_SECRET")
     llm_api_key: str = ""
+    llm_api_base: str = Field(
+        default="https://api.openai.com/v1", validation_alias="LLM_API_BASE"
+    )
+    llm_model: str = Field(default="gpt-4o-mini", validation_alias="LLM_MODEL")
+    llm_temperature: float = Field(default=0.0, validation_alias="LLM_TEMPERATURE")
+    llm_mode: str = Field(default="fake", validation_alias="LLM_MODE")
     use_memory_checkpointer: bool = True
     enable_data_source: bool = Field(
         default=False, validation_alias="ENABLE_DATA_SOURCE"

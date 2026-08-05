@@ -394,6 +394,14 @@ class RunLifecycle:
                         "tenant_id": tenant_id,
                         "thread_id": thread_id,
                         "route": route,
+                        "trace_id": trace_id,
+                        "request": {
+                            "query": query,
+                            "thread_id": thread_id,
+                            "route": route,
+                            "model": model,
+                            "extra": dict(extra or {}),
+                        },
                         "started_at": _utc_now_iso(),
                         "status": "pending",
                     }

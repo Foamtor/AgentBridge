@@ -56,6 +56,10 @@ def main() -> int:
             if required not in text:
                 errors.append(f"{marker} missing release marker: {required}")
 
+    nginx = (ROOT / "apps" / "web" / "nginx.conf").read_text(encoding="utf-8")
+    if "proxy_set_header Host $http_host;" not in nginx:
+        errors.append("web proxy must preserve the external Host port for same-origin auth")
+
     if errors:
         print("\n".join(errors), file=sys.stderr)
         return 1

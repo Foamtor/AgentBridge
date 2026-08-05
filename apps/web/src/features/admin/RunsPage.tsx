@@ -57,7 +57,7 @@ export function RunsPage() {
           {items.map((run) => (
             <tr key={run.run_id}>
               <td>
-                <Link to={`/debug?run_id=${encodeURIComponent(run.run_id)}`}>
+                <Link to={`/playground?run_id=${encodeURIComponent(run.run_id)}`}>
                   {run.run_id}
                 </Link>
               </td>
