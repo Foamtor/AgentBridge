@@ -14,6 +14,7 @@ import { ToolsPage } from "../features/admin/ToolsPage";
 import { AuthCallbackPage } from "../features/auth/callback";
 import { ContractsPage } from "../features/contracts/ContractsPage";
 import { VerificationWorkbench } from "../features/verification/VerificationWorkbench";
+import { PluginPlayground } from "../features/playground/PluginPlayground";
 
 export function AppRoutes() {
   return (
@@ -22,7 +23,8 @@ export function AppRoutes() {
       <Route path="/setup-password" element={<ProtectedRoute passwordChangeOnly />}><Route index element={<ChangePasswordPage />} /></Route>
       <Route element={<ProtectedRoute />}>
         <Route path="/" element={<VerificationWorkbench />} />
-        <Route path="/debug" element={<Navigate to="/?mode=advanced" replace />} />
+        <Route path="/playground" element={<PluginPlayground />} />
+        <Route path="/debug" element={<Navigate to="/playground" replace />} />
         <Route path="/contracts" element={<ContractsPage />} />
         <Route path="/admin" element={<OverviewPage />} />
         <Route path="/domains" element={<DomainsPage />} />

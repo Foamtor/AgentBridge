@@ -26,6 +26,10 @@ class ConfigItemSpec:
 
 _CONFIG_MANIFEST: list[ConfigItemSpec] = [
     ConfigItemSpec("LLM_BACKEND", "llm_backend", "B", "模型路由方式"),
+    ConfigItemSpec("LLM_MODE", "llm_mode", "B", "案例执行模式"),
+    ConfigItemSpec("LLM_MODEL", "llm_model", "B", "模型名"),
+    ConfigItemSpec("LLM_API_BASE", "llm_api_base", "B", "模型 HTTP 基址"),
+    ConfigItemSpec("LLM_TEMPERATURE", "llm_temperature", "B", "模型温度"),
     ConfigItemSpec("KNOWLEDGE_BACKEND", "knowledge_backend", "B", "知识后端类型"),
     ConfigItemSpec("AUTH_REQUIRED", "auth_required", "B", "是否强制鉴权"),
     ConfigItemSpec("LOCK_BACKEND", "lock_backend", "B", "线程锁后端"),

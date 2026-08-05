@@ -33,6 +33,9 @@ function AppFrame() {
         <Link to="/" aria-current={location.pathname === "/" ? "page" : undefined}>
           {t("verify")}
         </Link>
+        <Link to="/playground" aria-current={location.pathname === "/playground" ? "page" : undefined}>
+          {t("playground")}
+        </Link>
         {ADMIN_NAV.map((item) => (
           <Link
             key={item.to}

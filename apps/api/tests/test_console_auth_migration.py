@@ -9,7 +9,7 @@ def test_local_auth_is_the_default(monkeypatch):
     monkeypatch.setenv("AUTH_MODE", "local")
     settings = Settings(_env_file=None)
     assert settings.resolved_auth_mode == "local"
-    assert settings.auth_password_min_length == 12
+    assert settings.auth_password_min_length == 8
 
 
 def test_settings_accept_auth_mode(monkeypatch):
@@ -35,4 +35,4 @@ def test_console_auth_migration_contains_no_seed_password():
     assert "console_login_attempts" in sql
     assert "INSERT INTO console_admins" not in sql
     assert "password_hash TEXT NOT NULL" in sql
-    assert "initial_password_issued_at TIMESTAMPTZ NOT NULL" in sql
+    assert "initial_password_issued_at TIMESTAMPTZ DEFAULT NOW()" in sql

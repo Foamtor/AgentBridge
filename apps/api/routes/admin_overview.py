@@ -99,7 +99,13 @@ async def overview(request: Request) -> dict[str, Any]:
     settings = request.app.state.settings
     return {
         "domains": _count_domains(catalog),
-        "llm_backend": {"type": settings.llm_backend, "status": "ok"},
+        "llm_backend": {
+            "type": settings.llm_backend,
+            "mode": settings.llm_mode,
+            "model": settings.llm_model,
+            "configured": bool(settings.llm_mode == "fake" or settings.llm_api_key.strip()),
+            "status": "ok" if settings.llm_mode == "fake" or settings.llm_api_key.strip() else "degraded",
+        },
         "knowledge_backend": _knowledge_backend_status(request),
         "infra_ready": await _ready_snapshot(request),
         "runs_24h": _runs_24h_stats(runs),

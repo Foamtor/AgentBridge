@@ -26,6 +26,8 @@ def test_project_config_excludes_tier_a_by_default() -> None:
     assert all(item["tier"] != "A" for item in items)
     keys = {item["key"] for item in items}
     assert "LLM_BACKEND" in keys
+    assert "LLM_MODE" in keys
+    assert "LLM_MODEL" in keys
     assert "EMBED_API_KEY" in keys
     assert "RATE_LIMIT_PER_MINUTE" not in keys
 

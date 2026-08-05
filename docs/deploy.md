@@ -46,9 +46,27 @@ docker compose up --build
 
 打开 `http://127.0.0.1:8080`。默认服务为 Web、API 和 pgvector PostgreSQL；Web 通过同源 `/api` 访问 API，PostgreSQL 不映射宿主机端口。默认使用离线 FakeChatModel、fake knowledge、脱敏工单数据和本地管理员登录，适合验证 `work_order_ops` 的查询、图表、草稿和审批。
 
-首次启动时 API 会在容器日志中仅打印一次 `admin` 的一次性密码：`docker compose logs api`。登录后必须设置至少 12 位的强密码才能访问工作台。密码只保存为 Argon2id 哈希，浏览器仅保存 HttpOnly 会话 Cookie。若丢失初始密码且尚未改密，可仅对演示环境执行 `docker compose down --volumes` 后重新启动；这会删除该 Compose 演示数据。
+首次启动时 API 会在容器日志中仅打印一次 `admin` 的一次性密码：`docker compose logs api`。登录后必须设置至少 8 位、同时包含字母和数字的密码才能访问工作台。密码只保存为 Argon2id 哈希，浏览器仅保存 HttpOnly 会话 Cookie。若丢失初始密码且尚未改密，可仅对演示环境执行 `docker compose down --volumes` 后重新启动；这会删除该 Compose 演示数据。
 
 停止：`docker compose down`。如需**删除所有本地演示数据**再初始化，执行 `docker compose down --volumes`；这只应对本项目演示 volume 使用。Redis 与 Authentik 分别用 `--profile redis` 与 `--profile auth` 按需启动；Authentik 默认也走 DaoCloud 的 GHCR 代理，可通过 `AUTHENTIK_IMAGE` 覆盖。
+
+### 真实模型案例验证
+
+默认 `work_order_ops` 是离线 Fake 演示：它用脱敏的 Compose 数据和确定性模型桩，适合确认平台链路。要验证真实模型如何选择案例 tools、读取自己的工单数据或检索知识，设置下列变量后重启 API：
+
+```dotenv
+LLM_MODE=openai_compatible
+LLM_API_BASE=https://your-openai-compatible-endpoint/v1
+LLM_MODEL=your-model-name
+LLM_API_KEY=replace-me
+ENABLE_DATA_SOURCE=true
+DATA_SOURCE_DSN=postgresql://user:password@host:5432/your_business_database
+# 需要真实知识检索时，再选择 langchain_pg 或 external，而不是 fake。
+KNOWLEDGE_BACKEND=external
+KB_EXTERNAL_BASE_URL=https://your-rag-service
+```
+
+然后在验证工作台选择“真实模型”。该模式只把平台权限筛选后的 `work_order_ops` 读工具交给模型选择，工具仍以当前租户执行；创建写入仍经过草稿、人工审批和幂等动作。没有设置 `LLM_MODE=openai_compatible` 时，真实模型模式会明确返回 `real_model_not_configured`，不会悄悄回退到 Fake。
 
 ---
 

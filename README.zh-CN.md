@@ -65,7 +65,7 @@ AgentBridge 是一个源码优先的 Python 平台，刻意把可复用运行时
 
 `apps/api/lifespan.py` 是生产组装根：负责创建适配器、注册插件，并把实现注入运行时。`packages/core` 不导入任何具体业务插件；业务插件也不自行创建基础设施适配器或直接发送 SSE。详细说明见[架构摘要](docs/architecture.md)、[事件契约](docs/contracts.md)和[不可违反的规则](AGENTS.md)。
 
-默认 Compose 会启动 React 调试台、FastAPI 服务和带 pgvector 的 PostgreSQL；Redis 与 Authentik 是可选 profile。技术预览默认使用离线模型桩和 fake 知识后端，同时以 PostgreSQL 业务数据和审批执行跑通完整演示闭环。
+默认 Compose 会启动 React 调试台、FastAPI 服务和带 pgvector 的 PostgreSQL；Redis 与 Authentik 是可选 profile。技术预览默认使用离线模型桩和 fake 知识后端，同时以 PostgreSQL 业务数据和审批执行跑通完整演示闭环。设置 `LLM_MODE=openai_compatible`、兼容 OpenAI 的模型地址、模型名和密钥后，参考案例会真实调用模型；Fake 演示仍可保留用于确定性验证。
 
 ## 🤖 用 Vibe Coding 方式接入你的业务系统
 
@@ -121,6 +121,8 @@ docker compose logs api
 ```
 
 使用 `admin` 登录，先设置一个强密码；随后在验证工作台运行 `work_order_ops`。
+
+日常插件调试请打开 `/playground`：请求编辑、会话历史、实时 SSE、时序、工具轨迹、契约检查、JSONL 导出和 Badcase 标注都在同一视图。Fake 与真实模型案例的配置见 [Plugin Playground](docs/plugin-playground.md)。
 如设置了 `WEB_PORT`，请使用对应端口。
 
 > 💡 跑起来不需要 API Key 或云服务。Compose 自带 PostgreSQL、离线模型和脱敏演示数据；初始密码不会写入仓库或镜像。
@@ -170,7 +172,7 @@ SKILL.md                Vibe Coding 接入指南（喂给 AI 助手用）
 ## 📊 当前状态
 
 - 🚧 v0.1.0 技术预览准备中
-- ✅ 默认 Compose 黄金流程已完成本地验收
+- 🚧 真实 Docker Compose 黄金冒烟仍需要具备 Docker Engine 与镜像网络的环境执行
 - ✅ 包含可运行的 `work_order_ops` 参考实现
 - ⚠️ CI 遗留问题正在清理
 - 🚧 生产 IdP、多机验证、迁移恢复和包发布尚未完成

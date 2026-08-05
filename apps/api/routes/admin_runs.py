@@ -5,9 +5,10 @@ from __future__ import annotations
 import base64
 from typing import Any
 
-from fastapi import APIRouter, Query, Request
-
 from auth.rbac import require_permission
+from fastapi import APIRouter, Query, Request
+from observability.run_diagnostics import build_run_diagnostics
+
 from routes.admin_common import admin_ctx, parse_iso
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -40,9 +41,7 @@ def _before_cursor(run: dict[str, Any], cursor_started: str, cursor_run_id: str)
     started_at, run_id = _run_sort_key(run)
     if started_at < cursor_started:
         return True
-    if started_at == cursor_started and run_id < cursor_run_id:
-        return True
-    return False
+    return started_at == cursor_started and run_id < cursor_run_id
 
 
 def _filter_runs(
@@ -76,6 +75,7 @@ def _project_run(run: dict[str, Any]) -> dict[str, Any]:
         "run_id": run.get("run_id"),
         "thread_id": run.get("thread_id"),
         "route": run.get("route"),
+        "trace_id": run.get("trace_id"),
         "status": run.get("status"),
         "tenant_id": run.get("tenant_id"),
         "started_at": run.get("started_at"),
@@ -88,6 +88,8 @@ async def list_runs(
     request: Request,
     status: str | None = None,
     route: str | None = None,
+    thread_id: str | None = None,
+    trace_id: str | None = None,
     since: str | None = None,
     until: str | None = None,
     limit: int = Query(default=20, ge=1, le=100),
@@ -100,6 +102,10 @@ async def list_runs(
     filtered = _filter_runs(
         runs, status=status, route=route, since=since, until=until
     )
+    if thread_id:
+        filtered = [run for run in filtered if run.get("thread_id") == thread_id]
+    if trace_id:
+        filtered = [run for run in filtered if run.get("trace_id") == trace_id]
     if cursor:
         decoded = _decode_cursor(cursor)
         if decoded is not None:
@@ -113,3 +119,41 @@ async def list_runs(
     items = [_project_run(r) for r in page[:limit]]
     next_cursor = _encode_cursor(page[limit]) if len(page) > limit else None
     return {"items": items, "next_cursor": next_cursor}
+
+
+@router.get("/diagnostics")
+async def aggregate_diagnostics(request: Request) -> dict[str, Any]:
+    ctx = admin_ctx(request)
+    require_permission(ctx, "admin:read")
+    tenant_id = ctx.tenant_id or "default"
+    runs = await request.app.state.run_store.list_by_tenant(tenant_id)
+    annotations = await request.app.state.run_annotation_store.list_for_tenant(
+        tenant_id
+    )
+    by_route: dict[str, dict[str, int]] = {}
+    tool_usage: dict[str, int] = {}
+    contract_failures = 0
+    for run in runs:
+        run_id = str(run.get("run_id") or "")
+        route = str(run.get("route") or "unknown")
+        route_stats = by_route.setdefault(route, {"runs": 0, "failures": 0})
+        route_stats["runs"] += 1
+        if run.get("status") in {"error", "cancelled"}:
+            route_stats["failures"] += 1
+        if not run_id:
+            continue
+        events = await request.app.state.event_log.list(run_id, tenant_id=tenant_id)
+        diagnostics = build_run_diagnostics(events)
+        if not diagnostics["contract_ok"]:
+            contract_failures += 1
+        for tool in diagnostics["tools"]:
+            name = str(tool.get("name") or "unknown")
+            tool_usage[name] = tool_usage.get(name, 0) + 1
+    return {
+        "total_runs": len(runs),
+        "contract_failures": contract_failures,
+        "annotations": len(annotations),
+        "badcases": sum(1 for item in annotations if item.get("category") == "badcase"),
+        "by_route": by_route,
+        "tool_usage": tool_usage,
+    }

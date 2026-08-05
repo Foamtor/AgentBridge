@@ -46,3 +46,20 @@ def test_admin_runs_cursor_pages_without_overlap(client) -> None:
     ids1 = {item["run_id"] for item in body1["items"]}
     ids2 = {item["run_id"] for item in body2["items"]}
     assert ids1.isdisjoint(ids2)
+
+
+def test_admin_runs_filters_by_thread_and_trace(client) -> None:
+    response = client.post(
+        "/chat/stream",
+        json={"query": "hello", "thread_id": "t-filtered", "route": "echo"},
+    )
+    assert response.status_code == 200
+    run_id = next(
+        __import__("json").loads(line[6:])["run_id"]
+        for line in response.text.splitlines()
+        if line.startswith("data: ")
+    )
+    by_thread = client.get("/admin/runs?thread_id=t-filtered")
+    by_trace = client.get(f"/admin/runs?trace_id={run_id}")
+    assert [item["run_id"] for item in by_thread.json()["items"]] == [run_id]
+    assert [item["run_id"] for item in by_trace.json()["items"]] == [run_id]
