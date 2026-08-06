@@ -68,6 +68,8 @@ KB_EXTERNAL_BASE_URL=https://your-rag-service
 
 然后在验证工作台选择“真实模型”。该模式只把平台权限筛选后的 `work_order_ops` 读工具交给模型选择，工具仍以当前租户执行；创建写入仍经过草稿、人工审批和幂等动作。没有设置 `LLM_MODE=openai_compatible` 时，真实模型模式会明确返回 `real_model_not_configured`，不会悄悄回退到 Fake。
 
+也可设置 `MODEL_CONFIG_ENCRYPTION_KEY` 后，在 `/models` 管理页添加模型别名、OpenAI 兼容 API 地址、模型名和 Key。可用 `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` 生成一次密钥。Key 会在写入 PostgreSQL 前加密，读取接口和浏览器不会得到明文。必须将该加密密钥保存在数据库之外且持续保留；丢失密钥会导致已保存的模型凭据无法解密。
+
 ---
 
 ## 本地（隔离内存会话）

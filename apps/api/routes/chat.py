@@ -58,7 +58,12 @@ async def chat_stream(
                 **ctx.metadata,
                 "data_source": request.app.state.data_source,
                 "llm_gateway": request.app.state.llm_gateway,
-                "llm_mode": settings.llm_mode,
+                "llm_mode": (
+                    "openai_compatible"
+                    if body.extra.get("case_mode") == "real"
+                    and request.app.state.model_config_service.is_real_alias(body.model)
+                    else settings.llm_mode
+                ),
                 "llm_model": settings.llm_model,
                 "retriever": request.app.state.retriever,
                 # Run-scoped reversible mask tokens (DataMasker); not checkpointed.

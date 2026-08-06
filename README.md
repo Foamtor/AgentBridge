@@ -65,7 +65,7 @@ Client → FastAPI route → RunLifecycle → registered business graph/tools
 
 `apps/api/lifespan.py` is the production composition root: it creates adapters, registers plugins, and injects implementations into the runtime. `packages/core` never imports a concrete business plugin, and plugins do not create infrastructure adapters or emit SSE directly. See [the architecture summary](docs/architecture.md), [event contracts](docs/contracts.md), and [non-negotiable rules](AGENTS.md).
 
-The default Compose stack starts the React console, FastAPI service, and PostgreSQL with pgvector. Redis and Authentik are optional profiles. The technical preview deliberately uses an offline model stub and fake knowledge backend, while Postgres-backed business data and approval execution exercise the complete demo flow. Set `LLM_MODE=openai_compatible` with an OpenAI-compatible endpoint, model, and key to run the reference case through a real model; Fake remains available for deterministic demos.
+The default Compose stack starts the React console, FastAPI service, and PostgreSQL with pgvector. Redis and Authentik are optional profiles. The technical preview deliberately uses an offline model stub and fake knowledge backend, while Postgres-backed business data and approval execution exercise the complete demo flow. Fake remains available for deterministic demos. For an environment default, set `LLM_MODE=openai_compatible` with an OpenAI-compatible endpoint, model, and key. For operator-managed switching, set `MODEL_CONFIG_ENCRYPTION_KEY` and add encrypted model aliases from the console's Models page; API keys are never returned to the browser.
 
 ## 🤖 Vibe Coding Integration
 

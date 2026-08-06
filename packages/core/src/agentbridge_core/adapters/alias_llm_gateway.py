@@ -31,6 +31,17 @@ class AliasLLMGateway:
             raise KeyError(f"unknown model alias: {alias}")
         return DirectLLMGateway(self._models[alias])
 
+    def replace_models(self, models: dict[str, Any]) -> None:
+        """Atomically replace host-wired aliases without exposing vendors to domains."""
+        if not models:
+            raise ValueError("models must be non-empty")
+        if self._default not in models:
+            raise ValueError(f"default alias {self._default!r} missing")
+        self._models = dict(models)
+
+    def aliases(self) -> tuple[str, ...]:
+        return tuple(sorted(self._models))
+
     async def chat(
         self,
         messages: list[Any],

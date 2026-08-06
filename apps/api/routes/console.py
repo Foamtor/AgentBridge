@@ -32,8 +32,7 @@ async def bootstrap(request: Request) -> dict:
             "llm_mode": settings.llm_mode,
             "llm_model": settings.llm_model,
             "real_model_ready": bool(
-                settings.llm_mode == "openai_compatible"
-                and settings.llm_api_key.strip()
+                request.app.state.model_config_service.has_real_model
             ),
             "knowledge_backend": settings.knowledge_backend,
             "observability_backend": settings.observability_store_backend,

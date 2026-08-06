@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     llm_model: str = Field(default="gpt-4o-mini", validation_alias="LLM_MODEL")
     llm_temperature: float = Field(default=0.0, validation_alias="LLM_TEMPERATURE")
     llm_mode: str = Field(default="fake", validation_alias="LLM_MODE")
+    model_config_encryption_key: str = Field(
+        default="", validation_alias="MODEL_CONFIG_ENCRYPTION_KEY"
+    )
     use_memory_checkpointer: bool = True
     enable_data_source: bool = Field(
         default=False, validation_alias="ENABLE_DATA_SOURCE"

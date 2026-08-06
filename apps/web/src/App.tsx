@@ -7,6 +7,7 @@ const ADMIN_NAV = [
   { to: "/admin", key: "admin" },
   { to: "/domains", key: "plugins" },
   { to: "/config", key: "config" },
+  { to: "/models", key: "models" },
   { to: "/tools", key: "tools" },
   { to: "/runs", key: "runs" },
   { to: "/prompts", key: "prompts" },
