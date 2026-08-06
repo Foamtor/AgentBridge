@@ -14,7 +14,7 @@ describe("console navigation", () => {
     render(<MemoryRouter initialEntries={["/"]}><App /></MemoryRouter>);
 
     expect(await screen.findByRole("link", { name: "验证工作台" })).toHaveAttribute("href", "/");
-    expect(screen.getByRole("link", { name: "配置" })).toHaveAttribute("href", "/config");
+    expect(screen.getByRole("link", { name: "管理" })).toHaveAttribute("href", "/admin");
   });
 
   it("redirects an anonymous visitor to the local login page", async () => {

@@ -3,16 +3,8 @@ import { AuthProvider, useAuth } from "./features/auth/session";
 import { I18nProvider, useI18n } from "./i18n";
 import { AppRoutes } from "./routes";
 
-const ADMIN_NAV = [
+const PRIMARY_NAV = [
   { to: "/admin", key: "admin" },
-  { to: "/domains", key: "plugins" },
-  { to: "/config", key: "config" },
-  { to: "/models", key: "models" },
-  { to: "/tools", key: "tools" },
-  { to: "/runs", key: "runs" },
-  { to: "/prompts", key: "prompts" },
-  { to: "/usage", key: "usage" },
-  { to: "/knowledge", key: "knowledge" },
 ] as const;
 
 export function App() {
@@ -37,7 +29,7 @@ function AppFrame() {
         <Link to="/playground" aria-current={location.pathname === "/playground" ? "page" : undefined}>
           {t("playground")}
         </Link>
-        {ADMIN_NAV.map((item) => (
+        {PRIMARY_NAV.map((item) => (
           <Link
             key={item.to}
             to={item.to}
