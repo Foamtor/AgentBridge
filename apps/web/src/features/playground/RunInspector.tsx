@@ -62,7 +62,7 @@ export function RunInspector(props: Props) {
   }
 
   return <aside className="run-inspector">
-    <div className="inspector-heading"><h2>{copy.inspector}</h2>{run ? <span className={`status-pill status-${run.status}`}>{run.status}</span> : null}</div>
+    <div className="inspector-heading"><h2>{copy.inspector}</h2>{run ? <span className={`status-pill status-${run.status}`}>{statusLabel(copy, run.status)}</span> : null}</div>
     <div className="inspector-tabs" role="tablist" aria-label={copy.inspector}>{tabs.map(([key, label], index) => <button type="button" id={`inspector-tab-${key}`} role="tab" aria-selected={tab === key} aria-controls={`inspector-panel-${key}`} tabIndex={tab === key ? 0 : -1} key={key} onClick={() => setTab(key)} onKeyDown={(event) => onTabKeyDown(event, index)}>{label}</button>)}</div>
     {props.loading ? <p className="inspector-empty" role="status">{copy.loadingRun}</p> : !run || !diagnostics ? <p className="inspector-empty">{copy.noSelection}</p> : <div className="inspector-body" id={`inspector-panel-${tab}`} role="tabpanel" aria-labelledby={`inspector-tab-${tab}`} tabIndex={0}>
       {tab === "overview" ? <Overview copy={copy} run={run} diagnostics={diagnostics} /> : null}
@@ -89,11 +89,22 @@ function Timing({ copy, diagnostics }: { copy: PlaygroundCopy; diagnostics: RunD
 
 function Tools({ copy, diagnostics }: { copy: PlaygroundCopy; diagnostics: RunDiagnostics }) {
   if (!diagnostics.tools.length) return <p className="inspector-empty">{copy.noTools}</p>;
-  return <ol className="tool-traces">{diagnostics.tools.map((tool) => <li key={tool.tool_call_id}><div><strong>{tool.name ?? "unknown"}</strong><span>{formatDuration(tool.duration_ms)}</span></div><code>{tool.tool_call_id}</code><details><summary>args</summary><pre>{JSON.stringify(tool.args, null, 2)}</pre></details><details><summary>result</summary><pre>{JSON.stringify(tool.result, null, 2)}</pre></details></li>)}</ol>;
+  return <ol className="tool-traces">{diagnostics.tools.map((tool) => <li key={tool.tool_call_id}><div><strong>{tool.name ?? copy.unknownTool}</strong><span>{formatDuration(tool.duration_ms)}</span></div><code>{tool.tool_call_id}</code><details><summary>{copy.arguments}</summary><pre>{JSON.stringify(tool.args, null, 2)}</pre></details><details><summary>{copy.toolResult}</summary><pre>{JSON.stringify(tool.result, null, 2)}</pre></details></li>)}</ol>;
 }
 
 function Contract({ copy, diagnostics }: { copy: PlaygroundCopy; diagnostics: RunDiagnostics }) {
-  return <ul className="contract-checks">{diagnostics.assertions.map((item) => <li key={item.key} data-pass={item.passed}><span aria-hidden="true">{item.passed ? "✓" : "×"}</span><div><strong>{item.key}</strong><small>{item.detail}</small></div><em>{item.passed ? copy.passed : copy.failed}</em></li>)}</ul>;
+  return <ul className="contract-checks">{diagnostics.assertions.map((item) => <li key={item.key} data-pass={item.passed}><span aria-hidden="true">{item.passed ? "✓" : "×"}</span><div><strong>{copy.checkName(item.key)}</strong><small>{item.detail}</small></div><em>{item.passed ? copy.passed : copy.failed}</em></li>)}</ul>;
+}
+
+function statusLabel(copy: PlaygroundCopy, status: string): string {
+  return ({
+    done: copy.statusDone,
+    complete: copy.statusDone,
+    awaiting_approval: copy.statusAwaitingApproval,
+    waiting_approval: copy.statusAwaitingApproval,
+    error: copy.statusError,
+    cancelled: copy.statusCancelled,
+  } as Record<string, string>)[status] ?? status;
 }
 
 function Raw({ copy, events, onExport, exporting }: { copy: PlaygroundCopy; events: StreamEvent[]; onExport: () => Promise<void>; exporting?: boolean }) {
