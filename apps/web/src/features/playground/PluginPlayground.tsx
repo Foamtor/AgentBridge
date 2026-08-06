@@ -116,6 +116,12 @@ export function PluginPlayground() {
     if (match) void selectRun(match);
   }, [runs, searchParams, selectRun, selectedRun?.run_id]);
 
+  useEffect(() => {
+    const requestedRoute = searchParams.get("route");
+    if (!requestedRoute) return;
+    setRequest((current) => current.route === requestedRoute ? current : { ...current, route: requestedRoute });
+  }, [searchParams]);
+
   function parseExtra(): Record<string, unknown> | null {
     try {
       const parsed: unknown = JSON.parse(extraText || "{}");

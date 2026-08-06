@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { adminFetch } from "./adminFetch";
 
 type ToolRow = {
@@ -16,6 +17,8 @@ type ToolsResponse = {
 };
 
 export function ToolsPage() {
+  const [searchParams] = useSearchParams();
+  const routeFilter = searchParams.get("route") ?? "";
   const [data, setData] = useState<ToolsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<ToolRow | null>(null);
@@ -47,11 +50,13 @@ export function ToolsPage() {
     }
   }
 
+  const visibleTools = data?.tools.filter((tool) => !routeFilter || tool.domain === routeFilter) ?? [];
+
   return (
     <main className="page">
       <header>
         <h1>Tools</h1>
-        <p className="lede">工具目录与权限矩阵；试调需后端开启 ADMIN_TOOL_INVOKE_ENABLED。</p>
+        <p className="lede">{routeFilter ? `仅显示 ${routeFilter} 的工具与权限；` : "工具目录与权限矩阵；"}试调需后端开启 ADMIN_TOOL_INVOKE_ENABLED。</p>
       </header>
       {error ? <p className="error">{error}</p> : null}
       {!data && !error ? <p className="muted">加载中…</p> : null}
@@ -68,7 +73,7 @@ export function ToolsPage() {
               </tr>
             </thead>
             <tbody>
-              {data.tools.map((tool) => (
+              {visibleTools.map((tool) => (
                 <tr key={`${tool.domain}:${tool.name}`}>
                   <td>{tool.name}</td>
                   <td>{tool.domain}</td>
@@ -94,7 +99,7 @@ export function ToolsPage() {
               </tr>
             </thead>
             <tbody>
-              {Object.entries(data.matrix.tools).map(([toolName, row]) => (
+              {Object.entries(data.matrix.tools).filter(([toolName]) => visibleTools.some((tool) => tool.name === toolName)).map(([toolName, row]) => (
                 <tr key={toolName}>
                   <td>{toolName}</td>
                   {data.matrix.roles.map((role) => (

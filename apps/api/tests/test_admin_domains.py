@@ -33,7 +33,32 @@ def test_admin_domains_returns_object_shape(client: TestClient) -> None:
         assert "description" in entry
         assert "tools" in entry
         assert "required_permissions" in entry
+        assert "required_permissions_all" in entry
+        assert "tool_details" in entry
+        assert "approval_actions" in entry
         assert "graph_registered" in entry
+
+
+def test_admin_domains_exposes_per_tool_rules_and_approval_actions(
+    client: TestClient,
+) -> None:
+    body = client.get("/admin/domains").json()
+    catalog = {item["name"]: item for item in body["domains"]}
+
+    work_order = catalog["work_order_ops"]
+    draft = next(
+        item for item in work_order["tool_details"] if item["name"] == "prepare_work_order_draft"
+    )
+    assert draft["required_permissions_all"] == ["workorder:create", "workorder:assign"]
+    assert work_order["approval_actions"] == [
+        {
+            "type": "work_order_ops.create_v1",
+            "resource": {
+                "name": "create_work_order",
+                "required_permissions_all": ["workorder:create", "workorder:assign"],
+            },
+        }
+    ]
 
 
 def test_admin_domains_forbidden_without_perm(monkeypatch: pytest.MonkeyPatch) -> None:
