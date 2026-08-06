@@ -36,8 +36,8 @@ export function RequestComposer(props: Props) {
     </div></div>
     <div className="request-fields">
       <label><span>{copy.route}</span><select value={request.route} onChange={(event) => patch({ route: event.target.value })}>
-        {props.routes.map((route) => <option value={route.name} key={route.name}>{route.name}</option>)}
-        {!props.routes.some((route) => route.name === request.route) ? <option value={request.route}>{request.route}</option> : null}
+        {props.routes.map((route) => <option value={route.name} key={route.name}>{copy.routeName(route.name, route.description)} ({route.name})</option>)}
+        {!props.routes.some((route) => route.name === request.route) ? <option value={request.route}>{copy.routeName(request.route)} ({request.route})</option> : null}
       </select></label>
       <label><span>{copy.thread}</span><input value={request.thread_id} onChange={(event) => patch({ thread_id: event.target.value })} /></label>
       <label><span>{copy.model}</span><select value={request.model} onChange={(event) => patch({ model: event.target.value })}><option value="default">default · Fake / environment</option>{props.models.map((model) => <option value={model.alias} key={model.alias}>{model.alias}{model.model_name ? ` · ${model.model_name}` : ""}</option>)}{request.model !== "default" && !props.models.some((model) => model.alias === request.model) ? <option value={request.model}>{request.model}</option> : null}</select></label>

@@ -58,7 +58,7 @@ export function HistoryRail(props: Props) {
         <h3 title={threadId}>{shortId(threadId)}</h3>
         {runs.map((run) => <button type="button" className="run-row" data-selected={props.selectedRunId === run.run_id} key={run.run_id} onClick={() => props.onSelect(run)}>
           <span className={`state-mark state-${run.status}`} aria-hidden="true" />
-          <span><strong title={run.route}>{run.route}</strong><small title={statusLabel[run.status] ?? run.status}>{statusLabel[run.status] ?? run.status} · {shortId(run.run_id)}</small></span>
+          <span><strong title={run.route}>{copy.routeName(run.route)}</strong><small title={`${run.route} · ${statusLabel[run.status] ?? run.status}`}>{statusLabel[run.status] ?? run.status} · {shortId(run.run_id)}</small></span>
           <time>{run.started_at ? new Date(run.started_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--:--"}</time>
         </button>)}
       </section>)}
