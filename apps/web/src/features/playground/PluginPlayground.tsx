@@ -34,6 +34,7 @@ export function PluginPlayground() {
   const [request, setRequest] = useState<ChatRequest>(initialRequest);
   const [extraText, setExtraText] = useState("{}");
   const [routes, setRoutes] = useState<Array<{ name: string; description: string }>>([{ name: "echo", description: "" }]);
+  const [models, setModels] = useState<Array<{ alias: string; model_name?: string; kind?: string }>>([]);
   const [runs, setRuns] = useState<RunRecord[]>([]);
   const [selectedRun, setSelectedRun] = useState<RunRecord | null>(null);
   const [events, setEvents] = useState<StreamEvent[]>([]);
@@ -66,14 +67,16 @@ export function PluginPlayground() {
   const refreshHistory = useCallback(async () => {
     setHistoryLoading(true);
     try {
-      const [runPage, domainPage, aggregate] = await Promise.all([
+      const [runPage, domainPage, aggregate, modelPage] = await Promise.all([
         playgroundFetch<{ items: RunRecord[] }>("/admin/runs?limit=100"),
         playgroundFetch<{ domains: Array<{ name: string; description: string }> }>("/admin/domains"),
         playgroundFetch<DiagnosticSummary>("/admin/diagnostics"),
+        playgroundFetch<{ models: Array<{ alias: string; model_name?: string; kind?: string }> }>("/models"),
       ]);
       setRuns(runPage.items);
       if (domainPage.domains.length) setRoutes(domainPage.domains);
       setSummary(aggregate);
+      setModels(Array.isArray(modelPage.models) ? modelPage.models : []);
     } catch (reason) {
       setError(`${copy.requestFailed}: ${String(reason)}`);
     } finally {
@@ -238,7 +241,7 @@ export function PluginPlayground() {
     <div className="playground-grid">
       <HistoryRail copy={copy} runs={runs} selectedRunId={selectedRun?.run_id} search={search} status={status} summary={summary} loading={historyLoading} onSearch={setSearch} onStatus={setStatus} onSelect={(run) => void selectRun(run)} onRefresh={() => void refreshHistory()} />
       <div className="playground-main">
-        <RequestComposer copy={copy} request={request} extraText={extraText} extraValid={extraValid} routes={routes} busy={busy} error={error} copied={copied} onRequest={setRequest} onExtraText={setExtraText} onSend={() => void send()} onCancel={() => void cancel()} onDoubleFire={() => void doubleFire()} onNewThread={() => setRequest((current) => ({ ...current, thread_id: newThreadId() }))} onLoad={loadSelectedRequest} onCopyCurl={() => void copyCurl()} canLoad={Boolean(selectedRun?.request)} />
+        <RequestComposer copy={copy} request={request} extraText={extraText} extraValid={extraValid} routes={routes} models={models} busy={busy} error={error} copied={copied} onRequest={setRequest} onExtraText={setExtraText} onSend={() => void send()} onCancel={() => void cancel()} onDoubleFire={() => void doubleFire()} onNewThread={() => setRequest((current) => ({ ...current, thread_id: newThreadId() }))} onLoad={loadSelectedRequest} onCopyCurl={() => void copyCurl()} canLoad={Boolean(selectedRun?.request)} />
         <section className="conversation-zone"><div className="section-title"><h2>{copy.answer}</h2>{busy ? <span className="live-indicator"><i />{copy.live}</span> : null}</div>{answer ? <div className="assistant-answer">{answer}</div> : <p className="empty-output">{copy.emptyAnswer}</p>}
           {selectedRun?.route === "work_order_ops" && events.length ? <details className="business-renderer"><summary>{copy.workOrderResult}</summary><BusinessResults events={events} token="" onPreset={() => undefined} showPresets={false} /></details> : null}
           {extensionEvents.length ? <details className="structured-extensions"><summary>{copy.extensions} ({extensionEvents.length})</summary>{extensionEvents.map((event, index) => <div key={event.event_id ?? index}><code>{event.type}</code><pre>{JSON.stringify(event.data, null, 2)}</pre></div>)}</details> : null}

@@ -26,11 +26,13 @@ export function useVerificationRun() {
   const [threadId] = useState(newThreadId);
   const [scenario, setScenario] = useState<VerificationScenario>("chart");
   const [mode, setMode] = useState<VerificationMode>("fake");
+  const [model, setModel] = useState("default");
   const [verification, dispatch] = useReducer(verificationReducer, initialVerificationState);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const definition = SCENARIOS[scenario];
+  const query = mode === "real" && scenario === "draft" ? REAL_DRAFT_QUERY : definition.query;
   const streamUrl = useMemo(() => `${apiBase()}/chat/stream`, []);
   const cancelUrl = useMemo(() => `${apiBase()}/chat/cancel`, []);
 
@@ -41,12 +43,11 @@ export function useVerificationRun() {
     setError(null);
     dispatch({ type: "start" });
     try {
-      const query = mode === "real" && scenario === "draft" ? REAL_DRAFT_QUERY : definition.query;
       const extra = mode === "real" ? { case_mode: "real" } : { ...definition.extra, case_mode: "fake" };
       await streamChatSse(streamUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query, thread_id: threadId, route: "work_order_ops", extra }),
+        body: JSON.stringify({ query, thread_id: threadId, route: "work_order_ops", model, extra }),
       }, {
         onEvent: (event) => dispatch({ type: "event", event }),
         onError: (cause) => setError(String(cause)),
@@ -69,5 +70,5 @@ export function useVerificationRun() {
     }
   }
 
-  return { scenario, setScenario, mode, setMode, threadId, verification, busy, error, run, cancel };
+  return { scenario, setScenario, mode, setMode, model, setModel, threadId, query, verification, busy, error, run, cancel };
 }

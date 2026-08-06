@@ -8,6 +8,7 @@ type Props = {
   request: ChatRequest;
   extraText: string;
   routes: RouteOption[];
+  models: Array<{ alias: string; model_name?: string; kind?: string }>;
   busy: boolean;
   error: string | null;
   copied: boolean;
@@ -39,7 +40,7 @@ export function RequestComposer(props: Props) {
         {!props.routes.some((route) => route.name === request.route) ? <option value={request.route}>{request.route}</option> : null}
       </select></label>
       <label><span>{copy.thread}</span><input value={request.thread_id} onChange={(event) => patch({ thread_id: event.target.value })} /></label>
-      <label><span>{copy.model}</span><input value={request.model} onChange={(event) => patch({ model: event.target.value })} /></label>
+      <label><span>{copy.model}</span><select value={request.model} onChange={(event) => patch({ model: event.target.value })}><option value="default">default · Fake / environment</option>{props.models.map((model) => <option value={model.alias} key={model.alias}>{model.alias}{model.model_name ? ` · ${model.model_name}` : ""}</option>)}{request.model !== "default" && !props.models.some((model) => model.alias === request.model) ? <option value={request.model}>{request.model}</option> : null}</select></label>
     </div>
     <p className="route-hint">{selectedRoute?.description || copy.routeHint}</p>
     <label className="query-field"><span>{copy.query}<small>{copy.queryHint}</small></span><textarea rows={4} value={request.query} onChange={(event) => patch({ query: event.target.value })} onKeyDown={(event) => { if ((event.ctrlKey || event.metaKey) && event.key === "Enter" && !props.busy && request.query.trim()) { event.preventDefault(); props.onSend(); } if (event.key === "Escape" && props.busy) { event.preventDefault(); props.onCancel(); } }} /></label>

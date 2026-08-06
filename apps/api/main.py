@@ -25,6 +25,7 @@ from routes.console import router as console_router
 from routes.chat import router as chat_router
 from routes.health import router as health_router
 from routes.metrics import router as metrics_router
+from routes.models import router as models_router
 from routes.ready import router as ready_router
 from routes.runs import router as runs_router
 from routes.threads import router as threads_router
@@ -65,6 +66,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(console_router)
     app.include_router(metrics_router)
+    app.include_router(models_router)
     app.include_router(chat_router)
     app.include_router(approvals_router)
     app.include_router(admin_router)

@@ -120,10 +120,9 @@ def _build_observability_stores(settings: Settings) -> tuple[Any, Any, Any, Any]
     raise ValueError("unsupported observability store backend")
 
 
-def _build_llm_gateway(settings: Settings) -> Any:
-    """Build the configured model gateway; fake remains an explicit offline mode."""
+def _build_llm_models(settings: Settings) -> tuple[dict[str, Any], set[str]]:
+    """Build host-owned fallback models; persistent aliases are overlaid later."""
     from agentbridge_core.adapters.alias_llm_gateway import AliasLLMGateway
-    from agentbridge_core.adapters.direct_llm_gateway import DirectLLMGateway
     from agentbridge_core.adapters.fake_chat_model import FakeChatModel
 
     if settings.llm_mode == "openai_compatible":
@@ -147,16 +146,30 @@ def _build_llm_gateway(settings: Settings) -> Any:
         default_model = FakeChatModel(["direct-ok"])
     else:
         raise ValueError("unsupported LLM_MODE; use fake or openai_compatible")
-    if settings.llm_backend == "gateway":
-        # Aliases are host-wired; domains only pass model= alias strings.
-        return AliasLLMGateway(
-            {
-                "default": default_model,
-                "fast": default_model,
-            },
-            default_alias="default",
-        )
-    return DirectLLMGateway(default_model)
+    models = {"default": default_model, "fast": default_model}
+    return models, ({"default", "fast"} if settings.llm_mode == "openai_compatible" else set())
+
+
+def _build_llm_gateway(settings: Settings) -> tuple[Any, dict[str, Any], set[str]]:
+    """Always expose aliases so operator-managed models can be selected safely."""
+    from agentbridge_core.adapters.alias_llm_gateway import AliasLLMGateway
+
+    models, real_aliases = _build_llm_models(settings)
+    return AliasLLMGateway(models, default_alias="default"), models, real_aliases
+
+
+def _build_model_config_store(settings: Settings) -> Any:
+    if settings.fake_runtime:
+        from testing.fake_model_config import FakeModelConfigStore
+
+        return FakeModelConfigStore()
+    if not settings.model_config_encryption_key.strip():
+        from adapters.unavailable_model_config_store import UnavailableModelConfigStore
+
+        return UnavailableModelConfigStore()
+    from adapters.postgres_model_config_store import PostgresModelConfigStore
+
+    return PostgresModelConfigStore(_resolve_postgres_dsn(settings))
 
 
 def _build_redis(settings: Settings) -> Any | None:
@@ -226,6 +239,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     approval_store = _build_approval_store(settings)
     console_auth_store = _build_console_auth_store(settings)
     console_auth_service: Any | None = None
+    model_config_store = _build_model_config_store(settings)
+    model_config_service: Any | None = None
     from adapters.approval_action_registry import ApprovalActionRegistry
 
     approval_actions = ApprovalActionRegistry()
@@ -277,7 +292,33 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             approval_actions=approval_actions,
             data_source=data_source,
         )
-        llm_gateway = _build_llm_gateway(settings)
+        llm_gateway, base_models, base_real_aliases = _build_llm_gateway(settings)
+        from admin.model_config_service import ModelConfigService
+
+        def build_configured_model(record: dict[str, Any], api_key: str) -> Any:
+            try:
+                from langchain_openai import ChatOpenAI
+            except ImportError as exc:  # pragma: no cover - packaging failure
+                raise RuntimeError(
+                    "configured models require agentbridge-core[rag]"
+                ) from exc
+            return ChatOpenAI(
+                api_key=api_key,
+                base_url=str(record["api_base"]).rstrip("/"),
+                model=str(record["model_name"]),
+                temperature=float(record["temperature"]),
+            )
+
+        await model_config_store.setup()
+        model_config_service = ModelConfigService(
+            model_config_store,
+            encryption_key=settings.model_config_encryption_key,
+            build_model=build_configured_model,
+            replace_gateway_models=llm_gateway.replace_models,
+            base_models=base_models,
+            base_real_aliases=base_real_aliases,
+        )
+        await model_config_service.refresh_runtime()
         from adapters.prometheus_metrics import PrometheusMetrics
         from observability.tracing import make_run_span_factory
 
@@ -343,6 +384,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.run_annotation_store = run_annotation_store
         app.state.approval_store = approval_store
         app.state.console_auth_service = console_auth_service
+        app.state.model_config_service = model_config_service
         app.state.approval_actions = approval_actions
         app.state.policy = policy
         app.state.config_provider = config_provider
@@ -394,6 +436,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                     result = close_console_auth_store()
                     if hasattr(result, "__await__"):
                         await result
+            close_model_config_store = getattr(model_config_store, "close", None)
+            if close_model_config_store is not None:
+                result = close_model_config_store()
+                if hasattr(result, "__await__"):
+                    await result
             for store in (
                 event_log,
                 message_store,

@@ -12,6 +12,7 @@ type Props = {
   token: string;
   onPreset: (preset: "list" | "chart" | "draft") => void;
   showPresets?: boolean;
+  showHeading?: boolean;
 };
 
 use([BarChart, LineChart, PieChart, GridComponent, LegendComponent, TitleComponent, TooltipComponent, CanvasRenderer]);
@@ -50,7 +51,7 @@ function Chart({ option }: { option: unknown }) {
   return <div className="golden-chart" ref={node} aria-label="Work-order chart" />;
 }
 
-export function GoldenCasePanel({ events, token, onPreset, showPresets = true }: Props) {
+export function GoldenCasePanel({ events, token, onPreset, showPresets = true, showHeading = true }: Props) {
   const { t } = useI18n();
   const list = eventData(events, "x.work_order_ops.list");
   const chart = eventData(events, "x.work_order_ops.chart");
@@ -86,7 +87,7 @@ export function GoldenCasePanel({ events, token, onPreset, showPresets = true }:
 
   return (
     <section className="golden-case" aria-label="Work-order golden case">
-      <div className="golden-heading">
+      {showHeading ? <div className="golden-heading">
         <div>
           <h2>{t("workOrderCase")}</h2>
           <p className="muted">{t("workOrderCaseDescription")}</p>
@@ -96,7 +97,7 @@ export function GoldenCasePanel({ events, token, onPreset, showPresets = true }:
           <button type="button" onClick={() => onPreset("chart")}>{t("chart")}</button>
           <button type="button" onClick={() => onPreset("draft")}>{t("draft")}</button>
         </div> : null}
-      </div>
+      </div> : null}
 
       {rows.length ? (
         <div className="golden-card">

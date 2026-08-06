@@ -3,6 +3,7 @@ import { ProtectedRoute } from "../features/auth/ProtectedRoute";
 import { LoginPage } from "../features/auth/LoginPage";
 import { ChangePasswordPage } from "../features/auth/ChangePasswordPage";
 import { ConfigPage } from "../features/admin/ConfigPage";
+import { ModelsPage } from "../features/admin/ModelsPage";
 import { DomainsPage } from "../features/admin/DomainsPage";
 import { ForbiddenPage } from "../features/admin/ForbiddenPage";
 import { OverviewPage } from "../features/admin/OverviewPage";
@@ -29,6 +30,7 @@ export function AppRoutes() {
         <Route path="/admin" element={<OverviewPage />} />
         <Route path="/domains" element={<DomainsPage />} />
         <Route path="/config" element={<ConfigPage />} />
+        <Route path="/models" element={<ModelsPage />} />
         <Route path="/tools" element={<ToolsPage />} />
         <Route path="/runs" element={<RunsPage />} />
         <Route path="/prompts" element={<PromptsPage />} />

@@ -6,6 +6,7 @@ type Props = {
   token: string;
   onPreset: (preset: "list" | "chart" | "draft") => void;
   showPresets?: boolean;
+  showHeading?: boolean;
 };
 
 /** Stable business-result boundary for the verification workbench. */

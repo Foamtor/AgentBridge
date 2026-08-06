@@ -14,6 +14,7 @@ dist/
 .DS_Store
 .impeccable.md
 apps/web/pnpm-lock.yaml
+.pnpm-store/
 .worktrees/
 # Internal planning artifacts are kept locally but are not part of the public repository.
 docs/superpowers/
