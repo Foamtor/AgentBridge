@@ -405,6 +405,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             tools_registry=tools,
             graph_names=set(graphs.keys()),
             meta_map=DOMAIN_META_MAP,
+            approval_actions=approval_actions,
         )
         # Expose checkpointer factory for /ready (memory always "ready" after setup).
         app.state.checkpointers = checkpointers

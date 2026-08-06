@@ -24,6 +24,15 @@ class ApprovalActionRegistry:
         _, resource = self._item_for(route, action)
         return dict(resource)
 
+    def list_for_route(self, route: str) -> list[dict[str, Any]]:
+        """Return non-executable approval metadata for the admin catalog."""
+        actions = [
+            {"type": action_type, "resource": dict(resource)}
+            for (item_route, action_type), (_, resource) in self._items.items()
+            if item_route == route
+        ]
+        return sorted(actions, key=lambda item: str(item["type"]))
+
     async def execute(
         self,
         *,
