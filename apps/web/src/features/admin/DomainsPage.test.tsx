@@ -20,10 +20,10 @@ describe("Loaded business capabilities", () => {
 
     render(<MemoryRouter><DomainsPage /></MemoryRouter>);
 
-    expect(await screen.findByRole("heading", { name: "已加载的业务能力" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "已加载插件" })).toBeInTheDocument();
     expect(screen.getByText("这个插件没有公开给模型的工具；它通过自身流程图完成处理，并非缺少配置。")).toBeInTheDocument();
     expect(screen.getAllByText("必须同时具备：workorder:create、workorder:assign")).toHaveLength(2);
-    expect(screen.getByRole("link", { name: "在调试场测试 ->" })).toHaveAttribute("href", "/playground");
+    expect(screen.getByRole("link", { name: "进入插件调试 ->" })).toHaveAttribute("href", "/playground");
     expect(screen.getAllByRole("link", { name: "查看工具权限" })[0]).toHaveAttribute("href", "/tools?route=demo_approval_write");
   });
 });

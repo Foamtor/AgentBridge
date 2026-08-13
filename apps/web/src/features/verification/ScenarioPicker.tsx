@@ -5,14 +5,15 @@ type Props = { value: VerificationScenario; disabled: boolean; onChange: (scenar
 
 const scenarios: Array<{
   id: VerificationScenario;
-  title: "scenarioListTitle" | "scenarioChartTitle" | "scenarioKnowledgeTitle" | "scenarioDraftTitle";
-  problem: "scenarioListProblem" | "scenarioChartProblem" | "scenarioKnowledgeProblem" | "scenarioDraftProblem";
-  expected: "scenarioListExpected" | "scenarioChartExpected" | "scenarioKnowledgeExpected" | "scenarioDraftExpected";
+  title: "scenarioListTitle" | "scenarioChartTitle" | "scenarioKnowledgeTitle" | "scenarioDraftTitle" | "scenarioRoutingTitle";
+  problem: "scenarioListProblem" | "scenarioChartProblem" | "scenarioKnowledgeProblem" | "scenarioDraftProblem" | "scenarioRoutingProblem";
+  expected: "scenarioListExpected" | "scenarioChartExpected" | "scenarioKnowledgeExpected" | "scenarioDraftExpected" | "scenarioRoutingExpected";
 }> = [
   { id: "list", title: "scenarioListTitle", problem: "scenarioListProblem", expected: "scenarioListExpected" },
   { id: "chart", title: "scenarioChartTitle", problem: "scenarioChartProblem", expected: "scenarioChartExpected" },
   { id: "knowledge", title: "scenarioKnowledgeTitle", problem: "scenarioKnowledgeProblem", expected: "scenarioKnowledgeExpected" },
   { id: "draft", title: "scenarioDraftTitle", problem: "scenarioDraftProblem", expected: "scenarioDraftExpected" },
+  { id: "routing", title: "scenarioRoutingTitle", problem: "scenarioRoutingProblem", expected: "scenarioRoutingExpected" },
 ];
 
 export function ScenarioPicker({ value, disabled, onChange }: Props) {

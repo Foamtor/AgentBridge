@@ -62,11 +62,21 @@ def _chart_type(query: str) -> str:
     return "bar"
 
 
-def _chart_payload(rows: list[dict[str, Any]], query: str) -> dict[str, Any]:
-    categories = sorted({str(row.get("status") or "unknown") for row in rows})
-    values = [
-        sum(row.get("status") == category for row in rows) for category in categories
-    ]
+def _chart_payload(
+    rows: list[dict[str, Any]],
+    query: str,
+    *,
+    statistics: dict[str, int] | None = None,
+) -> dict[str, Any]:
+    if statistics is not None:
+        categories = sorted(statistics)
+        values = [statistics[category] for category in categories]
+    else:
+        categories = sorted({str(row.get("status") or "unknown") for row in rows})
+        values = [
+            sum(row.get("status") == category for row in rows)
+            for category in categories
+        ]
     chart_type = _chart_type(query)
     series = [{"name": "工单数", "data": values}]
     echarts_series: dict[str, Any] = {
@@ -197,7 +207,11 @@ async def _plan_reads_model(
         if name not in available_names:
             continue
         call_id = str(item.get("id") or f"tc-{_run_id(config)}-{name}-{index}")
-        call_ids[name] = call_id
+        call_key = name
+        if name == "work_order_statistics":
+            dimension = str((item.get("args") or {}).get("dimension") or "")
+            call_key = f"{name}:{dimension}"
+        call_ids[call_key] = call_id
         tool_calls.append(
             {
                 "name": name,
@@ -329,11 +343,20 @@ async def _plan_draft(
             "current_draft_call_id": None,
         }
     response = await gateway.chat(
-        [{"role": "user", "content": _query_text(state)}],
+        [
+            {
+                "role": "system",
+                "content": (
+                    "Use prepare_work_order_draft to create the draft now. "
+                    "Supply title, priority, assignee_id, and ledger_summary. "
+                    "Do not return prose."
+                ),
+            },
+            {"role": "user", "content": _query_text(state)},
+        ],
         ctx=ctx,
         model=state.get("model_alias"),
         tools=[draft_tool],
-        tool_choice=_DRAFT_TOOL_NAME,
     )
     raw_args = _model_draft_args(response)
     if raw_args is None:
@@ -401,12 +424,40 @@ def _tool_results(
     return []
 
 
+def _has_tool_result(
+    state: WorkOrderOpsState,
+    name: str,
+    call_id: str | None,
+) -> bool:
+    return bool(_tool_results(state, name, call_id))
+
+
 def _read_rows(state: WorkOrderOpsState) -> list[dict[str, Any]]:
     call_id = (state.get("current_read_call_ids") or {}).get("list_work_orders")
     for value, failed in _tool_results(state, "list_work_orders", call_id):
         if not failed and isinstance(value, list):
             return [row for row in value if isinstance(row, dict)]
     return []
+
+
+def _has_read_result(state: WorkOrderOpsState, name: str) -> bool:
+    call_id = (state.get("current_read_call_ids") or {}).get(name)
+    return _has_tool_result(state, name, call_id)
+
+
+def _read_statistics(state: WorkOrderOpsState) -> dict[str, int] | None:
+    call_ids = state.get("current_read_call_ids") or {}
+    call_id = call_ids.get("work_order_statistics:status") or call_ids.get(
+        "work_order_statistics"
+    )
+    for value, failed in _tool_results(state, "work_order_statistics", call_id):
+        if not failed and isinstance(value, dict):
+            return {
+                str(category): count
+                for category, count in value.items()
+                if isinstance(count, int) and not isinstance(count, bool)
+            }
+    return None
 
 
 def _read_citations(state: WorkOrderOpsState) -> list[dict[str, Any]]:
@@ -443,14 +494,19 @@ def _read_draft(
     return None, True
 
 
-def _present(state: WorkOrderOpsState, config: RunnableConfig | None = None) -> dict[str, Any]:
+def _present(
+    state: WorkOrderOpsState, config: RunnableConfig | None = None
+) -> dict[str, Any]:
     query = _query_text(state)
     raw_rows = _read_rows(state)
+    statistics = _read_statistics(state)
     safe_rows = [
         {key: row.get(key) for key in SAFE_ORDER_FIELDS} for row in raw_rows[:100]
     ]
-    extensions: list[dict[str, Any]] = [
-        {
+    extensions: list[dict[str, Any]] = []
+    if _has_read_result(state, "list_work_orders"):
+        extensions.append(
+            {
             "type": "x.work_order_ops.list",
             "data": {
                 "schema_version": 1,
@@ -464,16 +520,29 @@ def _present(state: WorkOrderOpsState, config: RunnableConfig | None = None) -> 
                 "total": len(raw_rows),
                 "truncated": len(raw_rows) > len(safe_rows),
             },
-        },
-        {"type": "x.work_order_ops.chart", "data": _chart_payload(safe_rows, query)},
-        {
+            }
+        )
+    if statistics is not None:
+        extensions.append(
+            {
+            "type": "x.work_order_ops.chart",
+            "data": _chart_payload(
+                safe_rows,
+                query,
+                statistics=statistics,
+            ),
+            }
+        )
+    if _has_read_result(state, "search_work_order_knowledge"):
+        extensions.append(
+            {
             "type": "x.bridge.citation",
             "data": {
                 "citations": _read_citations(state),
                 "route": "work_order_ops",
             },
-        },
-    ]
+            }
+        )
     prompt_evidence = state.get("prompt_evidence")
     if isinstance(prompt_evidence, list) and prompt_evidence:
         extensions.append(
@@ -545,7 +614,9 @@ def build_work_order_ops_graph(
     ) -> dict[str, Any]:
         return await _plan_draft(state, config, draft_tool=draft_tool)
 
-    async def plan_reads(state: WorkOrderOpsState, config: RunnableConfig) -> dict[str, Any]:
+    async def plan_reads(
+        state: WorkOrderOpsState, config: RunnableConfig
+    ) -> dict[str, Any]:
         if state.get("use_model_planner"):
             return await _plan_reads_model(
                 state,
@@ -570,6 +641,7 @@ def build_work_order_ops_graph(
             handle_tool_errors=_DRAFT_VALIDATION_MESSAGE,
         ),
     )
+
     def present(state: WorkOrderOpsState, config: RunnableConfig) -> dict[str, Any]:
         return _present(state, config)
 

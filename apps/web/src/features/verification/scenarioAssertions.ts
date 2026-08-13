@@ -1,10 +1,11 @@
 import type { StreamEvent } from "../../lib/sseClient";
 import type { VerificationScenario } from "./useVerificationRun";
+import type { RouteDecision } from "./useVerificationRun";
 
 export type ScenarioCheckStatus = "pass" | "fail" | "pending";
 
 export type ScenarioCheck = {
-  id: "list" | "chart" | "citation" | "draft" | "approval" | "created_once";
+  id: "list" | "chart" | "citation" | "draft" | "approval" | "created_once" | "route" | "route_tools";
   status: ScenarioCheckStatus;
   evidenceTypes: string[];
 };
@@ -41,7 +42,18 @@ function hasCitations(event: StreamEvent): boolean {
   return Array.isArray(event.data?.citations) && event.data.citations.length > 0;
 }
 
-export function evaluateScenario(scenario: VerificationScenario, events: StreamEvent[]): ScenarioCheck[] {
+export function evaluateScenario(scenario: VerificationScenario, events: StreamEvent[], routeDecision?: RouteDecision | null): ScenarioCheck[] {
+  if (scenario === "routing") {
+    const routePassed = routeDecision?.route === "work_order_ops";
+    const expectedTools = routeDecision?.expected_tools ?? [];
+    const calledTools = new Set(events.filter((event) => event.type === "tool_call").map((event) => String(event.data?.name ?? "")));
+    const toolsPassed = expectedTools.length > 0 && expectedTools.every((name) => calledTools.has(name));
+    const terminal = isTerminal(events);
+    return [
+      { id: "route", status: routePassed ? "pass" : routeDecision ? "fail" : "pending", evidenceTypes: ["console.route"] },
+      { id: "route_tools", status: toolsPassed ? "pass" : routeDecision?.route && terminal ? "fail" : routeDecision?.route ? "pending" : "fail", evidenceTypes: ["tool_call"] },
+    ];
+  }
   if (scenario === "list") {
     return [requiredCheck("list", events, ["x.work_order_ops.list"], hasRows)];
   }

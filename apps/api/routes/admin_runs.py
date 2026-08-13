@@ -70,8 +70,10 @@ def _filter_runs(
     return out
 
 
-def _project_run(run: dict[str, Any]) -> dict[str, Any]:
-    return {
+def _project_run(
+    run: dict[str, Any], diagnostics: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    result = {
         "run_id": run.get("run_id"),
         "thread_id": run.get("thread_id"),
         "route": run.get("route"),
@@ -81,6 +83,16 @@ def _project_run(run: dict[str, Any]) -> dict[str, Any]:
         "started_at": run.get("started_at"),
         "ended_at": run.get("ended_at"),
     }
+    if diagnostics is not None:
+        result.update(
+            {
+                "tool_count": diagnostics.get("tool_count", 0),
+                "approval_status": diagnostics.get("approval_status"),
+                "approval_id": diagnostics.get("approval_id"),
+                "error": diagnostics.get("error"),
+            }
+        )
+    return result
 
 
 @router.get("/runs")
@@ -116,7 +128,14 @@ async def list_runs(
                 if _before_cursor(r, cursor_started, cursor_run_id)
             ]
     page = filtered[: limit + 1]
-    items = [_project_run(r) for r in page[:limit]]
+    items = []
+    for run in page[:limit]:
+        run_id = str(run.get("run_id") or "")
+        diagnostics = None
+        if run_id:
+            events = await request.app.state.event_log.list(run_id, tenant_id=tenant_id)
+            diagnostics = build_run_diagnostics(events)
+        items.append(_project_run(run, diagnostics))
     next_cursor = _encode_cursor(page[limit]) if len(page) > limit else None
     return {"items": items, "next_cursor": next_cursor}
 

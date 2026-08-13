@@ -14,6 +14,8 @@ def test_admin_runs_filters_by_status_and_route(client) -> None:
     assert "items" in body
     assert all(item["route"] == "echo" for item in body["items"])
     assert all(item["status"] == "done" for item in body["items"])
+    assert all(item["tool_count"] == 0 for item in body["items"])
+    assert all(item["error"] is None for item in body["items"])
 
 
 def test_admin_runs_empty_when_no_match(client) -> None:

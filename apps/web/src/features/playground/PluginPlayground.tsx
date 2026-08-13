@@ -53,6 +53,7 @@ export function PluginPlayground() {
   const [copied, setCopied] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const currentRunId = useRef<string | null>(null);
+  const modelInitialized = useRef(false);
 
   const diagnostics = useMemo(() => events.length ? analyzeEvents(events) : serverDiagnostics, [events, serverDiagnostics]);
   const extraValid = useMemo(() => {
@@ -76,7 +77,13 @@ export function PluginPlayground() {
       setRuns(runPage.items);
       if (domainPage.domains.length) setRoutes(domainPage.domains);
       setSummary(aggregate);
-      setModels(Array.isArray(modelPage.models) ? modelPage.models : []);
+      const selectableModels = Array.isArray(modelPage.models) ? modelPage.models : [];
+      setModels(selectableModels);
+      if (!modelInitialized.current) {
+        const preferred = selectableModels.find((model) => model.kind === "real")?.alias ?? "default";
+        setRequest((current) => ({ ...current, model: preferred }));
+        modelInitialized.current = true;
+      }
     } catch (reason) {
       setError(`${copy.requestFailed}: ${String(reason)}`);
     } finally {
@@ -183,13 +190,22 @@ export function PluginPlayground() {
     const body = JSON.stringify({ ...request, extra });
     const init = { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body, credentials: "include" as RequestCredentials };
     const first = fetch(`${apiBase()}/chat/stream`, init);
-    await new Promise((resolve) => setTimeout(resolve, 40));
+    // Start both requests in the same turn. A fixed delay lets short demo
+    // graphs finish and release the thread lock before the second request.
+    const second = fetch(`${apiBase()}/chat/stream`, init);
     try {
-      const second = await fetch(`${apiBase()}/chat/stream`, init);
-      setError(second.status === 409 ? copy.threadBusy : `${copy.requestFailed}: HTTP ${second.status}`);
+      const response = await second;
+      setError(
+        response.status === 409
+          ? copy.threadBusy
+          : response.status === 200
+            ? "重复发送验证未捕获到并发冲突；两个请求可能已先后完成。"
+            : `${copy.requestFailed}: HTTP ${response.status}`,
+      );
     } finally {
       await playgroundFetch("/chat/cancel", { method: "POST", body: JSON.stringify({ thread_id: request.thread_id }) }).catch(() => undefined);
-      void first;
+      const firstResponse = await first.catch(() => null);
+      await firstResponse?.body?.cancel().catch(() => undefined);
     }
   }
 

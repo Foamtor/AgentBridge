@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-DOMAIN_META = {"description": "LLM 网关调用示例插件"}
+DOMAIN_META = {"description": "把问题发送给所选模型，用于验证模型连接和回复"}
 
 from agentbridge_core.registry.graphs import GraphRegistry
 from agentbridge_core.registry.input_builders import InputBuilderRegistry

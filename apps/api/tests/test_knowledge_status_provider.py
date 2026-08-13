@@ -19,7 +19,10 @@ async def test_fake_backend_status_skips_embedding() -> None:
     provider = KnowledgeStatusProvider(settings, retriever=object())
     body = await provider.get_status(tenant_id="acme")
     assert body["backend"] == "fake"
+    assert body["tenant_id"] == "acme"
+    assert body["scope"] == "tenant"
     assert body["healthy"] is True
+    assert body["tenant_id"] == "acme"
     assert body["embedding"]["status"] == "skipped"
     assert body["ingest_jobs"] == []
 

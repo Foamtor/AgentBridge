@@ -3,7 +3,7 @@ import { apiBase } from "../../lib/apiBase";
 import { useI18n } from "../../i18n";
 
 type Bootstrap = {
-  runtime?: { auth_mode?: string; llm_backend?: string; llm_mode?: string; llm_model?: string; real_model_ready?: boolean; knowledge_backend?: string; observability_backend?: string; checkpointer_backend?: string };
+  runtime?: { auth_mode?: string; llm_backend?: string; llm_mode?: string; real_model_ready?: boolean; knowledge_backend?: string; observability_backend?: string; checkpointer_backend?: string };
   context?: { tenant_id?: string };
   reference?: { available?: boolean; data_class?: string };
 };
@@ -43,7 +43,7 @@ export function EnvironmentSummary() {
   const checkCount = ready?.checks ? Object.values(ready.checks).filter((check) => check.status === "ok" || check.status === "skipped").length : 0;
   return <section className={`environment-summary environment-${status}`} aria-label={t("environment")}>
     <div className="environment-state"><span className="environment-status" aria-hidden="true">{status === "ready" ? "●" : status === "loading" ? "○" : "!"}</span><strong>{label}</strong></div>
-    {snapshot ? <div className="environment-facts"><span>{t("tenant")} <code>{snapshot.context?.tenant_id ?? "-"}</code></span><span>{t("data")} <code>{snapshot.reference?.data_class ?? "-"}</code></span><span>{snapshot.runtime?.real_model_ready ? `${snapshot.runtime.llm_model} · real ready` : t("fakeMode")}</span><span>{t("persistence")} <code>{snapshot.runtime?.observability_backend ?? "-"} / {snapshot.runtime?.checkpointer_backend ?? "-"}</code></span><span>{checkCount} checks</span></div> : <span className="muted">{t("offlineDescription")}</span>}
+    {snapshot ? <div className="environment-facts"><span>{t("tenant")} <code>{snapshot.context?.tenant_id ?? "-"}</code></span><span>{t("data")} <code>{snapshot.reference?.data_class ?? "-"}</code></span><span>{snapshot.runtime?.real_model_ready ? `${t("realModelConfigured")} · ${t("ready")}` : t("fakeMode")}</span><span>{t("persistence")} <code>{snapshot.runtime?.observability_backend ?? "-"} / {snapshot.runtime?.checkpointer_backend ?? "-"}</code></span><span>{checkCount} checks</span></div> : <span className="muted">{t("offlineDescription")}</span>}
     <button type="button" className="environment-refresh" onClick={() => void load()} disabled={status === "loading"} title={t("environment")} aria-label={t("environment")}>↻</button>
   </section>;
 }

@@ -35,7 +35,7 @@ def test_demo_approval_write_and_resume(monkeypatch: pytest.MonkeyPatch) -> None
         r = c.post(
             "/chat/stream",
             json={
-                "query": "please write",
+                "query": "请提交一条测试写入申请，主题是更换办公设备。",
                 "thread_id": "t-appr-1",
                 "route": "demo_approval_write",
             },
@@ -45,6 +45,7 @@ def test_demo_approval_write_and_resume(monkeypatch: pytest.MonkeyPatch) -> None
         assert any(e["type"] == "x.bridge.approval_required" for e in events)
         assert not any(e["type"] == "done" for e in events)
         req = next(e for e in events if e["type"] == "x.bridge.approval_required")
+        assert "更换办公设备" in req["data"]["summary"]
         approval_id = req["data"]["approval_id"]
         run_id = req["run_id"]
 

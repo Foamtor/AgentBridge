@@ -43,7 +43,9 @@ async def work_order_statistics(
     dimension: str,
     config: Annotated[RunnableConfig, InjectedToolArg],
 ) -> dict[str, int]:
-    """Count current-tenant work orders by status, priority, or assignee."""
+    """Count current-tenant work orders by status, priority, or assignee_id."""
+    if dimension == "assignee":
+        dimension = "assignee_id"
     if dimension not in {"status", "priority", "assignee_id"}:
         raise ValueError("unsupported statistics dimension")
     source, ctx = _source(config)

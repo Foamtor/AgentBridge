@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-DOMAIN_META = {"description": "写操作审批门禁示例插件"}
+DOMAIN_META = {"description": "模拟提交写入申请并等待审批，用于验证人工审批流程"}
 
 from agentbridge_core.registry.graphs import GraphRegistry
 from agentbridge_core.registry.input_builders import InputBuilderRegistry

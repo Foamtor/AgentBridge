@@ -9,6 +9,20 @@ from config.settings import Settings
 
 _RAG_AGENT_EMBED_MODEL = "BAAI/bge-m3"
 _RAG_AGENT_EMBED_DIMENSIONS = 512
+_WORK_ORDER_REFERENCE_DOCS = [
+    {
+        "chunk_id": "work-order-reference-sop",
+        "doc_id": "work-order-reference-sop",
+        "text": (
+            "工单处理 SOP : 确认影响范围和优先级，分配有效处理人，"
+            "记录台账摘要，再提交草稿等待人工审批后创建工单。 "
+            "Work-order handling SOP: confirm impact and priority, assign an "
+            "active owner, record the ledger summary, then submit the draft "
+            "for human approval before creation."
+        ),
+        "metadata": {"source": "bundled-reference", "synthetic": True},
+    }
+]
 
 
 def resolve_kb_dsn(settings: Settings) -> str:
@@ -85,7 +99,9 @@ def validate_rag_agent_pg_settings(settings: Settings) -> None:
 async def build_retriever(settings: Settings) -> Any:
     backend = (settings.knowledge_backend or "fake").strip().lower()
     if backend == "fake":
-        return FakeRetriever()
+        retriever = FakeRetriever()
+        await retriever.ingest(_WORK_ORDER_REFERENCE_DOCS, tenant_id="dev")
+        return retriever
     if backend == "external":
         validate_external_settings(settings)
         from adapters.external_rag_retriever import ExternalRagRetriever

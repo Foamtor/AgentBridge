@@ -26,8 +26,8 @@ type Domain = {
 };
 
 const zh = {
-  title: "已加载的业务能力",
-  intro: "这里显示当前 API 进程已从源码加载的插件。插件的创建和修改在代码目录中完成；保存后重启 API，再回到这里确认是否已加载。",
+  title: "已加载插件",
+  intro: "这里显示当前 API 进程从源码加载的插件。插件只能在代码目录中创建或修改；本页面用于确认加载状态、查看能力和进入调试。",
   source: "来源",
   starter: "起步样例",
   demo: "内置演示",
@@ -45,15 +45,15 @@ const zh = {
   approval: "人工审批动作",
   noApproval: "没有登记需要平台审批的写入动作。",
   approvalRule: (action: ApprovalAction) => action.resource.required_permissions_all?.length ? `必须同时具备：${action.resource.required_permissions_all.join("、")}` : action.resource.required_permissions?.length ? `具备其中任一权限：${action.resource.required_permissions.join("、")}` : "审批后执行",
-  test: "在调试场测试",
+  test: "进入插件调试",
   policies: "查看工具权限",
   loading: "正在读取已加载的插件…",
   noDescription: "未提供业务说明。",
 };
 
 const en: typeof zh = {
-  title: "Loaded business capabilities",
-  intro: "This page shows plugins the current API process loaded from source. Create and edit plugins in the source tree, restart the API, then return here to confirm they loaded.",
+  title: "Loaded plugins",
+  intro: "This page lists plugins loaded from source by the current API process. Create and edit plugins in the source tree; use this page to confirm loading, review capabilities, and open debugging.",
   source: "Source",
   starter: "Starter example",
   demo: "Bundled demo",
@@ -71,7 +71,7 @@ const en: typeof zh = {
   approval: "Human approval actions",
   noApproval: "No platform approval-gated write action is registered.",
   approvalRule: (action: ApprovalAction) => action.resource.required_permissions_all?.length ? `All required: ${action.resource.required_permissions_all.join(", ")}` : action.resource.required_permissions?.length ? `Any of: ${action.resource.required_permissions.join(", ")}` : "Runs after approval",
-  test: "Test in playground",
+  test: "Open plugin debugging",
   policies: "View tool permissions",
   loading: "Reading loaded plugins…",
   noDescription: "No business description provided.",

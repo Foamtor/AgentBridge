@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-DOMAIN_META = {"description": "最小 Echo 示例插件"}
+DOMAIN_META = {"description": "原样返回你的输入，用于确认对话链路是否正常"}
 
 from domains.echo.graph import build_echo_graph
 from domains.echo.tools import echo

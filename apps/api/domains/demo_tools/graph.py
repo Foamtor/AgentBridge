@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from agentbridge_core.protocol.fragments import OUTBOUND_EXTENSIONS_KEY
-from langchain_core.messages import AIMessage
+from langchain_core.messages import AIMessage, ToolMessage
 from langgraph.graph import END, START, StateGraph
 from langgraph.prebuilt import ToolNode
 
@@ -14,6 +15,16 @@ from domains.demo_tools.tools import add
 
 
 def _prepare_tool_call(state: DemoToolsState) -> dict[str, Any]:
+    query = ""
+    for message in reversed(state.get("messages") or []):
+        content = getattr(message, "content", None) or (
+            message.get("content") if isinstance(message, dict) else None
+        )
+        if content:
+            query = str(content)
+            break
+    match = re.search(r"(-?\d+)\s*\+\s*(-?\d+)", query)
+    a, b = (int(match.group(1)), int(match.group(2))) if match else (2, 3)
     return {
         "messages": [
             AIMessage(
@@ -21,7 +32,7 @@ def _prepare_tool_call(state: DemoToolsState) -> dict[str, Any]:
                 tool_calls=[
                     {
                         "name": "add",
-                        "args": {"a": 2, "b": 3},
+                        "args": {"a": a, "b": b},
                         "id": "tc-demo-add-1",
                         "type": "tool_call",
                     }
@@ -32,7 +43,14 @@ def _prepare_tool_call(state: DemoToolsState) -> dict[str, Any]:
 
 
 def _finish(state: DemoToolsState) -> dict[str, Any]:
+    result = None
+    for message in reversed(state.get("messages") or []):
+        if isinstance(message, ToolMessage) and message.name == "add":
+            result = message.content
+            break
+    reply = f"计算结果：{result}（已调用 add 工具）。" if result is not None else "已调用 add 工具。"
     return {
+        "messages": [AIMessage(content=reply)],
         OUTBOUND_EXTENSIONS_KEY: [
             {
                 "type": "x.demo_tools.finished",

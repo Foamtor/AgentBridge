@@ -5,19 +5,29 @@ from __future__ import annotations
 from typing import Any
 
 from agentbridge_core.protocol.fragments import OUTBOUND_EXTENSIONS_KEY
+from langchain_core.messages import AIMessage
 from langgraph.graph import END, START, StateGraph
 
 from domains.demo_approval_write.state import DemoApprovalWriteState
 
 
 def _request_approval(state: DemoApprovalWriteState) -> dict[str, Any]:
-    _ = state
+    request = ""
+    for message in reversed(state.get("messages") or []):
+        content = getattr(message, "content", None) or (
+            message.get("content") if isinstance(message, dict) else None
+        )
+        if content:
+            request = str(content)
+            break
     return {
+        "messages": [AIMessage(content=f"已生成申请，等待审批：{request}")],
         OUTBOUND_EXTENSIONS_KEY: [
             {
                 "type": "x.bridge.approval_required",
                 "data": {
                     "tool": "write_record",
+                    "summary": request,
                     "timeout_seconds": 30.0,
                 },
             }

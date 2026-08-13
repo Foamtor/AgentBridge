@@ -68,7 +68,21 @@ def build_run_diagnostics(events: list[dict[str, Any]]) -> dict[str, Any]:
 
     calls: dict[str, dict[str, Any]] = {}
     tools: list[dict[str, Any]] = []
+    errors: list[dict[str, Any]] = []
+    approval_id: str | None = None
+    approval_status: str | None = None
     for event in ordered:
+        if event.get("type") == "error":
+            data = dict(event.get("data") or {})
+            errors.append({"code": data.get("code"), "message": data.get("message")})
+        if event.get("type") == "x.bridge.approval_required":
+            data = dict(event.get("data") or {})
+            approval_id = str(data.get("approval_id") or "") or approval_id
+            approval_status = "pending"
+        elif event.get("type") == "x.bridge.approval_resolved":
+            data = dict(event.get("data") or {})
+            approval_id = str(data.get("approval_id") or "") or approval_id
+            approval_status = str(data.get("decision") or "resolved")
         if event.get("type") not in {"tool_call", "tool_result"}:
             continue
         data = dict(event.get("data") or {})
@@ -108,5 +122,10 @@ def build_run_diagnostics(events: list[dict[str, Any]]) -> dict[str, Any]:
         "duplicate_event_ids": duplicate_ids,
         "milestones": milestones,
         "tools": tools,
+        "tool_count": len(tools),
+        "errors": errors,
+        "error": errors[-1] if errors else None,
+        "approval_id": approval_id,
+        "approval_status": approval_status,
         "event_types": dict(Counter(str(event.get("type")) for event in ordered)),
     }

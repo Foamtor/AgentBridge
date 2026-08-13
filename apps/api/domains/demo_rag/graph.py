@@ -109,7 +109,14 @@ def _cite(state: DemoRagState) -> dict[str, Any]:
             item = _normalize_citation(doc)
             if item is not None:
                 citations.append(item)
+    if citations:
+        reply = "检索到的处理规范：" + "；".join(
+            str(item["text"]).strip() for item in citations[:3]
+        )
+    else:
+        reply = "没有找到与该问题相关的知识库内容。"
     return {
+        "messages": [AIMessage(content=reply)],
         OUTBOUND_EXTENSIONS_KEY: [
             {
                 "type": "x.bridge.citation",

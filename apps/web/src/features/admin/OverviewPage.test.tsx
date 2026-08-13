@@ -21,7 +21,7 @@ describe("Admin center", () => {
     expect(await screen.findByRole("heading", { name: "管理中心" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "先配置，才能进行真实验证" })).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: /模型连接/ })[0]).toHaveAttribute("href", "/models");
-    expect(screen.getByRole("link", { name: /工具与权限/ })).toHaveAttribute("href", "/tools");
+    expect(screen.getByRole("link", { name: /工具权限/ })).toHaveAttribute("href", "/tools");
     expect(screen.getByRole("link", { name: "查看运行记录 ->" })).toHaveAttribute("href", "/runs");
     expect(screen.getByRole("link", { name: "r-failed" })).toHaveAttribute("href", "/playground?run_id=r-failed");
   });

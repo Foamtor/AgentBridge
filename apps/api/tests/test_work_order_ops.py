@@ -29,7 +29,10 @@ from agentbridge_core.registry.input_builders import InputBuilderRegistry
 from agentbridge_core.registry.tools import ToolRegistry
 from domains.work_order_ops.approval import make_create_work_order_handler
 from domains.work_order_ops.graph import _chart_payload
-from domains.work_order_ops.tools import prepare_work_order_draft
+from domains.work_order_ops.tools import (
+    prepare_work_order_draft,
+    work_order_statistics,
+)
 from fastapi.testclient import TestClient
 from jose import jwt
 from langchain_core.messages import AIMessage
@@ -47,6 +50,13 @@ MISSING_FIELDS_MESSAGE = (
 DRAFT_VALIDATION_MESSAGE = (
     "工单草稿校验失败，请检查 title、priority、assignee_id 和 ledger_summary。"
 )
+
+
+@pytest.fixture(autouse=True)
+def _isolate_auth_mode(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Do not let a developer's local console mode alter domain contracts."""
+    monkeypatch.setenv("AUTH_MODE", "disabled")
+    monkeypatch.setenv("AUTH_REQUIRED", "false")
 
 
 def _events(body: str) -> list[dict]:
@@ -80,6 +90,7 @@ def _configure_real_runtime_auth(
     monkeypatch.setenv("AGENTBRIDGE_FAKE_RUNTIME", "0")
     monkeypatch.setenv("AUTH_REQUIRED", "true")
     monkeypatch.setenv("AUTH_DEV_STUB", "false")
+    monkeypatch.setenv("AUTH_MODE", "oidc")
     monkeypatch.setenv("OIDC_JWT_SECRET", secret)
 
 
@@ -133,6 +144,29 @@ class CountingRetriever:
 
     async def close(self) -> None:
         return None
+
+
+@pytest.mark.asyncio
+async def test_work_order_statistics_accepts_assignee_alias() -> None:
+    source = FakeDataSource()
+    source.seed(
+        "work_orders",
+        [
+            {
+                "id": "WO-ASSIGNEE-1",
+                "tenant_id": "dev",
+                "assignee_id": "assignee-dev-a",
+            }
+        ],
+    )
+    context = RunContext(tenant_id="dev", metadata={"data_source": source})
+
+    result = await work_order_statistics.ainvoke(
+        {"dimension": "assignee"},
+        config={"configurable": {RUN_CONTEXT_KEY: context}},
+    )
+
+    assert result == {"assignee-dev-a": 1}
 
 
 def test_work_order_ops_emits_structured_business_events(
@@ -406,7 +440,15 @@ def test_natural_language_draft_uses_only_guarded_prepare_tool(
         "prepare_work_order_draft"
     ]
     assert gateway.calls[0]["tools"][0] is not prepare_work_order_draft
-    assert gateway.calls[0]["tool_choice"] == "prepare_work_order_draft"
+    assert gateway.calls[0]["tool_choice"] is None
+    assert gateway.calls[0]["messages"][0] == {
+        "role": "system",
+        "content": (
+            "Use prepare_work_order_draft to create the draft now. "
+            "Supply title, priority, assignee_id, and ledger_summary. "
+            "Do not return prose."
+        ),
+    }
     required = next(
         event
         for event in _events(response.text)
@@ -534,11 +576,8 @@ def test_same_thread_read_turn_does_not_reuse_stale_results_or_draft(
     listing = next(
         event for event in second_events if event["type"] == "x.work_order_ops.list"
     )
-    citation = next(
-        event for event in second_events if event["type"] == "x.bridge.citation"
-    )
     assert [row["id"] for row in listing["data"]["rows"]] == ["WO-CURRENT"]
-    assert citation["data"]["citations"] == []
+    assert "x.bridge.citation" not in _event_types(second.text)
     assert "x.work_order_ops.ledger_preview" not in _event_types(second.text)
     assert "x.bridge.approval_required" not in _event_types(second.text)
 

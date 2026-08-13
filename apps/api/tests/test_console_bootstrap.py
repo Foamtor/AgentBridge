@@ -23,6 +23,7 @@ def test_bootstrap_requires_local_session_and_returns_safe_snapshot(monkeypatch)
         assert body["runtime"]["auth_mode"] == "local"
         assert body["runtime"]["observability_backend"] == "memory"
         assert body["runtime"]["checkpointer_backend"] == "memory"
+        assert "llm_model" not in body["runtime"]
         assert body["reference"]["route"] == "work_order_ops"
         assert "password" not in response.text.lower()
         assert "dsn" not in response.text.lower()
@@ -44,3 +45,38 @@ def test_bootstrap_marks_the_postgres_fallback_as_a_configured_source(monkeypatc
         )
 
         assert client.get("/console/bootstrap").json()["reference"]["data_class"] == "configured_source"
+
+
+def test_route_query_selects_work_order_plugin_and_does_not_guess(monkeypatch):
+    monkeypatch.setenv("AUTH_MODE", "local")
+    monkeypatch.setenv("AGENTBRIDGE_FAKE_RUNTIME", "1")
+    monkeypatch.setenv("USE_MEMORY_CHECKPOINTER", "true")
+    app = create_test_app()
+    with TestClient(app) as client:
+        password = __import__("asyncio").run(app.state.console_auth_service.rotate_initial_password())
+        client.post("/auth/login", json={"username": "admin", "password": password})
+        client.post(
+            "/auth/change-password",
+            json={"current_password": password, "new_password": "Correct Horse Battery Staple 2026!"},
+        )
+
+        matched = client.post("/console/route", json={"query": "请查询当前租户的工单，并按状态统计数量。"})
+        assert matched.status_code == 200
+        assert matched.json() == {
+            "route": "work_order_ops",
+            "reason": "Matched keywords: 工单, 状态",
+            "expected_tools": ["list_work_orders", "work_order_statistics"],
+            "candidates": [{
+                "route": "work_order_ops",
+                "score": 2,
+                "matched_keywords": ["工单", "状态"],
+                "expected_tools": ["list_work_orders", "work_order_statistics"],
+            }],
+        }
+
+        unmatched = client.post("/console/route", json={"query": "帮我写一首诗"})
+        assert unmatched.status_code == 200
+        assert unmatched.json()["route"] is None
+        assert unmatched.json()["candidates"] == []
+
+        assert client.post("/console/route", json={"query": "   "}).status_code == 422

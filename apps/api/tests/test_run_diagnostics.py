@@ -29,6 +29,8 @@ def test_run_diagnostics_and_jsonl_export(client) -> None:
     assert body["terminal"] == "done"
     assert body["contract_ok"] is True
     assert body["event_count"] >= 2
+    assert body["tool_count"] == 0
+    assert body["error"] is None
     assert body["milestones"][0]["type"] == "start"
 
     exported = client.get(f"/runs/{run_id}/events.jsonl")

@@ -7,8 +7,10 @@ citations, an immutable approval draft, and atomic work-order plus ledger
 creation.
 
 The default Compose experience uses the `dev` tenant, Postgres demo data, and
-fake knowledge. The RAG-Agent backend is an optional, read-only advanced path;
-it is never required to run this case.
+fake knowledge. In fake mode, AgentBridge seeds one tenant-scoped, synthetic
+work-order SOP so the bundled knowledge verification has a visible citation;
+it is not a production knowledge base. The RAG-Agent backend is an optional,
+read-only advanced path; it is never required to run this case.
 
 ## Setup
 

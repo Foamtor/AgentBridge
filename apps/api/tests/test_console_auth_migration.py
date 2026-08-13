@@ -26,6 +26,7 @@ def test_local_auth_requires_secure_cookie_in_production(monkeypatch):
     monkeypatch.setenv("AUTH_COOKIE_SECURE", "true")
     monkeypatch.setenv("APPROVAL_STORE_BACKEND", "postgres")
     monkeypatch.setenv("OBSERVABILITY_STORE_BACKEND", "postgres")
+    monkeypatch.setenv("RUNTIME_CONFIG_BACKEND", "postgres")
     monkeypatch.setenv("USE_MEMORY_CHECKPOINTER", "false")
     Settings(_env_file=None).validate_auth_mode()
 
@@ -57,6 +58,7 @@ def test_production_rejects_ephemeral_business_state(
         AUTH_COOKIE_SECURE=True,
         APPROVAL_STORE_BACKEND="postgres",
         OBSERVABILITY_STORE_BACKEND="postgres",
+        RUNTIME_CONFIG_BACKEND="postgres",
         USE_MEMORY_CHECKPOINTER=False,
     )
     setattr(settings, field, value)

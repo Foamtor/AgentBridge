@@ -126,6 +126,24 @@ describe("adminFetch", () => {
     window.removeEventListener("agentbridge:auth-error", authError);
   });
 
+  it("does not treat a current-password challenge as session expiry", async () => {
+    const authError = vi.fn();
+    window.addEventListener("agentbridge:auth-error", authError);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ detail: { code: "current_password_required" } }), { status: 401 }),
+      ),
+    );
+
+    await expect(adminFetch("/admin/config/RATE_LIMIT_PER_MINUTE", { method: "PUT" })).rejects.toMatchObject({
+      status: 401,
+      code: "current_password_required",
+    });
+    expect(authError).not.toHaveBeenCalled();
+    window.removeEventListener("agentbridge:auth-error", authError);
+  });
+
   it("returns English operator messages when locale is requested", async () => {
     vi.stubGlobal(
       "fetch",

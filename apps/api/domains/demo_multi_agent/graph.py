@@ -11,16 +11,26 @@ from langgraph.graph import END, START, StateGraph
 from domains.demo_multi_agent.state import DemoMultiAgentState
 
 
+def _query(state: DemoMultiAgentState) -> str:
+    for message in reversed(state.get("messages") or []):
+        content = getattr(message, "content", None) or (
+            message.get("content") if isinstance(message, dict) else None
+        )
+        if content:
+            return str(content)
+    return ""
+
+
 def _researcher(state: DemoMultiAgentState) -> dict[str, Any]:
-    _ = state
+    query = _query(state)
+    finding = f"研究分析：围绕“{query}”，先梳理现状、瓶颈和可量化指标。"
     return {
-        "messages": [AIMessage(content="research notes")],
         OUTBOUND_EXTENSIONS_KEY: [
             {
                 "type": "x.demo_multi_agent.spoke",
                 "data": {
                     "agent_id": "researcher",
-                    "content": "found sources",
+                    "content": finding,
                 },
             }
         ],
@@ -28,15 +38,16 @@ def _researcher(state: DemoMultiAgentState) -> dict[str, Any]:
 
 
 def _writer(state: DemoMultiAgentState) -> dict[str, Any]:
-    _ = state
+    query = _query(state)
+    reply = f"协作建议：针对“{query}”，先按优先级分流，再明确负责人和处理时限，并每周复盘积压原因。"
     return {
-        "messages": [AIMessage(content="draft")],
+        "messages": [AIMessage(content=reply)],
         OUTBOUND_EXTENSIONS_KEY: [
             {
                 "type": "x.demo_multi_agent.spoke",
                 "data": {
                     "agent_id": "writer",
-                    "content": "wrote summary",
+                    "content": reply,
                 },
             }
         ],

@@ -47,8 +47,8 @@ copy .env.example .env
 ## 2. 启动 API
 
 ```bash
-cd apps/api
-uvicorn main:app --reload --port 8000
+python -m uvicorn main:app --app-dir apps/api --reload \
+  --reload-dir apps/api --reload-dir packages/core/src --port 8000
 ```
 
 浏览器打开，或命令行请求：

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-DOMAIN_META = {"description": "工具调用示例插件"}
+DOMAIN_META = {"description": "调用计算工具处理问题，用于检查模型能否正确使用工具"}
 
 from domains.demo_tools.graph import build_demo_tools_graph
 from domains.demo_tools.tools import add, delete_records
