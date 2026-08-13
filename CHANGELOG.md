@@ -12,6 +12,6 @@ All notable public changes are recorded here.
 
 ### Known limits
 
-- Production deployment, migration/recovery, real IdP validation, and multi-instance validation remain deferred as P2-B.
+- Production deployment drills, migration/recovery, concrete IdP integration, and multi-instance validation are post-1.0 hardening work; they are not single-node 1.0 release gates.
 - Real LLMs and external RAG are opt-in integrations; the default demo runs offline.
 - This preview does not publish PyPI, npm, GHCR, signed images, or supply-chain artifacts.
