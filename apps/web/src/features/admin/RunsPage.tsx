@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { adminFetch } from "./adminFetch";
+import { adminErrorMessage, adminFetch } from "./adminFetch";
 
 type RunItem = {
   run_id: string;
@@ -24,7 +24,7 @@ export function RunsPage() {
     params.set("limit", "20");
     void adminFetch<{ items: RunItem[] }>(`/admin/runs?${params.toString()}`)
       .then((body) => setItems(body.items))
-      .catch((err) => setError(String(err)));
+      .catch((err) => setError(adminErrorMessage(err)));
   }, [status, route]);
 
   return (

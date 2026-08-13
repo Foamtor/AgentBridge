@@ -1,8 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
 import pytest
-
-from auth.local_admin import ConsoleAdminService, PasswordPolicyError
+from auth.local_admin import AuthSessionError, ConsoleAdminService, PasswordPolicyError
 from testing.fake_console_auth import FakeConsoleAuthStore
 
 
@@ -126,3 +125,21 @@ async def test_login_failure_limit_expires_after_window(service):
     attempts["last_failure_at"] = expired
     session = await service.authenticate("admin", created.initial_password, bucket_key="test-client:admin")
     assert session.kind == "password_change"
+
+
+@pytest.mark.asyncio
+async def test_reauthentication_requires_an_authenticated_session_and_current_password(service):
+    created = await service.ensure_admin()
+    assert created is not None
+    change_session = await service.create_session("admin", kind="password_change")
+    changed = await service.change_password(
+        session_token=change_session,
+        current_password=created.initial_password,
+        new_password="Password2026",
+    )
+
+    assert await service.verify_reauthentication(
+        session_token=changed.token, password="Password2026"
+    ) == "admin"
+    with pytest.raises(AuthSessionError, match="reauth_invalid_credentials"):
+        await service.verify_reauthentication(session_token=changed.token, password="wrong")

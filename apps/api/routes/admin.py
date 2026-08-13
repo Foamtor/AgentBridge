@@ -5,10 +5,10 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from auth.rbac import require_permission
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
-from auth.rbac import require_permission
 from routes.admin_common import admin_ctx
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -62,7 +62,12 @@ async def export_audit(request: Request) -> StreamingResponse:
     """JSONL audit export without large user-text fields."""
     ctx = _ctx(request)
     require_permission(ctx, "admin:audit")
-    records = list(getattr(request.app.state.audit, "records", []) or [])
+    audit = request.app.state.audit
+    list_records = getattr(audit, "list_records", None)
+    if callable(list_records):
+        records = await list_records(tenant_id=ctx.tenant_id or "default")
+    else:
+        records = list(getattr(audit, "records", []) or [])
 
     async def lines():
         for rec in records:

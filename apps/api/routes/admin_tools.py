@@ -3,17 +3,19 @@
 from __future__ import annotations
 
 import inspect
+import logging
 from typing import Any
-
-from fastapi import APIRouter, HTTPException, Request
 
 from agentbridge_core.application.tool_guard import guard_tools
 from agentbridge_core.protocol.context import RunContext
 from agentbridge_core.protocol.tool_meta import get_tool_meta
 from auth.rbac import require_permission
+from fastapi import APIRouter, HTTPException, Request
+
 from routes.admin_common import admin_ctx, require_tools_read
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+logger = logging.getLogger(__name__)
 
 
 def _tool_name(tool: Any) -> str:
@@ -31,15 +33,19 @@ def _tool_resource(tool: Any) -> dict[str, Any]:
         "name": _tool_name(tool),
         "required_roles": meta["required_roles"],
         "required_permissions": meta["required_permissions"],
+        "required_permissions_all": meta["required_permissions_all"],
     }
 
 
 def _iter_tools(tools_registry: Any) -> list[tuple[str, Any]]:
     out: list[tuple[str, Any]] = []
-    for route in tools_registry.keys():
+    keys = getattr(tools_registry, "keys", None)
+    routes = keys() if callable(keys) else tools_registry
+    for route in routes:
         try:
             raw_tools = tools_registry.get(route)
-        except Exception:  # noqa: BLE001
+        except Exception:
+            logger.warning("Skipping unreadable tool registry route: %s", route, exc_info=True)
             continue
         if not isinstance(raw_tools, list):
             raw_tools = list(raw_tools) if raw_tools else []
@@ -48,10 +54,16 @@ def _iter_tools(tools_registry: Any) -> list[tuple[str, Any]]:
     return out
 
 
-def _find_tool(tools_registry: Any, name: str) -> tuple[str, Any] | None:
-    for route, tool in _iter_tools(tools_registry):
-        if _tool_name(tool) == name:
-            return route, tool
+def _tool_key(route: str, name: str) -> str:
+    return f"{route}:{name}"
+
+
+def _find_tool(
+    tools_registry: Any, name: str, *, route: str | None = None
+) -> tuple[str, Any] | None:
+    for candidate_route, tool in _iter_tools(tools_registry):
+        if (route is None or candidate_route == route) and _tool_name(tool) == name:
+            return candidate_route, tool
     return None
 
 
@@ -68,7 +80,15 @@ def _build_matrix(
     roles: list[str],
 ) -> dict[str, str]:
     row: dict[str, str] = {}
+    meta = get_tool_meta(tool)
+    permission_only = bool(
+        (meta["required_permissions"] or meta["required_permissions_all"])
+        and not meta["required_roles"]
+    )
     for role in roles:
+        if permission_only:
+            row[role] = "permission_required"
+            continue
         ctx = RunContext(roles=[role], permissions=[])
         filtered = policy.filter_tools(route, [tool], ctx)
         row[role] = "allow" if filtered else "deny"
@@ -89,15 +109,17 @@ async def list_tools(request: Request) -> dict[str, Any]:
         meta = get_tool_meta(tool)
         tools_out.append(
             {
+                "tool_id": _tool_key(route, name),
                 "name": name,
                 "domain": route,
                 "description": _tool_description(tool),
                 "required_permissions": meta["required_permissions"],
+                "required_permissions_all": meta["required_permissions_all"],
                 "required_roles": meta["required_roles"],
                 "invoke_allowed": bool(settings.admin_tool_invoke_enabled),
             }
         )
-        matrix_tools[name] = _build_matrix(
+        matrix_tools[_tool_key(route, name)] = _build_matrix(
             policy, route=route, tool=tool, roles=roles
         )
     tools_out.sort(key=lambda t: (t["domain"], t["name"]))
@@ -144,7 +166,13 @@ async def invoke_tool(
                 "message": "admin tool invoke is disabled",
             },
         )
-    found = _find_tool(request.app.state.tools, name)
+    requested_route = (body or {}).get("route")
+    if requested_route is not None and not isinstance(requested_route, str):
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "invalid_body", "message": "route must be a string"},
+        )
+    found = _find_tool(request.app.state.tools, name, route=requested_route)
     if found is None:
         raise HTTPException(
             status_code=404,
@@ -175,7 +203,7 @@ async def invoke_tool(
         result = await _invoke_tool(guarded[0], arguments)
     except HTTPException:
         raise
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         raise HTTPException(
             status_code=400,
             detail={"code": "tool_invoke_failed", "message": str(exc)},

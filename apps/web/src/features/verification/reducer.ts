@@ -22,6 +22,14 @@ function orderedUnique(events: StreamEvent[]): StreamEvent[] {
     });
 }
 
+function eventPhase(type: string): VerificationState["phase"] | undefined {
+  if (type === "x.bridge.approval_required") return "waiting_approval";
+  if (type === "done") return "complete";
+  if (type === "cancelled") return "cancelled";
+  if (type === "error") return "error";
+  return undefined;
+}
+
 export function verificationReducer(
   state: VerificationState,
   action: VerificationAction,
@@ -29,16 +37,16 @@ export function verificationReducer(
   switch (action.type) {
     case "reset": return initialVerificationState;
     case "start": return { events: [], phase: "running" };
-    case "hydrate": return { ...state, events: orderedUnique(action.events) };
+    case "hydrate": {
+      const events = orderedUnique(action.events);
+      const terminal = [...events].reverse().find((event) => eventPhase(event.type));
+      return { ...state, events, phase: terminal ? eventPhase(terminal.type)! : state.phase };
+    }
     case "error": return { ...state, phase: "error", error: action.message };
     case "event": {
       const events = orderedUnique([...state.events, action.event]);
       const type = action.event.type;
-      const phase = type === "x.bridge.approval_required" ? "waiting_approval"
-        : type === "done" ? "complete"
-        : type === "cancelled" ? "cancelled"
-        : type === "error" ? "error"
-        : state.phase;
+      const phase = eventPhase(type) ?? state.phase;
       return { ...state, events, phase };
     }
   }

@@ -5,6 +5,7 @@ type Props = {
   events: StreamEvent[];
   token: string;
   onPreset: (preset: "list" | "chart" | "draft") => void;
+  onApprovalResolved?: (runId: string) => Promise<void>;
   showPresets?: boolean;
   showHeading?: boolean;
 };

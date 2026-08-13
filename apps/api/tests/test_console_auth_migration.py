@@ -1,7 +1,6 @@
 from pathlib import Path
 
 import pytest
-
 from config.settings import Settings
 
 
@@ -25,7 +24,45 @@ def test_local_auth_requires_secure_cookie_in_production(monkeypatch):
         Settings(_env_file=None).validate_auth_mode()
 
     monkeypatch.setenv("AUTH_COOKIE_SECURE", "true")
+    monkeypatch.setenv("APPROVAL_STORE_BACKEND", "postgres")
+    monkeypatch.setenv("OBSERVABILITY_STORE_BACKEND", "postgres")
+    monkeypatch.setenv("USE_MEMORY_CHECKPOINTER", "false")
     Settings(_env_file=None).validate_auth_mode()
+
+
+def test_production_requires_database_runtime_config(monkeypatch):
+    monkeypatch.setenv("AUTH_MODE", "local")
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("AUTH_COOKIE_SECURE", "true")
+    monkeypatch.setenv("RUNTIME_CONFIG_BACKEND", "memory")
+    with pytest.raises(ValueError, match="RUNTIME_CONFIG_BACKEND=memory"):
+        Settings(_env_file=None).validate_auth_mode()
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("approval_store_backend", "memory", "APPROVAL_STORE_BACKEND"),
+        ("observability_store_backend", "memory", "OBSERVABILITY_STORE_BACKEND"),
+        ("use_memory_checkpointer", True, "USE_MEMORY_CHECKPOINTER"),
+    ],
+)
+def test_production_rejects_ephemeral_business_state(
+    field: str, value: object, message: str
+) -> None:
+    settings = Settings(
+        _env_file=None,
+        ENVIRONMENT="production",
+        AUTH_MODE="local",
+        AUTH_COOKIE_SECURE=True,
+        APPROVAL_STORE_BACKEND="postgres",
+        OBSERVABILITY_STORE_BACKEND="postgres",
+        USE_MEMORY_CHECKPOINTER=False,
+    )
+    setattr(settings, field, value)
+
+    with pytest.raises(ValueError, match=message):
+        settings.validate_auth_mode()
 
 
 def test_console_auth_migration_contains_no_seed_password():

@@ -12,4 +12,5 @@ class WorkOrderOpsState(TypedDict):
     structured_draft: NotRequired[dict[str, Any] | None]
     current_read_call_ids: NotRequired[dict[str, str]]
     current_draft_call_id: NotRequired[str | None]
+    prompt_evidence: NotRequired[list[dict[str, Any]]]
     outbound_extensions: NotRequired[list[dict[str, Any]]]

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any
 
 
@@ -33,6 +34,27 @@ class FakeModelConfigStore:
 
     async def delete(self, alias: str) -> bool:
         return self.records.pop(alias, None) is not None
+
+    async def record_test(
+        self,
+        alias: str,
+        *,
+        status: str,
+        latency_ms: int | None,
+        error: str | None,
+        capability: str | None,
+    ) -> dict[str, Any] | None:
+        record = self.records.get(alias)
+        if record is None:
+            return None
+        record.update({
+            "last_test_status": status,
+            "last_tested_at": datetime.now(timezone.utc).isoformat(),
+            "last_test_latency_ms": latency_ms,
+            "last_test_error": error,
+            "last_test_capability": capability,
+        })
+        return dict(record)
 
     async def close(self) -> None:
         return None

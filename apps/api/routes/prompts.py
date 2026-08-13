@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
+import inspect
 from typing import Any
 
+from auth.rbac import require_permission
 from fastapi import APIRouter, HTTPException, Request
 
-from auth.rbac import require_permission
 from routes.admin_common import admin_ctx
 
 router = APIRouter(prefix="/prompts", tags=["prompts"])
+
+
+async def _maybe_await(value: Any) -> Any:
+    return await value if inspect.isawaitable(value) else value
 
 
 def _require_prompt_read(ctx) -> None:
@@ -28,7 +33,7 @@ async def list_prompts(request: Request) -> dict[str, Any]:
     ctx = admin_ctx(request)
     _require_prompt_read(ctx)
     registry = request.app.state.prompt_registry
-    names = registry.list_names()
+    names = await _maybe_await(registry.list_names())
     return {"items": [{"name": n} for n in names]}
 
 
@@ -37,7 +42,7 @@ async def get_prompt(name: str, request: Request) -> dict[str, Any]:
     ctx = admin_ctx(request)
     _require_prompt_read(ctx)
     registry = request.app.state.prompt_registry
-    rec = registry.get(name)
+    rec = await _maybe_await(registry.get(name))
     if rec is None:
         raise HTTPException(
             status_code=404,
@@ -59,7 +64,7 @@ async def put_prompt(
             detail={"code": "invalid_body", "message": "content must be a string"},
         )
     registry = request.app.state.prompt_registry
-    rec = registry.put(name, content=content)
+    rec = await _maybe_await(registry.put(name, content=content))
     audit = getattr(request.app.state, "audit", None)
     if audit is not None:
         await audit.log(
@@ -79,7 +84,7 @@ async def publish_prompt(name: str, request: Request) -> dict[str, Any]:
     require_permission(ctx, "admin:prompts")
     registry = request.app.state.prompt_registry
     try:
-        rec = registry.publish(name)
+        rec = await _maybe_await(registry.publish(name))
     except KeyError as exc:
         raise HTTPException(
             status_code=404,

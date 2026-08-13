@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
-import { adminFetch } from "./adminFetch";
+import { adminErrorMessage, adminFetch } from "./adminFetch";
+import { useI18n } from "../../i18n";
 
 type PromptItem = { name: string };
 
 export function PromptsPage() {
+  const { locale } = useI18n();
+  const copy = locale === "en" ? { title: "Prompt overrides", intro: "Save a draft, then publish it to make it active in the real work-order planner. Drafts never affect runs.", name: "Prompt name", content: "Content", save: "Save draft", publish: "Publish", registered: "Registered prompts", saved: "Draft saved", published: "Published", loading: "Loading…", error: "Could not load prompt settings." } : { title: "提示词覆盖", intro: "先保存草稿，再发布到真实工单规划流程；草稿不会影响运行。", name: "提示词名称", content: "内容", save: "保存草稿", publish: "发布", registered: "已登记提示词", saved: "草稿已保存", published: "已发布", loading: "加载中…", error: "无法读取提示词配置。" };
   const [items, setItems] = useState<PromptItem[]>([]);
   const [name, setName] = useState("demo_prompt");
   const [content, setContent] = useState("hello {name}");
@@ -16,8 +19,8 @@ export function PromptsPage() {
   }
 
   useEffect(() => {
-    void reload().catch((err) => setError(String(err)));
-  }, []);
+    void reload().catch((err) => setError(adminErrorMessage(err, locale)));
+  }, [locale]);
 
   async function onSave() {
     setError(null);
@@ -28,10 +31,10 @@ export function PromptsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content }),
       });
-      setMessage("已保存草稿");
+      setMessage(copy.saved);
       await reload();
     } catch (err) {
-      setError(String(err));
+      setError(adminErrorMessage(err, locale));
     }
   }
 
@@ -42,40 +45,40 @@ export function PromptsPage() {
       await adminFetch(`/prompts/${encodeURIComponent(name)}/publish`, {
         method: "POST",
       });
-      setMessage("已发布");
+      setMessage(copy.published);
       await reload();
     } catch (err) {
-      setError(String(err));
+      setError(adminErrorMessage(err, locale));
     }
   }
 
   return (
     <main className="page">
       <header>
-        <h1>Prompts</h1>
-        <p className="lede">平台 Prompt 覆盖（C2）；发布后优先于插件目录文件。</p>
+        <h1>{copy.title}</h1>
+        <p className="lede">{copy.intro}</p>
       </header>
       {error ? <p className="error">{error}</p> : null}
       {message ? <p className="muted">{message}</p> : null}
       <div className="session-bar">
         <label>
-          name
+          {copy.name}
           <input value={name} onChange={(e) => setName(e.target.value)} />
         </label>
       </div>
       <label>
-        content
+        {copy.content}
         <textarea rows={6} value={content} onChange={(e) => setContent(e.target.value)} />
       </label>
       <div className="actions">
         <button type="button" onClick={() => void onSave()}>
-          保存
+          {copy.save}
         </button>
         <button type="button" onClick={() => void onPublish()}>
-          发布
+          {copy.publish}
         </button>
       </div>
-      <h2>已登记 Prompt</h2>
+      <h2>{copy.registered}</h2>
       <ul className="timeline">
         {items.map((item) => (
           <li key={item.name}>{item.name}</li>

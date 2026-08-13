@@ -44,6 +44,43 @@ def test_unknown_route_400(client):
     assert r.json()["detail"]["code"] == "unknown_route"
 
 
+def test_real_case_requires_a_real_model_alias(client):
+    r = client.post(
+        "/chat/stream",
+        json={
+            "query": "show work orders",
+            "thread_id": "t-real-alias",
+            "route": "work_order_ops",
+            "model": "default",
+            "extra": {"case_mode": "real"},
+        },
+    )
+    assert r.status_code == 409
+    assert r.json()["detail"]["code"] == "real_model_unavailable"
+
+
+def test_stream_records_reported_model_usage(client) -> None:
+    class UsageRuntime:
+        async def astream(self, builder, **kwargs):
+            from agentbridge_core.protocol.fragments import OutboundFragment
+
+            yield OutboundFragment(
+                type="x.bridge.model_usage",
+                data={"input_tokens": 12, "output_tokens": 7},
+            )
+
+    client.app.state.run_lifecycle.replace_runtime(UsageRuntime())
+    response = client.post(
+        "/chat/stream",
+        json={"query": "usage", "thread_id": "t-usage", "route": "echo"},
+    )
+
+    assert response.status_code == 200
+    usage = client.app.state.usage_store.aggregate(group_by="route", tenant_id="dev")
+    assert usage["totals"] == {"input_tokens": 12, "output_tokens": 7}
+    assert usage["items"][0]["route"] == "echo"
+
+
 def test_thread_busy_409(client):
     class BlockingRuntime:
         async def astream(self, builder, **kwargs):

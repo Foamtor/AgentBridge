@@ -27,14 +27,16 @@ class PostgresModelConfigStore:
 
     async def setup(self) -> None:
         """Apply the isolated, idempotent migration for existing Compose volumes."""
-        migration = (
-            Path(__file__).resolve().parents[1]
-            / "migrations"
-            / "011_model_configs.sql"
-        )
+        migration_dir = Path(__file__).resolve().parents[1] / "migrations"
         pool = await self._ensure_pool()
         async with pool.acquire() as connection:
-            await connection.execute(migration.read_text(encoding="utf-8"))
+            for name in (
+                "011_model_configs.sql",
+                "013_model_connection_tests.sql",
+                "018_model_alias_format.sql",
+                "019_model_tool_call_capability.sql",
+            ):
+                await connection.execute((migration_dir / name).read_text(encoding="utf-8"))
 
     async def list(self) -> list[dict[str, Any]]:
         pool = await self._ensure_pool()
@@ -77,12 +79,42 @@ class PostgresModelConfigStore:
                 """
                 UPDATE bridge_model_configs
                 SET api_base = $2, model_name = $3, api_key_ciphertext = $4,
-                    temperature = $5, enabled = $6, updated_at = NOW()
+                    temperature = $5, enabled = $6, last_test_status = $7,
+                    last_tested_at = $8, last_test_latency_ms = $9,
+                    last_test_error = $10, last_test_capability = $11,
+                    updated_at = NOW()
                 WHERE alias = $1
                 RETURNING *
                 """,
                 alias, record["api_base"], record["model_name"],
                 record["api_key_ciphertext"], record["temperature"], record["enabled"],
+                record.get("last_test_status"), record.get("last_tested_at"),
+                record.get("last_test_latency_ms"), record.get("last_test_error"),
+                record.get("last_test_capability"),
+            )
+        return dict(row) if row is not None else None
+
+    async def record_test(
+        self,
+        alias: str,
+        *,
+        status: str,
+        latency_ms: int | None,
+        error: str | None,
+        capability: str | None,
+    ) -> dict[str, Any] | None:
+        pool = await self._ensure_pool()
+        async with pool.acquire() as connection:
+            row = await connection.fetchrow(
+                """
+                UPDATE bridge_model_configs
+                SET last_test_status = $2, last_tested_at = NOW(),
+                    last_test_latency_ms = $3, last_test_error = $4,
+                    last_test_capability = $5, updated_at = NOW()
+                WHERE alias = $1
+                RETURNING *
+                """,
+                alias, status, latency_ms, error, capability,
             )
         return dict(row) if row is not None else None
 

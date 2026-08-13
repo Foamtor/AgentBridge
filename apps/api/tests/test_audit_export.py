@@ -10,6 +10,20 @@ from fastapi.testclient import TestClient
 from jose import jwt
 
 
+def test_production_audit_logger_is_postgres() -> None:
+    from adapters.postgres_audit_logger import PostgresAuditLogger
+    from config.settings import Settings
+    from lifespan import _build_audit_logger
+
+    settings = Settings(
+        _env_file=None,
+        AGENTBRIDGE_FAKE_RUNTIME=False,
+        PG_DSN="postgresql://u:p@db/agentbridge",
+    )
+
+    assert isinstance(_build_audit_logger(settings), PostgresAuditLogger)
+
+
 def test_audit_export_jsonl_redacts_query(client: TestClient) -> None:
     audit = client.app.state.audit
     audit.records.append(

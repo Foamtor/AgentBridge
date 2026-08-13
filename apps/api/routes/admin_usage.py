@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import inspect
 from typing import Any
 
+from auth.rbac import require_permission
 from fastapi import APIRouter, HTTPException, Request
 
-from auth.rbac import require_permission
 from routes.admin_common import admin_ctx
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -18,6 +19,7 @@ async def usage_tokens(
     group_by: str = "route",
     since: str | None = None,
     until: str | None = None,
+    run_id: str | None = None,
 ) -> dict[str, Any]:
     ctx = admin_ctx(request)
     require_permission(ctx, "admin:usage")
@@ -27,4 +29,13 @@ async def usage_tokens(
             detail={"code": "invalid_group_by", "message": "group_by must be tenant|route|model"},
         )
     usage_store = request.app.state.usage_store
-    return usage_store.aggregate(group_by=group_by, since=since, until=until)
+    result = usage_store.aggregate(
+        group_by=group_by,
+        since=since,
+        until=until,
+        tenant_id=ctx.tenant_id or "default",
+        run_id=run_id,
+    )
+    if inspect.isawaitable(result):
+        return await result
+    return result

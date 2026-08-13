@@ -1,6 +1,8 @@
 services:
   postgres:
     image: ${IMAGE_REGISTRY:-docker.m.daocloud.io}/pgvector/pgvector:pg16
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: change-me
@@ -30,7 +32,7 @@ services:
       LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0}
-      MODEL_CONFIG_ENCRYPTION_KEY: ${MODEL_CONFIG_ENCRYPTION_KEY:-}
+      MODEL_CONFIG_ENV_FILE: /workspace/.env
       ENABLE_DATA_SOURCE: "true"
       DATA_SOURCE_DSN: ${DATA_SOURCE_DSN:-}
       KB_EXTERNAL_BASE_URL: ${KB_EXTERNAL_BASE_URL:-}
@@ -43,6 +45,8 @@ services:
       PG_USER: postgres
       PG_PASSWORD: change-me
       USE_MEMORY_CHECKPOINTER: "false"
+    volumes:
+      - ./.env:/workspace/.env
     depends_on:
       postgres:
         condition: service_healthy

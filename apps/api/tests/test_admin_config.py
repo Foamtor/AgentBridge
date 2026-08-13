@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from routes.admin_config import _CONFIG_MANIFEST, project_config
 from config.settings import Settings
+from routes.admin_config import _CONFIG_MANIFEST, project_config
 
 
 def test_admin_config_masks_secrets(client) -> None:
@@ -36,3 +36,4 @@ def test_project_config_includes_tier_a_when_requested() -> None:
     items = project_config(Settings(), include_tier_a=True)
     keys = {item["key"] for item in items}
     assert "RATE_LIMIT_PER_MINUTE" in keys
+    assert "ADMIN_TOOL_INVOKE_ENABLED" in keys

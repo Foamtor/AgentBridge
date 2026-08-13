@@ -65,7 +65,7 @@ AgentBridge 是一个源码优先的 Python 平台，刻意把可复用运行时
 
 `apps/api/lifespan.py` 是生产组装根：负责创建适配器、注册插件，并把实现注入运行时。`packages/core` 不导入任何具体业务插件；业务插件也不自行创建基础设施适配器或直接发送 SSE。详细说明见[架构摘要](docs/architecture.md)、[事件契约](docs/contracts.md)和[不可违反的规则](AGENTS.md)。
 
-默认 Compose 会启动 React 调试台、FastAPI 服务和带 pgvector 的 PostgreSQL；Redis 与 Authentik 是可选 profile。技术预览默认使用离线模型桩和 fake 知识后端，同时以 PostgreSQL 业务数据和审批执行跑通完整演示闭环；Fake 演示仍可保留用于确定性验证。可通过 `LLM_MODE=openai_compatible`、兼容 OpenAI 的模型地址、模型名和密钥配置环境默认模型；也可设置 `MODEL_CONFIG_ENCRYPTION_KEY` 后，在控制台“模型”页保存加密模型别名，API Key 不会返回浏览器。
+默认 Compose 会启动 React 调试台、FastAPI 服务和带 pgvector 的 PostgreSQL；Redis 与 Authentik 是可选 profile。技术预览默认使用离线模型桩和 fake 知识后端，同时以 PostgreSQL 业务数据和审批执行跑通完整演示闭环；Fake 演示仍可保留用于确定性验证。可通过 `LLM_MODE=openai_compatible`、兼容 OpenAI 的模型地址、模型名和密钥配置环境默认模型；根目录 `.env` 会持久挂载给 API，管理员可在控制台“模型”页二次验证密码后生成并保存 `MODEL_CONFIG_ENCRYPTION_KEY`，本地开发和 Compose 都可使用。模型 API Key 会加密后保存，绝不会返回浏览器。
 
 ## 🤖 用 Vibe Coding 方式接入你的业务系统
 

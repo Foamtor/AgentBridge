@@ -11,6 +11,7 @@ type Props = {
   events: StreamEvent[];
   token: string;
   onPreset: (preset: "list" | "chart" | "draft") => void;
+  onApprovalResolved?: (runId: string) => Promise<void>;
   showPresets?: boolean;
   showHeading?: boolean;
 };
@@ -28,6 +29,7 @@ function asRows(value: unknown): Array<Record<string, unknown>> {
 }
 
 function Chart({ option }: { option: unknown }) {
+  const { t } = useI18n();
   const node = useRef<HTMLDivElement | null>(null);
   const [invalid, setInvalid] = useState(false);
 
@@ -48,16 +50,24 @@ function Chart({ option }: { option: unknown }) {
   }, [option]);
 
   if (invalid) return <p className="muted">Chart data is unavailable; inspect the JSON timeline below.</p>;
+  const series = (option as { series?: unknown }).series;
+  const hasData = Array.isArray(series) && series.some((item) => {
+    if (!item || typeof item !== "object") return false;
+    const data = (item as { data?: unknown }).data;
+    return Array.isArray(data) && data.length > 0;
+  });
+  if (!hasData) return <p className="golden-empty-result">{t("noChartData")}</p>;
   return <div className="golden-chart" ref={node} aria-label="Work-order chart" />;
 }
 
-export function GoldenCasePanel({ events, token, onPreset, showPresets = true, showHeading = true }: Props) {
+export function GoldenCasePanel({ events, token, onPreset, onApprovalResolved, showPresets = true, showHeading = true }: Props) {
   const { t } = useI18n();
   const list = eventData(events, "x.work_order_ops.list");
   const chart = eventData(events, "x.work_order_ops.chart");
   const citation = eventData(events, "x.bridge.citation");
   const draft = eventData(events, "x.work_order_ops.ledger_preview");
-  const approval = eventData(events, "x.bridge.approval_required");
+  const approvalEvent = [...events].reverse().find((event) => event.type === "x.bridge.approval_required");
+  const approval = approvalEvent?.data;
   const created = eventData(events, "x.work_order_ops.work_order_created");
   const [approvalState, setApprovalState] = useState<string | null>(null);
 
@@ -74,11 +84,16 @@ export function GoldenCasePanel({ events, token, onPreset, showPresets = true, s
     try {
       const response = await fetch(`${apiBase()}/approvals/${encodeURIComponent(approvalId)}`, {
         method: "POST",
+        credentials: "include",
         headers,
         body: JSON.stringify({ decision }),
       });
-      const body = (await response.json()) as { approval?: { status?: string; result?: unknown } };
+      const body = (await response.json()) as { approval?: { status?: string; result?: unknown; run_id?: string } };
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const runId = typeof body.approval?.run_id === "string"
+        ? body.approval.run_id
+        : approvalEvent?.run_id;
+      if (runId) await onApprovalResolved?.(runId);
       setApprovalState(`${t("approvalStatus")}：${body.approval?.status ?? decision}`);
     } catch (error) {
       setApprovalState(`${t("approvalFailed")}：${String(error)}`);
