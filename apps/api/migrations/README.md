@@ -9,7 +9,7 @@ Checkpointer / schema migrations.
 | `005_work_order_ops.sql` | Synthetic tenant-scoped golden-case business data |
 | `006_approval_hardening.sql` | Approval fencing, sequence, expiry and terminal projection fields |
 | `007_work_order_demo_tenant.sql` | Synthetic `rag-agent-demo` work-order reference data |
-| `008_v01_demo.sql` | Synthetic `dev` tenant data for the default v0.1.0 Compose demo |
+| `008_v01_demo.sql` | Synthetic `dev` tenant data for the default v1.0.0 Compose demo (historical filename) |
 | `009_console_auth.sql` | Local console administrator, opaque sessions and login throttling state |
 | `020_demo_readonly_dev_seed.sql` | Synthetic `dev` tenant orders for the read-only plugin demo |
 

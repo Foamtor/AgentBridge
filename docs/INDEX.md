@@ -43,8 +43,8 @@
 | [怎么加插件（细）](./add-a-domain.md) | 已经决定加插件，要逐步清单 |
 | [知识库](./knowledge-base.md) | 检索与引用细节 |
 | [路线图](./roadmap.md) | 做到哪一步了 |
-| [发布规划](./release-plan.md) | v0.1.0 首发定位、范围与延期边界 |
-| [v0.1.0 首发 Spec](./superpowers/specs/2026-08-01-p3a-open-source-release-readiness-design.md) | 当前唯一活动发布规格 |
-| [v0.1.0 首发 Plan](./superpowers/plans/2026-08-01-p3a-open-source-release-preparation.md) | 当前唯一活动实施计划 |
-| [v0.1.0 技术预览说明](./releases/v0.1.0-tech-preview.md) | 了解可体验能力、已知限制与公开发布前提 |
+| [发布规划](./release-plan.md) | v1.0.0 单机稳定版范围、门槛与后续边界 |
+| [v0.1.0 首发 Spec](./superpowers/specs/2026-08-01-p3a-open-source-release-readiness-design.md) | 历史发布规格 |
+| [v0.1.0 首发 Plan](./superpowers/plans/2026-08-01-p3a-open-source-release-preparation.md) | 历史实施计划 |
+| [v1.0.0 发布说明](./releases/v1.0.0.md) | 了解当前稳定版能力、已知限制与后续路线 |
 | [superpowers/](./superpowers/plans/README.md) | **历史**设计与分期计划（归档，日常别从这入门） |

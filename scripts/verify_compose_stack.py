@@ -1,4 +1,4 @@
-"""Bring up a disposable v0.1 Compose stack and verify the golden flow."""
+"""Bring up a disposable Compose stack and verify the golden flow."""
 
 from __future__ import annotations
 

@@ -2,7 +2,7 @@ import type { TranslationKey } from "./zh-CN";
 
 export const en: Record<TranslationKey, string> = {
   product: "AgentBridge",
-  preview: "technical preview",
+  preview: "v1.0.0",
   verify: "Verification Workbench",
   playground: "Plugin Playground",
   admin: "Admin",

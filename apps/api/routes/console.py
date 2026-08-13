@@ -80,7 +80,7 @@ async def bootstrap(request: Request) -> dict:
         else "synthetic_redacted"
     )
     return {
-        "release": {"version": "0.1.0", "stage": "technical_preview"},
+        "release": {"version": "1.0.0", "stage": "stable"},
         "runtime": {
             "auth_mode": settings.resolved_auth_mode,
             "llm_backend": settings.llm_backend,

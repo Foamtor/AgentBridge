@@ -1,6 +1,6 @@
 # Work-order operations reference domain
 
-`work_order_ops` is the v0.1.0 golden reference for converting a traditional
+`work_order_ops` is the v1.0.0 golden reference for converting a traditional
 business workflow into an AI conversation. All bundled records are synthetic.
 It demonstrates tenant-scoped lists, statistics, ECharts options, RAG
 citations, an immutable approval draft, and atomic work-order plus ledger

@@ -3,7 +3,7 @@
 给业务系统接一层 AI 对话能力（软件装在你自己的机器/机房上，叫**自托管**）：  
 业务做成插件；流式输出、同一会话别抢跑等由平台统一做。登录校验、权限、审计等能力平台也备好了，可按需打开。
 
-**v0.1.0 的首发用法：** clone/fork 后让 AI 先读本文件与 `docs/ai-instructions/`，参考 `apps/api/domains/work_order_ops/`，按规则编写自己的 domain/tools/tests，再用根目录 Compose 验证。`work_order_ops` 是真实业务模式参考，不是要复制进 core 的默认业务。
+**v1.0.0 的首发用法：** clone/fork 后让 AI 先读本文件与 `docs/ai-instructions/`，参考 `apps/api/domains/work_order_ops/`，按规则编写自己的 domain/tools/tests，再用根目录 Compose 验证。`work_order_ops` 是真实业务模式参考，不是要复制进 core 的默认业务。
 
 本文件与 `CLAUDE.md` **正文同步**（改一处请改另一处）。
 

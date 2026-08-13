@@ -1,6 +1,6 @@
 export const zhCN = {
   product: "AgentBridge",
-  preview: "技术预览",
+  preview: "v1.0.0",
   verify: "验证工作台",
   playground: "插件调试",
   admin: "管理",
