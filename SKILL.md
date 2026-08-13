@@ -256,7 +256,7 @@ AgentBridge 提供标准的 SSE 接口（`POST /chat/stream`）。你的前端�
 
 ### Q: 怎么接入真实的大模型？
 
-v0.1.0 默认使用离线 FakeChatModel，保证演示和测试不依赖外部服务。仓库已有 LLM Gateway 接口和 direct/gateway 路由骨架，但尚未提供开箱即用的真实模型供应商配置。接入真实模型时，需要在组装根实现并注入对应 Gateway adapter。参见 `docs/architecture.md` 和 `agentbridge_core.ports.llm_gateway`。
+v1.0.0 默认使用离线 FakeChatModel，保证演示和测试不依赖外部服务。仓库已有 LLM Gateway 接口和 direct/gateway 路由骨架；接入真实模型时，使用控制台模型配置或在组装根注入对应 Gateway adapter。参见 `docs/architecture.md` 和 `agentbridge_core.ports.llm_gateway`。
 
 ---
 

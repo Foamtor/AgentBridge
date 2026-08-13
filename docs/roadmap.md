@@ -1,6 +1,6 @@
 # 路线图（AgentBridge）
 
-> 当前首发范围见 [v0.1.0 开源发布 Spec](./superpowers/specs/2026-08-01-p3a-open-source-release-readiness-design.md) 与[实施 Plan](./superpowers/plans/2026-08-01-p3a-open-source-release-preparation.md)。本路线图保留长期能力地图，不替代首发计划。
+> 当前首发范围见 [v1.0.0 发布规划](./release-plan.md)。历史 v0.1.0 Spec 与实施 Plan 保留在 `docs/superpowers/` 作为实施记录。
 > 这里按「能力做到哪一步」划分，不按人天估工期。  
 > 实施记录：[superpowers/plans/README.md](./superpowers/plans/README.md)
 
@@ -75,11 +75,11 @@
 | 标签 | 含义 |
 |------|------|
 | v0.1 | M0–M1 |
-| **v0.1.0** | 首次开源技术预览：源码可读、AI 可按规则扩展、Compose 可运行黄金案例 |
+| **v0.1.0** | 历史技术预览版本 |
 | v0.2 | +M2a +M2b |
 | v0.3 | +M3 |
 | v0.4 | +M4 |
-| **v1.0** | **M0–M4、P1、P2-A 与 P3 都过**（单机主承诺）；不强制要求 P2-B、M5+ 或默认多机 |
+| **v1.0.0** | **M0–M4、P1、P2-A 与 P3 都过**（单机稳定版）；不强制要求 P2-B、M5+ 或默认多机 |
 | v1.x | 再叠已交付的 M5–M8 |
 | v1.x（多机） | +M9 |
 | v2.0 | +M10 |

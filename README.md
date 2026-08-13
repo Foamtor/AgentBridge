@@ -65,7 +65,7 @@ Client → FastAPI route → RunLifecycle → registered business graph/tools
 
 `apps/api/lifespan.py` is the production composition root: it creates adapters, registers plugins, and injects implementations into the runtime. `packages/core` never imports a concrete business plugin, and plugins do not create infrastructure adapters or emit SSE directly. See [the architecture summary](docs/architecture.md), [event contracts](docs/contracts.md), and [non-negotiable rules](AGENTS.md).
 
-The default Compose stack starts the React console, FastAPI service, and PostgreSQL with pgvector. Redis and Authentik are optional profiles. The technical preview deliberately uses an offline model stub and fake knowledge backend, while Postgres-backed business data and approval execution exercise the complete demo flow. Fake remains available for deterministic demos. For an environment default, set `LLM_MODE=openai_compatible` with an OpenAI-compatible endpoint, model, and key. The repository `.env` is persistently mounted into the API, so an administrator can re-authenticate in the console's Models page to generate and save `MODEL_CONFIG_ENCRYPTION_KEY` during both direct development and Compose use. Model API keys are encrypted at rest and never returned to the browser.
+The default Compose stack starts the React console, FastAPI service, and PostgreSQL with pgvector. Redis and Authentik are optional profiles. The v1.0.0 single-node release includes an offline model stub and fake knowledge backend for deterministic verification, while Postgres-backed business data and approval execution exercise the complete demo flow. Real OpenAI-compatible models and external RAG are opt-in integrations. For an environment default, set `LLM_MODE=openai_compatible` with an OpenAI-compatible endpoint, model, and key. The repository `.env` is persistently mounted into the API, so an administrator can re-authenticate in the console's Models page to generate and save `MODEL_CONFIG_ENCRYPTION_KEY` during both direct development and Compose use. Model API keys are encrypted at rest and never returned to the browser.
 
 ## 🤖 Vibe Coding Integration
 
@@ -171,10 +171,10 @@ SKILL.md                Vibe Coding integration guide (for AI assistants)
 
 ## 📊 Current status
 
-- 🚧 v0.1.0 Technical Preview preparation
-- 🚧 Real Docker Compose golden smoke still needs an environment with Docker Engine and registry access
+- ✅ v1.0.0 single-node stable release
+- ℹ️ Real Docker Compose golden smoke is environment-dependent and should be run before deployment
 - ✅ Reference `work_order_ops` implementation included
-- ⚠️ CI cleanup is in progress
+- ✅ Python, API, core, Web, architecture, and release-document gates pass
 - 🚧 Production deployment drills, migration/recovery, concrete IdP integration, multi-instance validation, and package publishing are post-1.0 follow-up work
 
 ## 🤝 Contributing
