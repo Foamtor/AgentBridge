@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Request
-
 from auth.run_context import claims_to_run_context
+from fastapi import APIRouter, Request
 
 router = APIRouter(prefix="/console", tags=["console"])
 
@@ -21,7 +20,7 @@ async def bootstrap(request: Request) -> dict:
     reference = next((item for item in catalog if item.get("name") == "work_order_ops"), None)
     data_class = (
         "configured_source"
-        if settings.enable_data_source and settings.data_source_dsn.strip()
+        if settings.enable_data_source
         else "synthetic_redacted"
     )
     return {

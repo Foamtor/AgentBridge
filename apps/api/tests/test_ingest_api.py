@@ -34,6 +34,21 @@ def test_ingest_fake_backend_and_searchable(client) -> None:
     assert len(jobs) >= 1
     assert jobs[0]["status"] == "completed"
 
+    search = client.post(
+        "/admin/knowledge/search",
+        json={"query": "AgentBridge pipeline"},
+    )
+    assert search.status_code == 200
+    assert search.json()["hits"] == [
+        {
+            "chunk_id": "rb-1",
+            "doc_id": "doc-rb",
+            "text": "AgentBridge ingest pipeline works",
+            "score": 2.0,
+            "metadata": {},
+        }
+    ]
+
 
 def test_ingest_rejects_empty_docs(client) -> None:
     r = client.post("/ingest", json={"docs": []})

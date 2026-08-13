@@ -34,8 +34,13 @@ DATA_SOURCE_DSN=postgresql://user:password@host:5432/your_business_database
 
 For real knowledge results, also configure `KNOWLEDGE_BACKEND=external` or `langchain_pg`. If real mode is selected while the service is still in Fake mode, the run fails explicitly with `real_model_not_configured`; it never silently claims a real-model result.
 
-For operator-managed model switching, set `MODEL_CONFIG_ENCRYPTION_KEY` once and
-use the `/models` admin page. Enter an alias, OpenAI-compatible API base, model
-name, and key. The key is stored as authenticated ciphertext in PostgreSQL and
-is never returned to the browser. The Verification Workbench and Playground
-only receive enabled aliases; Fake remains available independently.
+For operator-managed model switching, configure `MODEL_CONFIG_ENCRYPTION_KEY`
+outside PostgreSQL and use the `/models` admin page. When the API runs directly
+from the source tree, a local administrator can generate this key in the page;
+the API writes it to the repository `.env`, and must then be restarted. Enter an
+alias, OpenAI-compatible API base, model name, and key. The model key is stored
+as authenticated ciphertext in PostgreSQL and is never returned to the browser.
+Compose mounts the repository `.env` into the API, so the same page flow works
+there when the file exists before startup. Other container deployments should
+mount a persistent environment file or use a secret manager. The Verification Workbench and Playground only receive
+enabled aliases; Fake remains available independently.

@@ -96,8 +96,8 @@
 |------|------|------|------|
 | GET | `/admin/overview` | 总览（24h Run/错误、backend 探测、infra_ready） | 已有 |
 | GET | `/admin/domains` | 插件清单 `{ "domains": [...] }` | 已有 |
-| GET | `/admin/config` | 配置只读投影（档 B/C；C2+ 含档 A） | 已有 |
-| PUT | `/admin/config/{key}` | 档 A 热写（需 ConfigProvider） | 已有 C2+ |
+| GET | `/admin/config` | 配置投影；档 A 显示来源，档 C 脱敏 | 已有 |
+| PUT | `/admin/config/{key}` | 档 A 热写；本地认证每次保存需当前密码，生产持久化到 PostgreSQL | 已有 |
 | GET | `/admin/tools` | 工具目录 + 权限矩阵 | 已有 C1 |
 | POST | `/admin/tools/{name}/invoke` | 工具试调（默认关，`ADMIN_TOOL_INVOKE_ENABLED`） | 已有 C1 |
 | GET | `/admin/runs` | Run 列表（筛选/分页） | 已有 C1 |

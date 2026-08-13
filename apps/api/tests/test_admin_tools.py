@@ -3,10 +3,27 @@
 from __future__ import annotations
 
 import os
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
 from jose import jwt
+
+
+def test_tool_lookup_honors_explicit_domain() -> None:
+    from routes.admin_tools import _find_tool
+
+    class Registry:
+        def keys(self):
+            return ["alpha", "beta"]
+
+        def get(self, route: str):
+            return [SimpleNamespace(name="same_name", route=route)]
+
+    found = _find_tool(Registry(), "same_name", route="beta")
+
+    assert found is not None
+    assert found[0] == "beta"
 
 
 def test_admin_tools_returns_matrix(client) -> None:
@@ -17,6 +34,29 @@ def test_admin_tools_returns_matrix(client) -> None:
     assert "roles" in body["matrix"]
     names = {t["name"] for t in body["tools"]}
     assert "search_knowledge" in names or "echo" in names
+
+
+def test_admin_tools_exposes_all_required_permissions(client) -> None:
+    response = client.get("/admin/tools")
+
+    assert response.status_code == 200
+    draft_tool = next(
+        tool
+        for tool in response.json()["tools"]
+        if tool["name"] == "prepare_work_order_draft"
+    )
+    assert draft_tool["required_permissions_all"] == [
+        "workorder:create",
+        "workorder:assign",
+    ]
+
+
+def test_permission_only_matrix_does_not_claim_role_denial(client) -> None:
+    body = client.get("/admin/tools").json()
+    draft_tool = next(
+        tool for tool in body["tools"] if tool["name"] == "prepare_work_order_draft"
+    )
+    assert body["matrix"]["tools"][draft_tool["tool_id"]]["admin"] == "permission_required"
 
 
 def test_tool_invoke_disabled_by_default(client) -> None:

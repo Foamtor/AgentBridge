@@ -51,6 +51,30 @@ from fastapi import FastAPI
 logger = logging.getLogger(__name__)
 
 
+def _build_openai_compatible_model(
+    *,
+    api_key: str,
+    api_base: str,
+    model_name: str,
+    temperature: float,
+) -> Any:
+    """Build a bounded, single-attempt OpenAI-compatible chat client."""
+    try:
+        from langchain_openai import ChatOpenAI
+    except ImportError as exc:  # pragma: no cover - packaging failure
+        raise RuntimeError(
+            "openai-compatible models require agentbridge-core[rag]"
+        ) from exc
+    return ChatOpenAI(
+        api_key=api_key,
+        base_url=api_base.rstrip("/"),
+        model=model_name,
+        temperature=temperature,
+        max_retries=0,
+        timeout=10.0,
+    )
+
+
 def _resolve_postgres_dsn(settings: Settings) -> str:
     if settings.pg_dsn:
         return settings.pg_dsn
@@ -91,6 +115,24 @@ def _build_console_auth_store(settings: Settings) -> Any:
     return PostgresConsoleAuthStore(_resolve_postgres_dsn(settings))
 
 
+def _build_config_provider(settings: Settings) -> Any:
+    if settings.fake_runtime or settings.runtime_config_backend == "memory":
+        return MemoryConfigProvider()
+    from adapters.postgres_config_provider import PostgresConfigProvider
+
+    return PostgresConfigProvider(_resolve_postgres_dsn(settings))
+
+
+async def _restore_runtime_config(settings: Settings, provider: Any) -> None:
+    """Load only typed hot settings; deployment settings stay environment-owned."""
+    rate_limit = await provider.get("RATE_LIMIT_PER_MINUTE")
+    if isinstance(rate_limit, int) and not isinstance(rate_limit, bool) and 0 <= rate_limit <= 100000:
+        settings.rate_limit_per_minute = rate_limit
+    tool_invoke = await provider.get("ADMIN_TOOL_INVOKE_ENABLED")
+    if isinstance(tool_invoke, bool):
+        settings.admin_tool_invoke_enabled = tool_invoke
+
+
 def _build_observability_stores(settings: Settings) -> tuple[Any, Any, Any, Any]:
     """Build durable run evidence stores at the application composition root."""
     if settings.observability_store_backend == "memory":
@@ -122,7 +164,6 @@ def _build_observability_stores(settings: Settings) -> tuple[Any, Any, Any, Any]
 
 def _build_llm_models(settings: Settings) -> tuple[dict[str, Any], set[str]]:
     """Build host-owned fallback models; persistent aliases are overlaid later."""
-    from agentbridge_core.adapters.alias_llm_gateway import AliasLLMGateway
     from agentbridge_core.adapters.fake_chat_model import FakeChatModel
 
     if settings.llm_mode == "openai_compatible":
@@ -130,17 +171,11 @@ def _build_llm_models(settings: Settings) -> tuple[dict[str, Any], set[str]]:
             raise ValueError(
                 "LLM_MODE=openai_compatible requires LLM_API_KEY"
             )
-        try:
-            from langchain_openai import ChatOpenAI
-        except ImportError as exc:  # pragma: no cover - packaging failure
-            raise RuntimeError(
-                "LLM_MODE=openai_compatible requires agentbridge-core[rag]"
-            ) from exc
-        default_model = ChatOpenAI(
+        default_model = _build_openai_compatible_model(
             api_key=settings.llm_api_key,
-            base_url=settings.llm_api_base.rstrip("/"),
-            model=settings.llm_model,
-            temperature=settings.llm_temperature,
+            api_base=settings.llm_api_base,
+            model_name=settings.llm_model,
+            temperature=float(settings.llm_temperature),
         )
     elif settings.llm_mode == "fake":
         default_model = FakeChatModel(["direct-ok"])
@@ -170,6 +205,38 @@ def _build_model_config_store(settings: Settings) -> Any:
     from adapters.postgres_model_config_store import PostgresModelConfigStore
 
     return PostgresModelConfigStore(_resolve_postgres_dsn(settings))
+
+
+def _build_ingest_job_store(settings: Settings) -> Any:
+    if settings.fake_runtime or settings.runtime_config_backend == "memory":
+        return MemoryIngestJobStore()
+    from adapters.postgres_ingest_job_store import PostgresIngestJobStore
+
+    return PostgresIngestJobStore(_resolve_postgres_dsn(settings))
+
+
+def _build_audit_logger(settings: Settings) -> Any:
+    if settings.fake_runtime or settings.runtime_config_backend == "memory":
+        return MemoryAuditLogger()
+    from adapters.postgres_audit_logger import PostgresAuditLogger
+
+    return PostgresAuditLogger(_resolve_postgres_dsn(settings))
+
+
+def _build_usage_store(settings: Settings) -> Any:
+    if settings.fake_runtime or settings.runtime_config_backend == "memory":
+        return MemoryUsageStore()
+    from adapters.postgres_usage_store import PostgresUsageStore
+
+    return PostgresUsageStore(_resolve_postgres_dsn(settings))
+
+
+def _build_prompt_registry(settings: Settings) -> Any:
+    if settings.fake_runtime or settings.runtime_config_backend == "memory":
+        return MemoryPromptRegistry()
+    from adapters.postgres_prompt_registry import PostgresPromptRegistry
+
+    return PostgresPromptRegistry(_resolve_postgres_dsn(settings))
 
 
 def _build_redis(settings: Settings) -> Any | None:
@@ -225,17 +292,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         hooks = NoopHooks()
 
     policy = RolePolicyEngine()
-    audit = MemoryAuditLogger()
+    audit = _build_audit_logger(settings)
     event_log, message_store, run_store, run_annotation_store = (
         _build_observability_stores(settings)
     )
-    config_provider = MemoryConfigProvider()
-    platform_prompt_registry = MemoryPromptRegistry()
+    config_provider = _build_config_provider(settings)
+    platform_prompt_registry = _build_prompt_registry(settings)
     prompt_runtime = LayeredPromptRegistry(
         platform_prompt_registry,
         DomainFilePromptRegistry(Path(__file__).resolve().parent / "domains"),
     )
-    usage_store = MemoryUsageStore()
+    usage_store = _build_usage_store(settings)
     approval_store = _build_approval_store(settings)
     console_auth_store = _build_console_auth_store(settings)
     console_auth_service: Any | None = None
@@ -249,8 +316,27 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     retriever = await build_retriever(settings)
     data_source: Any | None = None
     approval_expiry_task: asyncio.Task[Any] | None = None
+    ingest_job_store: Any | None = None
     try:
-        ingest_job_store = MemoryIngestJobStore()
+        setup_config_provider = getattr(config_provider, "setup", None)
+        if setup_config_provider is not None:
+            result = setup_config_provider()
+            if hasattr(result, "__await__"):
+                await result
+        await _restore_runtime_config(settings, config_provider)
+        setup_audit = getattr(audit, "setup", None)
+        if setup_audit is not None:
+            await setup_audit()
+        setup_usage_store = getattr(usage_store, "setup", None)
+        if setup_usage_store is not None:
+            await setup_usage_store()
+        setup_prompt_registry = getattr(platform_prompt_registry, "setup", None)
+        if setup_prompt_registry is not None:
+            await setup_prompt_registry()
+        ingest_job_store = _build_ingest_job_store(settings)
+        setup_ingest_job_store = getattr(ingest_job_store, "setup", None)
+        if setup_ingest_job_store is not None:
+            await setup_ingest_job_store()
         knowledge_ingest = build_knowledge_ingest(
             settings,
             retriever,
@@ -296,16 +382,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         from admin.model_config_service import ModelConfigService
 
         def build_configured_model(record: dict[str, Any], api_key: str) -> Any:
-            try:
-                from langchain_openai import ChatOpenAI
-            except ImportError as exc:  # pragma: no cover - packaging failure
-                raise RuntimeError(
-                    "configured models require agentbridge-core[rag]"
-                ) from exc
-            return ChatOpenAI(
+            return _build_openai_compatible_model(
                 api_key=api_key,
-                base_url=str(record["api_base"]).rstrip("/"),
-                model=str(record["model_name"]),
+                api_base=str(record["api_base"]),
+                model_name=str(record["model_name"]),
                 temperature=float(record["temperature"]),
             )
 
@@ -431,6 +511,21 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 result = close_approval_store()
                 if hasattr(result, "__await__"):
                     await result
+            close_audit = getattr(audit, "close", None)
+            if close_audit is not None:
+                result = close_audit()
+                if hasattr(result, "__await__"):
+                    await result
+            close_usage_store = getattr(usage_store, "close", None)
+            if close_usage_store is not None:
+                result = close_usage_store()
+                if hasattr(result, "__await__"):
+                    await result
+            close_prompt_registry = getattr(platform_prompt_registry, "close", None)
+            if close_prompt_registry is not None:
+                result = close_prompt_registry()
+                if hasattr(result, "__await__"):
+                    await result
             if console_auth_store is not None:
                 close_console_auth_store = getattr(console_auth_store, "close", None)
                 if close_console_auth_store is not None:
@@ -440,6 +535,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             close_model_config_store = getattr(model_config_store, "close", None)
             if close_model_config_store is not None:
                 result = close_model_config_store()
+                if hasattr(result, "__await__"):
+                    await result
+            if ingest_job_store is not None:
+                close_ingest_job_store = getattr(ingest_job_store, "close", None)
+                if close_ingest_job_store is not None:
+                    result = close_ingest_job_store()
+                    if hasattr(result, "__await__"):
+                        await result
+            close_config_provider = getattr(config_provider, "close", None)
+            if close_config_provider is not None:
+                result = close_config_provider()
                 if hasattr(result, "__await__"):
                     await result
             for store in (

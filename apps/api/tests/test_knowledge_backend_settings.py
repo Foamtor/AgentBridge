@@ -17,6 +17,21 @@ from agentbridge_core.adapters.unsupported_knowledge_ingest import (
 from config.settings import Settings
 
 
+def test_production_ingest_job_store_is_postgres() -> None:
+    from adapters.postgres_ingest_job_store import PostgresIngestJobStore
+    from lifespan import _build_ingest_job_store
+
+    settings = Settings(
+        _env_file=None,
+        AGENTBRIDGE_FAKE_RUNTIME=False,
+        PG_DSN="postgresql://u:p@db/agentbridge",
+    )
+
+    store = _build_ingest_job_store(settings)
+
+    assert isinstance(store, PostgresIngestJobStore)
+
+
 def test_validate_langchain_pg_requires_embed(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("PG_DSN", "postgresql://u:p@localhost:5432/db")
     monkeypatch.setenv("KNOWLEDGE_BACKEND", "langchain_pg")

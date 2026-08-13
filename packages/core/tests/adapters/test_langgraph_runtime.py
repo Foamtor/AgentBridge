@@ -7,7 +7,10 @@ from typing import Any
 
 import pytest
 from agentbridge_core.adapters.langgraph_runtime import LangGraphRuntime
-from agentbridge_core.protocol.fragments import OUTBOUND_EXTENSIONS_KEY, OutboundFragment
+from agentbridge_core.protocol.fragments import (
+    OUTBOUND_EXTENSIONS_KEY,
+    OutboundFragment,
+)
 
 
 class _FakeCompiled:
@@ -135,6 +138,38 @@ async def test_runtime_no_duplicate_text_when_model_streamed():
         frags.append(frag)
     texts = [f.data.get("content") for f in frags if f.type == "text_delta"]
     assert texts == ["Hi"]
+
+
+@pytest.mark.asyncio
+async def test_runtime_emits_normalized_model_usage():
+    compiled = _FakeCompiled(
+        events=[
+            {
+                "event": "on_chat_model_end",
+                "data": {
+                    "output": SimpleNamespace(
+                        usage_metadata={"input_tokens": 9, "output_tokens": 4}
+                    )
+                },
+            }
+        ],
+        state_values={},
+    )
+    runtime = LangGraphRuntime()
+    frags: list[OutboundFragment] = []
+    async for frag in runtime.astream(
+        lambda **_kw: compiled,
+        tools=[],
+        checkpointer=None,
+        thread_id="t1",
+        query="hi",
+        cancel_token=None,
+    ):
+        frags.append(frag)
+
+    assert [(frag.type, frag.data) for frag in frags] == [
+        ("x.bridge.model_usage", {"input_tokens": 9, "output_tokens": 4})
+    ]
 
 
 @pytest.mark.asyncio

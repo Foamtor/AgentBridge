@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useI18n } from "../../i18n";
-import { adminFetch } from "./adminFetch";
+import { adminErrorMessage, adminFetch } from "./adminFetch";
 
 type Overview = {
   domains: { registered: number; graph_ready: number };
@@ -181,8 +181,8 @@ export function OverviewPage() {
   useEffect(() => {
     void adminFetch<Overview>("/admin/overview")
       .then(setData)
-      .catch((err) => setError(String(err)));
-  }, []);
+      .catch((err) => setError(adminErrorMessage(err, locale)));
+  }, [locale]);
 
   const failedRuns = data?.runs_24h.errors ?? 0;
   return <main className="page admin-hub">

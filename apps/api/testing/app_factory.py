@@ -25,6 +25,11 @@ def ensure_api_on_path() -> Path:
 
 def create_test_app():
     """Import create_app only after path fix (safe from repo root)."""
+    import os
+
+    # Tests exercise both fake and real graph runtimes without requiring a
+    # PostgreSQL service; production keeps the postgres default.
+    os.environ.setdefault("RUNTIME_CONFIG_BACKEND", "memory")
     ensure_api_on_path()
     from main import create_app
 

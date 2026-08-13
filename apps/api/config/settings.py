@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=str(PROJECT_ROOT / ".env"),
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -45,6 +49,9 @@ class Settings(BaseSettings):
     model_config_encryption_key: str = Field(
         default="", validation_alias="MODEL_CONFIG_ENCRYPTION_KEY"
     )
+    model_config_env_file: str = Field(
+        default=str(PROJECT_ROOT / ".env"), validation_alias="MODEL_CONFIG_ENV_FILE"
+    )
     use_memory_checkpointer: bool = True
     enable_data_source: bool = Field(
         default=False, validation_alias="ENABLE_DATA_SOURCE"
@@ -65,6 +72,7 @@ class Settings(BaseSettings):
         validation_alias="APPROVAL_EXPIRY_SCAN_INTERVAL_SECONDS",
     )
     fake_runtime: bool = Field(default=False, validation_alias="AGENTBRIDGE_FAKE_RUNTIME")
+    runtime_config_backend: str = Field(default="postgres", validation_alias="RUNTIME_CONFIG_BACKEND")
     hooks_backend: str = Field(default="noop", validation_alias="HOOKS_BACKEND")
     rate_limit_per_minute: int = Field(
         default=0, validation_alias="RATE_LIMIT_PER_MINUTE"
@@ -127,6 +135,23 @@ class Settings(BaseSettings):
             raise ValueError("AUTH_MODE=disabled is not allowed in production")
         if mode == "local" and self.environment.lower() == "production" and not self.auth_cookie_secure:
             raise ValueError("AUTH_COOKIE_SECURE=true is required for local auth in production")
+        if self.runtime_config_backend not in {"memory", "postgres"}:
+            raise ValueError("unsupported RUNTIME_CONFIG_BACKEND")
+        if self.runtime_config_backend == "memory" and self.environment.lower() == "production":
+            raise ValueError("RUNTIME_CONFIG_BACKEND=memory is not allowed in production")
+        if self.environment.lower() == "production":
+            if self.approval_store_backend != "postgres":
+                raise ValueError(
+                    "APPROVAL_STORE_BACKEND=postgres is required in production"
+                )
+            if self.observability_store_backend != "postgres":
+                raise ValueError(
+                    "OBSERVABILITY_STORE_BACKEND=postgres is required in production"
+                )
+            if self.use_memory_checkpointer:
+                raise ValueError(
+                    "USE_MEMORY_CHECKPOINTER=false is required in production"
+                )
 
     @property
     def resolved_auth_mode(self) -> str:

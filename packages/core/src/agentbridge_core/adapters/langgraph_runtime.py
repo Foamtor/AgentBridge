@@ -13,7 +13,10 @@ from agentbridge_core.adapters.event_mapper import (
     map_tool_call,
     map_tool_result,
 )
-from agentbridge_core.protocol.fragments import OUTBOUND_EXTENSIONS_KEY, OutboundFragment
+from agentbridge_core.protocol.fragments import (
+    OUTBOUND_EXTENSIONS_KEY,
+    OutboundFragment,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -136,6 +139,26 @@ def _tool_call_id_fallback(event: dict[str, Any], data: dict[str, Any]) -> str:
     return fallback
 
 
+def _model_usage(output: Any) -> dict[str, int] | None:
+    """Normalize provider token metadata without exposing provider-specific data."""
+    usage = getattr(output, "usage_metadata", None)
+    if usage is None:
+        response_metadata = getattr(output, "response_metadata", None)
+        if isinstance(response_metadata, dict):
+            usage = response_metadata.get("token_usage")
+    if not isinstance(usage, dict):
+        return None
+    input_tokens = usage.get("input_tokens", usage.get("prompt_tokens"))
+    output_tokens = usage.get("output_tokens", usage.get("completion_tokens"))
+    if not isinstance(input_tokens, int) or isinstance(input_tokens, bool):
+        return None
+    if not isinstance(output_tokens, int) or isinstance(output_tokens, bool):
+        return None
+    if input_tokens < 0 or output_tokens < 0:
+        return None
+    return {"input_tokens": input_tokens, "output_tokens": output_tokens}
+
+
 class LangGraphRuntime:
     async def astream(
         self,
@@ -202,6 +225,10 @@ class LangGraphRuntime:
                     if text:
                         streamed_model_text = True
                         yield map_text_delta(text)
+                elif kind == "on_chat_model_end":
+                    usage = _model_usage(data.get("output"))
+                    if usage is not None:
+                        yield OutboundFragment(type="x.bridge.model_usage", data=usage)
                 elif kind == "on_tool_start":
                     if pending_tool_call_ids:
                         tool_call_id = pending_tool_call_ids.pop(0)
@@ -256,8 +283,8 @@ class LangGraphRuntime:
             if callable(aclose):
                 try:
                     await aclose()
-                except Exception:  # noqa: BLE001
-                    pass
+                except Exception:
+                    logger.warning("Failed to close LangGraph event stream", exc_info=True)
 
         if isinstance(cancel_token, asyncio.Event) and cancel_token.is_set():
             return

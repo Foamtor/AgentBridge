@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
+import logging
 from collections.abc import AsyncIterator
-from typing import Any
-
-from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import StreamingResponse
+from typing import Annotated, Any
 
 from agentbridge_core.adapters.sse_event_sink import SseEventSink
 from agentbridge_core.application.errors import (
@@ -22,9 +21,13 @@ from agentbridge_core.protocol.sse import format_sse_line
 from agentbridge_core.public import cancel_run, orchestration_stream
 from auth.run_context import claims_to_run_context
 from deps import get_pipeline, get_run_lifecycle
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import StreamingResponse
+
 from routes.schemas import CancelRequest, ChatStreamRequest
 
 router = APIRouter(prefix="/chat", tags=["chat"])
+logger = logging.getLogger(__name__)
 
 
 def _http_error(status: int, code: str, message: str, **extra: Any) -> HTTPException:
@@ -34,17 +37,63 @@ def _http_error(status: int, code: str, message: str, **extra: Any) -> HTTPExcep
     )
 
 
+async def _record_model_usage(
+    request: Request,
+    event: dict[str, Any],
+    *,
+    tenant_id: str,
+    route: str,
+    model: str,
+) -> None:
+    if event.get("type") != "x.bridge.model_usage":
+        return
+    data = event.get("data")
+    if not isinstance(data, dict):
+        return
+    input_tokens = data.get("input_tokens")
+    output_tokens = data.get("output_tokens")
+    if not isinstance(input_tokens, int) or isinstance(input_tokens, bool):
+        return
+    if not isinstance(output_tokens, int) or isinstance(output_tokens, bool):
+        return
+    if input_tokens < 0 or output_tokens < 0:
+        return
+    try:
+        result = request.app.state.usage_store.record(
+            tenant_id=tenant_id,
+            route=route,
+            model=model or "default",
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            run_id=str(event.get("run_id") or "") or None,
+            event_id=str(event.get("event_id") or "") or None,
+        )
+        if inspect.isawaitable(result):
+            await result
+    except Exception:
+        logger.warning("model usage persistence failed", exc_info=True)
+
+
 @router.post("/stream")
 async def chat_stream(
     body: ChatStreamRequest,
     request: Request,
-    pipeline: RequestPipeline = Depends(get_pipeline),
-    lifecycle: RunLifecycle = Depends(get_run_lifecycle),
+    pipeline: Annotated[RequestPipeline, Depends(get_pipeline)],
+    lifecycle: Annotated[RunLifecycle, Depends(get_run_lifecycle)],
 ) -> StreamingResponse:
     queue: asyncio.Queue[dict[str, Any] | None | tuple[str, BaseException]] = asyncio.Queue()
     sink = SseEventSink(queue)  # type: ignore[arg-type]
     cancelled_on_disconnect = False
     settings = request.app.state.settings
+    is_real_case = body.extra.get("case_mode") == "real"
+    model_config_service = request.app.state.model_config_service
+    if is_real_case and not model_config_service.is_real_alias(body.model):
+        raise _http_error(
+            409,
+            "real_model_unavailable",
+            "real mode requires an enabled configured model",
+            model=body.model,
+        )
     claims = getattr(request.state, "auth_claims", None)
     ctx = claims_to_run_context(
         claims,
@@ -60,12 +109,12 @@ async def chat_stream(
                 "llm_gateway": request.app.state.llm_gateway,
                 "llm_mode": (
                     "openai_compatible"
-                    if body.extra.get("case_mode") == "real"
-                    and request.app.state.model_config_service.is_real_alias(body.model)
+                    if is_real_case
                     else settings.llm_mode
                 ),
                 "llm_model": settings.llm_model,
                 "retriever": request.app.state.retriever,
+                "prompt_runtime": request.app.state.prompt_runtime,
                 # Run-scoped reversible mask tokens (DataMasker); not checkpointed.
                 "token_map": dict(ctx.metadata.get("token_map") or {}),
             }
@@ -141,6 +190,13 @@ async def chat_stream(
             if first is not None and not (
                 isinstance(first, tuple) and first[0] == "__error__"
             ):
+                await _record_model_usage(
+                    request,
+                    first,
+                    tenant_id=ctx.tenant_id or "default",
+                    route=body.route,
+                    model=body.model,
+                )
                 yield format_sse_line(first)  # type: ignore[arg-type]
             while True:
                 if await request.is_disconnected():
@@ -165,6 +221,13 @@ async def chat_stream(
                     # Mid-stream host errors must not synthesize r-host frames;
                     # lifecycle owns terminal error events.
                     break
+                await _record_model_usage(
+                    request,
+                    item,
+                    tenant_id=ctx.tenant_id or "default",
+                    route=body.route,
+                    model=body.model,
+                )
                 yield format_sse_line(item)  # type: ignore[arg-type]
         finally:
             if not task.done() and not cancelled_on_disconnect:
@@ -185,7 +248,7 @@ async def chat_stream(
 async def chat_cancel(
     body: CancelRequest,
     request: Request,
-    lifecycle: RunLifecycle = Depends(get_run_lifecycle),
+    lifecycle: Annotated[RunLifecycle, Depends(get_run_lifecycle)],
 ) -> dict[str, bool]:
     settings = request.app.state.settings
     claims = getattr(request.state, "auth_claims", None)

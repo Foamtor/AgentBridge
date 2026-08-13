@@ -17,6 +17,7 @@ from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatc
 
 from auth.ports import ConsoleAuthStore
 
+
 class PasswordPolicyError(ValueError):
     def __init__(self, code: str) -> None:
         super().__init__(code)
@@ -233,3 +234,28 @@ class ConsoleAdminService:
         fresh = await self.store.get_session(self.hash_session(token))
         assert fresh is not None
         return AuthSession(token, username, "authenticated", fresh["expires_at"])
+
+    async def verify_reauthentication(
+        self, *, session_token: str, password: str
+    ) -> str:
+        """Verify an active admin session's password without issuing a session."""
+        record = await self.get_session(session_token)
+        if not record or record.get("kind") != "authenticated":
+            raise AuthSessionError("invalid_session")
+        bucket_key = f"reauth:{self.hash_session(session_token)}"
+        now = datetime.now(timezone.utc)
+        failures = await self.store.get_login_failures(bucket_key)
+        if failures and int(failures.get("failures") or 0) >= 5:
+            first_failure = failures.get("first_failure_at") or failures.get("last_failure_at")
+            if isinstance(first_failure, datetime) and first_failure.tzinfo is None:
+                first_failure = first_failure.replace(tzinfo=timezone.utc)
+            if isinstance(first_failure, datetime) and (now - first_failure).total_seconds() < self.login_failure_window_seconds:
+                raise AuthSessionError("auth_rate_limited")
+            await self.store.clear_login_failures(bucket_key)
+        username = str(record["username"])
+        admin = await self.store.get_admin(username)
+        if admin is None or not self.verify_password(admin["password_hash"], password):
+            await self.store.record_login_failure(bucket_key, now=now)
+            raise AuthSessionError("reauth_invalid_credentials")
+        await self.store.clear_login_failures(bucket_key)
+        return username

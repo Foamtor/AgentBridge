@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { adminFetch } from "./adminFetch";
+import { useI18n } from "../../i18n";
 
 type UsageResponse = {
   group_by: string;
@@ -8,6 +9,8 @@ type UsageResponse = {
 };
 
 export function UsagePage() {
+  const { locale } = useI18n();
+  const copy = locale === "en" ? { title: "Token usage", intro: "View this tenant's recorded usage by capability or model.", group: "Group by", tenant: "Tenant", route: "Capability", model: "Model", loading: "Loading…", empty: "No usage data", input: "Input", output: "Output", error: "Could not load token usage." } : { title: "Token 用量", intro: "按业务能力或模型查看当前租户已记录的用量。", group: "分组方式", tenant: "租户", route: "业务能力", model: "模型", loading: "加载中…", empty: "暂无用量数据", input: "输入", output: "输出", error: "无法读取 Token 用量。" };
   const [groupBy, setGroupBy] = useState("route");
   const [data, setData] = useState<UsageResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -15,29 +18,29 @@ export function UsagePage() {
   useEffect(() => {
     void adminFetch<UsageResponse>(`/admin/usage/tokens?group_by=${groupBy}`)
       .then(setData)
-      .catch((err) => setError(String(err)));
-  }, [groupBy]);
+      .catch(() => setError(copy.error));
+  }, [groupBy, copy.error]);
 
   return (
     <main className="page">
       <header>
-        <h1>Token 用量</h1>
-        <p className="lede">按 tenant / route / model 聚合；无上报数据时显示空列表。</p>
+        <h1>{copy.title}</h1>
+        <p className="lede">{copy.intro}</p>
       </header>
       <label>
-        group_by
+        {copy.group}
         <select value={groupBy} onChange={(e) => setGroupBy(e.target.value)}>
-          <option value="tenant">tenant</option>
-          <option value="route">route</option>
-          <option value="model">model</option>
+          <option value="tenant">{copy.tenant}</option>
+          <option value="route">{copy.route}</option>
+          <option value="model">{copy.model}</option>
         </select>
       </label>
       {error ? <p className="error">{error}</p> : null}
-      {!data && !error ? <p className="muted">加载中…</p> : null}
+      {!data && !error ? <p className="muted">{copy.loading}</p> : null}
       {data ? (
         <>
           {data.items.length === 0 ? (
-            <p className="muted">暂无用量数据</p>
+            <p className="muted">{copy.empty}</p>
           ) : (
             <table className="config-table">
               <thead>
@@ -59,7 +62,7 @@ export function UsagePage() {
             </table>
           )}
           <p className="muted">
-            合计 input={data.totals.input_tokens} output={data.totals.output_tokens}
+            {copy.input}={data.totals.input_tokens} · {copy.output}={data.totals.output_tokens}
           </p>
         </>
       ) : null}

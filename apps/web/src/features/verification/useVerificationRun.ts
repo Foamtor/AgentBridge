@@ -70,5 +70,13 @@ export function useVerificationRun() {
     }
   }
 
-  return { scenario, setScenario, mode, setMode, model, setModel, threadId, query, verification, busy, error, run, cancel };
+  async function reload(runId: string) {
+    const response = await fetch(`${apiBase()}/runs/${encodeURIComponent(runId)}/events`, { credentials: "include" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const events = await response.json() as unknown;
+    if (!Array.isArray(events)) throw new Error("invalid run event response");
+    dispatch({ type: "hydrate", events });
+  }
+
+  return { scenario, setScenario, mode, setMode, model, setModel, threadId, query, verification, busy, error, run, cancel, reload };
 }

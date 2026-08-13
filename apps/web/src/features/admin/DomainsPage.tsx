@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useI18n } from "../../i18n";
-import { adminFetch } from "./adminFetch";
+import { adminErrorMessage, adminFetch } from "./adminFetch";
 
 type ToolDetail = {
   name: string;
@@ -102,8 +102,8 @@ export function DomainsPage() {
   useEffect(() => {
     void adminFetch<{ domains: Domain[] }>("/admin/domains")
       .then((body) => setDomains(body.domains))
-      .catch((err) => setError(String(err)));
-  }, []);
+      .catch((err) => setError(adminErrorMessage(err, locale)));
+  }, [locale]);
 
   return <main className="page domains-page">
     <header className="domains-header"><div><p className="eyebrow">AgentBridge / {copy.source}</p><h1>{copy.title}</h1><p className="lede">{copy.intro}</p></div><Link className="primary" to="/playground">{copy.test} -&gt;</Link></header>

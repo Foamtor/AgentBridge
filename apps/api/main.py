@@ -2,33 +2,39 @@
 
 from __future__ import annotations
 
-from fastapi import FastAPI
+import asyncio
+import sys
 
 from auth.middleware import OptionalOidcMiddleware
 from auth.oidc import validate_auth_settings
 from config.settings import get_settings
+from fastapi import FastAPI
 from lifespan import _build_redis, lifespan
 from middleware.rate_limit import RateLimitMiddleware
 from routes.admin import router as admin_router
 from routes.admin_config import router as admin_config_router
+from routes.admin_config_write import router as admin_config_write_router
+from routes.admin_knowledge import router as admin_knowledge_router
 from routes.admin_overview import router as admin_overview_router
 from routes.admin_runs import router as admin_runs_router
-from routes.admin_config_write import router as admin_config_write_router
 from routes.admin_tools import router as admin_tools_router
-from routes.admin_knowledge import router as admin_knowledge_router
 from routes.admin_usage import router as admin_usage_router
-from routes.ingest import router as ingest_router
-from routes.prompts import router as prompts_router
 from routes.approvals import router as approvals_router
 from routes.auth import router as auth_router
-from routes.console import router as console_router
 from routes.chat import router as chat_router
+from routes.console import router as console_router
 from routes.health import router as health_router
+from routes.ingest import router as ingest_router
 from routes.metrics import router as metrics_router
 from routes.models import router as models_router
+from routes.prompts import router as prompts_router
 from routes.ready import router as ready_router
 from routes.runs import router as runs_router
 from routes.threads import router as threads_router
+
+# psycopg's async connection cannot run on Windows' default Proactor loop.
+if sys.platform == "win32" and hasattr(asyncio, "WindowsSelectorEventLoopPolicy"):
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 
 def create_app() -> FastAPI:

@@ -5,15 +5,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from agentbridge_core.protocol.context import RunContext
+from config.settings import Settings
 from fastapi import APIRouter, HTTPException, Request
 
-from agentbridge_core.protocol.context import RunContext
 from routes.admin_common import admin_ctx
-from config.settings import Settings
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 Tier = Literal["A", "B", "C"]
+ConfigSource = Literal["database", "memory"]
 
 
 @dataclass(frozen=True)
@@ -70,6 +71,12 @@ def _is_configured(value: Any) -> bool:
     return True
 
 
+def runtime_config_source(settings: Settings) -> ConfigSource:
+    if settings.fake_runtime or settings.runtime_config_backend == "memory":
+        return "memory"
+    return "database"
+
+
 def project_config(
     settings: Settings, *, include_tier_a: bool = False
 ) -> list[dict[str, Any]]:
@@ -93,6 +100,7 @@ def project_config(
             item["value"] = raw
             if spec.tier == "A":
                 item["writable"] = True
+                item["source"] = "deployment"
         items.append(item)
     return items
 
@@ -110,4 +118,5 @@ async def get_config(request: Request) -> dict[str, Any]:
             override = await provider.get(item["key"])
             if override is not None:
                 item["value"] = override
+                item["source"] = runtime_config_source(request.app.state.settings)
     return {"items": items}

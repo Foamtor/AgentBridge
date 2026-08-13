@@ -12,5 +12,8 @@ class MemoryConfigProvider:
     async def get(self, key: str) -> Any | None:
         return self._values.get(key)
 
-    async def set(self, key: str, value: Any) -> None:
+    async def set(
+        self, key: str, value: Any, *, updated_by: str | None = None
+    ) -> None:
+        _ = updated_by
         self._values[key] = value

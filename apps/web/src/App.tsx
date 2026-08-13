@@ -1,4 +1,5 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useEffect } from "react";
 import { AuthProvider, useAuth } from "./features/auth/session";
 import { I18nProvider, useI18n } from "./i18n";
 import { AppRoutes } from "./routes";
@@ -13,9 +14,23 @@ export function App() {
 
 function AppFrame() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { session, logout } = useAuth();
   const { t, toggleLocale } = useI18n();
   const authenticated = session?.status === "authenticated";
+
+  useEffect(() => {
+    const onAuthError = (event: Event) => {
+      const status = (event as CustomEvent<{ status?: number }>).detail?.status;
+      if (status === 401) {
+        void logout();
+        navigate("/login", { replace: true });
+      }
+      if (status === 403) navigate("/forbidden", { replace: true });
+    };
+    window.addEventListener("agentbridge:auth-error", onAuthError);
+    return () => window.removeEventListener("agentbridge:auth-error", onAuthError);
+  }, [logout, navigate]);
 
   if (!authenticated) return <AppRoutes />;
 

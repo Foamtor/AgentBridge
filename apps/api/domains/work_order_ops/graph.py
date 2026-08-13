@@ -175,15 +175,19 @@ async def _plan_reads_model(
     ]
     if gateway is None or not read_tools:
         return _plan_reads(state, config, available_names=available_names)
+    messages, prompt_evidence = await _planner_messages(state, ctx)
     response = await gateway.chat(
-        [{"role": "user", "content": _query_text(state)}],
+        messages,
         ctx=ctx,
         model=state.get("model_alias"),
         tools=read_tools,
     )
     raw_calls = getattr(response, "tool_calls", None)
     if not isinstance(raw_calls, list):
-        return _plan_reads(state, config, available_names=available_names)
+        result = _plan_reads(state, config, available_names=available_names)
+        if prompt_evidence:
+            result["prompt_evidence"] = prompt_evidence
+        return result
     tool_calls: list[dict[str, Any]] = []
     call_ids: dict[str, str] = {}
     for index, item in enumerate(raw_calls):
@@ -203,12 +207,46 @@ async def _plan_reads_model(
             }
         )
     if not tool_calls:
-        return _plan_reads(state, config, available_names=available_names)
-    return {
+        result = _plan_reads(state, config, available_names=available_names)
+        if prompt_evidence:
+            result["prompt_evidence"] = prompt_evidence
+        return result
+    result: dict[str, Any] = {
         "messages": [AIMessage(content="", tool_calls=tool_calls)],
         "current_read_call_ids": call_ids,
         "current_draft_call_id": None,
     }
+    if prompt_evidence:
+        result["prompt_evidence"] = prompt_evidence
+    return result
+
+
+async def _planner_messages(
+    state: WorkOrderOpsState,
+    ctx: Any,
+) -> tuple[list[dict[str, str]], list[dict[str, Any]]]:
+    messages = [{"role": "user", "content": _query_text(state)}]
+    evidence: list[dict[str, Any]] = []
+    runtime = ctx.metadata.get("prompt_runtime")
+    resolve = getattr(runtime, "resolve", None)
+    if not callable(resolve):
+        return messages, evidence
+    resolved = resolve("work_order_ops.planner")
+    if hasattr(resolved, "__await__"):
+        resolved = await resolved
+    if not isinstance(resolved, dict) or not resolved.get("content"):
+        return messages, evidence
+    prompt = {
+        "name": "work_order_ops.planner",
+        "source": str(resolved.get("source") or "platform"),
+        "version": int(resolved.get("version") or 0),
+    }
+    evidence.append(prompt)
+    ctx.metadata.setdefault("prompt_evidence", []).append(prompt)
+    return [
+        {"role": "system", "content": str(resolved["content"])},
+        *messages,
+    ], evidence
 
 
 def _draft_call(args: dict[str, Any], *, call_id: str) -> AIMessage:
@@ -405,7 +443,7 @@ def _read_draft(
     return None, True
 
 
-def _present(state: WorkOrderOpsState) -> dict[str, Any]:
+def _present(state: WorkOrderOpsState, config: RunnableConfig | None = None) -> dict[str, Any]:
     query = _query_text(state)
     raw_rows = _read_rows(state)
     safe_rows = [
@@ -436,6 +474,11 @@ def _present(state: WorkOrderOpsState) -> dict[str, Any]:
             },
         },
     ]
+    prompt_evidence = state.get("prompt_evidence")
+    if isinstance(prompt_evidence, list) and prompt_evidence:
+        extensions.append(
+            {"type": "x.bridge.prompt", "data": {"prompts": prompt_evidence}}
+        )
     draft, invalid_draft = _read_draft(state)
     output: dict[str, Any] = {OUTBOUND_EXTENSIONS_KEY: extensions}
     if invalid_draft:
@@ -527,7 +570,10 @@ def build_work_order_ops_graph(
             handle_tool_errors=_DRAFT_VALIDATION_MESSAGE,
         ),
     )
-    graph.add_node("present", _present)
+    def present(state: WorkOrderOpsState, config: RunnableConfig) -> dict[str, Any]:
+        return _present(state, config)
+
+    graph.add_node("present", present)
     graph.add_edge(START, "plan_reads")
     graph.add_edge("plan_reads", "read_tools")
     graph.add_edge("read_tools", "plan_draft")
