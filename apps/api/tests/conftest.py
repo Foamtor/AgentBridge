@@ -10,9 +10,21 @@ from testing.app_factory import create_test_app, ensure_api_on_path
 
 ensure_api_on_path()
 
-# Ensure Settings picks up fake runtime before create_app/lifespan.
-os.environ.setdefault("AGENTBRIDGE_FAKE_RUNTIME", "1")
-os.environ.setdefault("OBSERVABILITY_STORE_BACKEND", "memory")
+# Keep API tests independent from the developer's root .env.  Individual
+# tests override these values when they intentionally exercise another mode.
+os.environ.update(
+    {
+        "AGENTBRIDGE_FAKE_RUNTIME": "1",
+        "AUTH_MODE": "",
+        "AUTH_REQUIRED": "false",
+        "AUTH_DEV_STUB": "false",
+        "ENABLE_DATA_SOURCE": "false",
+        "KNOWLEDGE_BACKEND": "fake",
+        "OBSERVABILITY_STORE_BACKEND": "memory",
+        "RUNTIME_CONFIG_BACKEND": "memory",
+        "USE_MEMORY_CHECKPOINTER": "true",
+    }
+)
 
 
 @pytest.fixture(autouse=True)

@@ -11,7 +11,21 @@ from domains.work_order_ops.tools import (
     work_order_statistics,
 )
 
-DOMAIN_META = {"description": "脱敏工单运营黄金案例"}
+DOMAIN_META = {
+    "description": "查询、统计和创建脱敏工单，用于体验完整业务流程",
+    "routing": {
+        "keywords": [
+            "工单", "状态", "规范", "知识", "创建", "新建",
+            "work order", "ticket", "sop", "knowledge", "create",
+        ],
+        "tool_rules": [
+            {"tool": "list_work_orders", "keywords": ["工单", "列表", "查询", "list", "show"]},
+            {"tool": "work_order_statistics", "keywords": ["状态", "统计", "分布", "chart", "statistics"]},
+            {"tool": "search_work_order_knowledge", "keywords": ["规范", "知识", "sop", "knowledge"]},
+            {"tool": "prepare_work_order_draft", "keywords": ["创建", "新建", "草稿", "create", "draft"]},
+        ],
+    },
+}
 
 
 def _build_input(

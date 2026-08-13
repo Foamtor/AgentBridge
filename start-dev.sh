@@ -4,7 +4,8 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT"
 
 echo "Starting API on http://127.0.0.1:8000 ..."
-python -m uvicorn main:app --app-dir apps/api --reload --port 8000 &
+python -m uvicorn main:app --app-dir apps/api --reload \
+  --reload-dir apps/api --reload-dir packages/core/src --port 8000 &
 API_PID=$!
 echo "$API_PID" > .agentbridge-api.pid
 

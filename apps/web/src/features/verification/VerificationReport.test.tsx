@@ -30,4 +30,42 @@ describe("VerificationReport", () => {
     const checks = container.querySelector(".report-checks");
     expect(display?.compareDocumentPosition(checks!)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
+
+  it("renders a knowledge result without an unrelated empty chart", () => {
+    render(<VerificationReport
+      question="处理此类工单应遵循什么规范？"
+      token=""
+      scenario="knowledge"
+      events={[{
+        type: "x.bridge.citation",
+        event_id: "e-citation",
+        data: {
+          citations: [{
+            chunk_id: "work-order-reference-sop",
+            doc_id: "work-order-reference-sop",
+            text: "Work-order handling SOP",
+          }],
+        },
+      }]}
+    />);
+
+    expect(screen.getByText("work-order-reference-sop")).toBeInTheDocument();
+    expect(screen.getByText("Work-order handling SOP")).toBeInTheDocument();
+    expect(screen.queryByText("统计图表")).not.toBeInTheDocument();
+  });
+
+  it("does not claim success when knowledge retrieval returns no hits", () => {
+    render(<VerificationReport
+      question="处理此类工单应遵循什么规范？"
+      token=""
+      scenario="knowledge"
+      events={[
+        { type: "x.bridge.citation", event_id: "e-citation", data: { citations: [] } },
+        { type: "done", event_id: "e-done" },
+      ]}
+    />);
+
+    expect(screen.getByText("没有检索到匹配的处理规范。")).toBeInTheDocument();
+    expect(screen.queryByText("已生成结构化业务结果，请查看下方业务展示。")).not.toBeInTheDocument();
+  });
 });

@@ -49,6 +49,8 @@ class KnowledgeStatusProvider:
                 jobs = await self._ingest_jobs.list_jobs(tenant_id=tenant_id)
             return {
                 "backend": backend,
+                "tenant_id": tenant_id,
+                "scope": "tenant",
                 "healthy": healthy,
                 "embedding": embedding,
                 "ingest_jobs": jobs,
@@ -61,6 +63,8 @@ class KnowledgeStatusProvider:
             jobs = await self._ingest_jobs.list_jobs(tenant_id=tenant_id)
         return {
             "backend": backend,
+            "tenant_id": tenant_id,
+            "scope": "tenant",
             "healthy": healthy,
             "embedding": embedding,
             "ingest_jobs": jobs,

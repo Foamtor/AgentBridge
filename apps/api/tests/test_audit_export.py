@@ -18,6 +18,7 @@ def test_production_audit_logger_is_postgres() -> None:
     settings = Settings(
         _env_file=None,
         AGENTBRIDGE_FAKE_RUNTIME=False,
+        RUNTIME_CONFIG_BACKEND="postgres",
         PG_DSN="postgresql://u:p@db/agentbridge",
     )
 

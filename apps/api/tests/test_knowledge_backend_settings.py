@@ -10,11 +10,36 @@ from adapters.knowledge_backend import (
     validate_rag_agent_pg_settings,
 )
 from adapters.knowledge_ingest_factory import build_knowledge_ingest
+from agentbridge_core.adapters.fake_retriever import FakeRetriever
 from agentbridge_core.adapters.memory_ingest_job_store import MemoryIngestJobStore
 from agentbridge_core.adapters.unsupported_knowledge_ingest import (
     UnsupportedKnowledgeIngest,
 )
 from config.settings import Settings
+
+
+@pytest.mark.asyncio
+async def test_fake_backend_seeds_tenant_scoped_reference_sop() -> None:
+    retriever = await build_retriever(
+        Settings(_env_file=None, KNOWLEDGE_BACKEND="fake")
+    )
+
+    assert isinstance(retriever, FakeRetriever)
+    hits = await retriever.similarity_search(
+        "search the work-order SOP", tenant_id="dev"
+    )
+    other_tenant_hits = await retriever.similarity_search(
+        "search the work-order SOP", tenant_id="other"
+    )
+
+    assert hits[0]["chunk_id"] == "work-order-reference-sop"
+    assert hits[0]["metadata"]["synthetic"] is True
+    assert other_tenant_hits == []
+
+    chinese_hits = await retriever.similarity_search(
+        "工单处理 SOP", tenant_id="dev"
+    )
+    assert chinese_hits[0]["chunk_id"] == "work-order-reference-sop"
 
 
 def test_production_ingest_job_store_is_postgres() -> None:
@@ -24,6 +49,7 @@ def test_production_ingest_job_store_is_postgres() -> None:
     settings = Settings(
         _env_file=None,
         AGENTBRIDGE_FAKE_RUNTIME=False,
+        RUNTIME_CONFIG_BACKEND="postgres",
         PG_DSN="postgresql://u:p@db/agentbridge",
     )
 

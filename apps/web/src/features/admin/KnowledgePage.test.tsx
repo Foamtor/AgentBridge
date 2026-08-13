@@ -16,6 +16,7 @@ describe("KnowledgePage", () => {
       }
       return Promise.resolve(new Response(JSON.stringify({
         backend: "langchain_pg", healthy: true,
+        tenant_id: "default", scope: "tenant",
         embedding: { status: "ok", model: "bge-m3" },
         ingest_jobs: [{ job_id: "ing-123", status: "completed", ingested_count: 1, updated_at: "2026-08-06T10:00:00Z" }],
       }), { status: 200 }));
@@ -35,5 +36,9 @@ describe("KnowledgePage", () => {
     ));
     expect(await screen.findByText("ing-123")).toBeInTheDocument();
     expect(screen.getAllByText("已导入 1 段")).toHaveLength(2);
+    expect(screen.getByText("当前租户（default）")).toBeInTheDocument();
+    expect(screen.getByText("检索只返回当前租户的数据。")).toBeInTheDocument();
+    expect(screen.getByText("AgentBridge PostgreSQL")).toBeInTheDocument();
+    expect(screen.getByText("AgentBridge PostgreSQL 知识库")).toBeInTheDocument();
   });
 });

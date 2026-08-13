@@ -113,6 +113,7 @@ async def chat_stream(
                     else settings.llm_mode
                 ),
                 "llm_model": settings.llm_model,
+                "llm_model_alias": body.model,
                 "retriever": request.app.state.retriever,
                 "prompt_runtime": request.app.state.prompt_runtime,
                 # Run-scoped reversible mask tokens (DataMasker); not checkpointed.

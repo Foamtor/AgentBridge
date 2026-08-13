@@ -5,7 +5,8 @@ Set-Location $root
 
 Write-Host "Starting API on http://127.0.0.1:8000 ..."
 $api = Start-Process -PassThru -NoNewWindow python -ArgumentList @(
-  "-m", "uvicorn", "main:app", "--app-dir", "apps/api", "--reload", "--port", "8000"
+  "-m", "uvicorn", "main:app", "--app-dir", "apps/api", "--reload",
+  "--reload-dir", "apps/api", "--reload-dir", "packages/core/src", "--port", "8000"
 )
 
 $webDir = Join-Path $root "apps\web"

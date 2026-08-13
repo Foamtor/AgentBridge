@@ -15,12 +15,12 @@ type ConfigItem = {
 const copy = {
   "zh-CN": {
     title: "平台配置",
-    intro: "在线调整仅适用于无需重启的运行参数，保存后立即生效并持久化到数据库。部署、连接和安全配置仍由环境变量或部署系统管理。",
+    intro: "这里只调整无需重启的运行参数，保存后立即生效并写入数据库。部署、连接和安全配置由环境变量或部署系统管理。每项配置都会标明修改边界和来源。",
     runtime: "在线运行参数",
     runtimeHint: "每次保存都会在服务端确认当前管理员密码，并记录配置变更。",
     password: "确认当前密码",
     passwordHint: "每次保存都需要重新验证；密码不会被保存。",
-    key: "键",
+    key: "配置项",
     value: "当前值",
     source: "来源",
     description: "作用",
@@ -42,12 +42,12 @@ const copy = {
   },
   en: {
     title: "Platform configuration",
-    intro: "Only restart-free runtime parameters can be changed here. They take effect immediately and are persisted in the database. Deployment, connection, and security settings remain deployment-managed.",
+    intro: "Only restart-free runtime parameters can be changed here. They are persisted in the database. Deployment, connection, and security settings remain deployment-managed, with their boundary and source shown explicitly.",
     runtime: "Live runtime parameters",
     runtimeHint: "Every save verifies the current administrator password on the server and records the change.",
     password: "Confirm current password",
     passwordHint: "The password is verified on every save and is never stored.",
-    key: "Key",
+    key: "Setting",
     value: "Current value",
     source: "Source",
     description: "Effect",
@@ -112,7 +112,13 @@ export function ConfigPage() {
       setCurrentPassword("");
       setNotice(text.saved);
     } catch (err) {
-      setError((err as { status?: number }).status === 401 ? text.authError : text.error);
+      const requestError = err as { status?: number; code?: string };
+      setError(
+        requestError.status === 401
+        && (requestError.code === "current_password_required" || requestError.code === "reauth_invalid_credentials")
+          ? text.authError
+          : text.error,
+      );
     } finally {
       setSaving(null);
     }

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-DOMAIN_META = {"description": "多 Agent 协作示例插件"}
+DOMAIN_META = {"description": "让多个角色分工处理同一问题，用于验证协作流程"}
 
 from agentbridge_core.registry.graphs import GraphRegistry
 from agentbridge_core.registry.input_builders import InputBuilderRegistry

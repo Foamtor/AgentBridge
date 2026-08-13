@@ -22,9 +22,9 @@ type ToolsResponse = {
 export function ToolsPage() {
   const { locale } = useI18n();
   const copy = locale === "en" ? {
-    title: "Tools and permissions", intro: "Review plugin tools, required access, and the role matrix. Invocation requires ADMIN_TOOL_INVOKE_ENABLED.", name: "Name", domain: "Plugin", any: "Any of these permissions", all: "All of these permissions", roles: "Roles", select: "Select", loading: "Loading…", invoke: "Test tool", disabled: "Tool testing is disabled by the server.", args: "Arguments (JSON)", call: "Call", result: "Result", noExtra: "None", permissionRequired: "Depends on account permissions",
+    title: "Tool permissions", intro: "Review what each plugin tool does, who can call it, and whether approval is required. Direct tool calls are an advanced diagnostic and may have side effects.", name: "Tool", domain: "Plugin", any: "Any of these permissions", all: "All of these permissions", roles: "Roles", select: "Advanced test", loading: "Loading…", invoke: "Advanced tool test", disabled: "Tool testing is disabled by the server.", args: "Arguments (JSON)", call: "Call tool", result: "Result", noExtra: "None", permissionRequired: "Depends on account permissions", matrix: "Permission matrix", advancedHint: "This bypasses the model and does not represent a complete plugin flow. Use only with safe test data.", close: "Close",
   } : {
-    title: "工具与权限", intro: "查看插件工具、所需权限和角色矩阵。试调需要后端开启 ADMIN_TOOL_INVOKE_ENABLED。", name: "名称", domain: "插件", any: "满足任一权限", all: "必须同时具备", roles: "角色", select: "选择", loading: "加载中…", invoke: "试调工具", disabled: "后端未开启工具试调。", args: "参数（JSON）", call: "调用", result: "结果", noExtra: "无", permissionRequired: "取决于账号权限",
+    title: "工具权限", intro: "查看每个插件工具的作用、可调用对象和审批要求。直接调用属于高级排障操作，可能产生业务副作用。", name: "工具", domain: "插件", any: "满足任一权限", all: "必须同时具备", roles: "角色", select: "高级试调", loading: "加载中…", invoke: "高级工具试调", disabled: "后端未开启工具试调。", args: "参数（JSON）", call: "调用工具", result: "调用结果", noExtra: "无", permissionRequired: "取决于账号权限", matrix: "权限矩阵", advancedHint: "此操作会绕过模型，不代表完整插件流程。请只使用安全的测试数据。", close: "关闭",
   };
   const [searchParams] = useSearchParams();
   const routeFilter = searchParams.get("route") ?? "";
@@ -62,8 +62,8 @@ export function ToolsPage() {
   const visibleTools = data?.tools.filter((tool) => !routeFilter || tool.domain === routeFilter) ?? [];
 
   return (
-    <main className="page">
-      <header>
+    <main className="page admin-subpage tools-page">
+      <header className="admin-page-header">
         <h1>{copy.title}</h1>
         <p className="lede">{routeFilter ? `${routeFilter} · ` : ""}{copy.intro}</p>
       </header>
@@ -94,7 +94,7 @@ export function ToolsPage() {
               ))}
             </tbody>
           </table>
-          <h2>权限矩阵</h2>
+          <h2>{copy.matrix}</h2>
           <table className="config-table">
             <thead>
               <tr>
@@ -119,13 +119,14 @@ export function ToolsPage() {
             </tbody>
           </table>
           {selected ? (
-            <section>
+            <section className="tool-invoke-panel">
               <h2>{copy.invoke}: {selected.name}</h2>
+              <p className="muted">{copy.advancedHint}</p>
               {!selected.invoke_allowed ? (
                 <p className="muted">{copy.disabled}</p>
               ) : null}
-              <label>
-                {copy.args}
+              <label className="admin-editor-content">
+                <span>{copy.args}</span>
                 <textarea
                   rows={4}
                   value={argsJson}
@@ -142,6 +143,7 @@ export function ToolsPage() {
                 </button>
               </div>
               {invokeResult ? <><h3>{copy.result}</h3><pre>{invokeResult}</pre></> : null}
+              <button type="button" className="secondary-command" onClick={() => { setSelected(null); setInvokeResult(null); }}>{copy.close}</button>
             </section>
           ) : null}
         </>

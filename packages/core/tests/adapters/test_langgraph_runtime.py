@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from types import SimpleNamespace
 from typing import Any
 
@@ -26,6 +27,14 @@ class _FakeCompiled:
     async def aget_state(self, config):
         self.aget_state_calls.append(config)
         return SimpleNamespace(values=self._state_values)
+
+
+class _SlowCompiled(_FakeCompiled):
+    async def astream_events(self, *_args, **_kwargs):
+        for index, event in enumerate(self._events):
+            if index:
+                await asyncio.sleep(0.06)
+            yield event
 
 
 @pytest.mark.asyncio
@@ -73,6 +82,36 @@ async def test_runtime_yields_tool_result_and_extensions_via_aget_state():
 
 
 @pytest.mark.asyncio
+async def test_runtime_does_not_cancel_graph_events_while_waiting_for_model() -> None:
+    compiled = _SlowCompiled(
+        events=[
+            {"event": "on_chain_start", "name": "plan_reads", "data": {}},
+            {
+                "event": "on_tool_start",
+                "name": "list_work_orders",
+                "run_id": "tc-list",
+                "data": {"input": {}},
+            },
+        ],
+        state_values={},
+    )
+
+    fragments = [
+        fragment
+        async for fragment in LangGraphRuntime().astream(
+            lambda **_kwargs: compiled,
+            tools=[],
+            checkpointer=None,
+            thread_id="thread",
+            query="show work orders",
+            cancel_token=asyncio.Event(),
+        )
+    ]
+
+    assert [fragment.type for fragment in fragments] == ["step_update", "tool_call"]
+
+
+@pytest.mark.asyncio
 async def test_runtime_extensions_not_from_on_chain_end_output():
     """Even if on_chain_end output contains the key, we only read via aget_state."""
     compiled = _FakeCompiled(
@@ -110,6 +149,34 @@ async def test_runtime_extensions_not_from_on_chain_end_output():
 
 
 @pytest.mark.asyncio
+async def test_runtime_does_not_project_structured_result_as_assistant_text():
+    compiled = _FakeCompiled(
+        events=[
+            {
+                "event": "on_chain_end",
+                "name": "structured_node",
+                "data": {"output": {"result": {"status": "ok"}}},
+            }
+        ],
+        state_values={},
+    )
+
+    fragments = [
+        fragment
+        async for fragment in LangGraphRuntime().astream(
+            lambda **_kwargs: compiled,
+            tools=[],
+            checkpointer=None,
+            thread_id="thread",
+            query="show data",
+            cancel_token=None,
+        )
+    ]
+
+    assert all(fragment.type != "text_delta" for fragment in fragments)
+
+
+@pytest.mark.asyncio
 async def test_runtime_no_duplicate_text_when_model_streamed():
     compiled = _FakeCompiled(
         events=[
@@ -138,6 +205,43 @@ async def test_runtime_no_duplicate_text_when_model_streamed():
         frags.append(frag)
     texts = [f.data.get("content") for f in frags if f.type == "text_delta"]
     assert texts == ["Hi"]
+
+
+@pytest.mark.asyncio
+async def test_runtime_does_not_project_tool_json_as_assistant_text():
+    compiled = _FakeCompiled(
+        events=[
+            {
+                "event": "on_chain_end",
+                "name": "read_tools",
+                "data": {
+                    "output": {
+                        "messages": [
+                            SimpleNamespace(
+                                content='[{"chunk_id": "sop-1"}]',
+                                tool_call_id="tc-knowledge",
+                            )
+                        ]
+                    }
+                },
+            }
+        ],
+        state_values={},
+    )
+
+    fragments = [
+        fragment
+        async for fragment in LangGraphRuntime().astream(
+            lambda **_kwargs: compiled,
+            tools=[],
+            checkpointer=None,
+            thread_id="thread",
+            query="search SOP",
+            cancel_token=None,
+        )
+    ]
+
+    assert all(fragment.type != "text_delta" for fragment in fragments)
 
 
 @pytest.mark.asyncio

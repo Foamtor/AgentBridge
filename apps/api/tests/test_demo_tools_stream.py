@@ -27,7 +27,7 @@ def test_demo_tools_stream_tool_and_extension(monkeypatch: pytest.MonkeyPatch):
         r = c.post(
             "/chat/stream",
             json={
-                "query": "add",
+                "query": "请计算 27 + 15，并说明你调用了什么工具。",
                 "thread_id": "t-demo-tools-1",
                 "route": "demo_tools",
             },
@@ -47,3 +47,9 @@ def test_demo_tools_stream_tool_and_extension(monkeypatch: pytest.MonkeyPatch):
     assert call["data"]["tool_call_id"] == "tc-demo-add-1"
     assert result["data"]["tool_call_id"] == "tc-demo-add-1"
     assert result["data"]["ok"] is True
+    assert result["data"]["summary"] == "42"
+    assert any(
+        "计算结果：42" in str(event.get("data", {}).get("content", ""))
+        for event in events
+        if event["type"] == "text_delta"
+    )

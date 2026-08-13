@@ -19,6 +19,7 @@ def _parse_sse(body: str) -> list[dict]:
 
 
 def test_demo_multi_agent_two_agent_ids(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AUTH_MODE", "disabled")
     monkeypatch.setenv("AGENTBRIDGE_FAKE_RUNTIME", "0")
     import os
 
@@ -30,7 +31,7 @@ def test_demo_multi_agent_two_agent_ids(monkeypatch: pytest.MonkeyPatch) -> None
         r = c.post(
             "/chat/stream",
             json={
-                "query": "collaborate",
+                "query": "如何减少工单积压？",
                 "thread_id": "t-ma-1",
                 "route": "demo_multi_agent",
             },
@@ -44,3 +45,10 @@ def test_demo_multi_agent_two_agent_ids(monkeypatch: pytest.MonkeyPatch) -> None
     }
     assert "researcher" in agent_ids
     assert "writer" in agent_ids
+    visible_text = "".join(
+        str(event.get("data", {}).get("content", ""))
+        for event in events
+        if event["type"] == "text_delta"
+    )
+    assert "如何减少工单积压" in visible_text
+    assert "分流" in visible_text

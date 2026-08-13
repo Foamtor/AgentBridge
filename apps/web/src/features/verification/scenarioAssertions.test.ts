@@ -50,4 +50,28 @@ describe("evaluateScenario", () => {
     ]);
     expect(duplicate[2].status).toBe("fail");
   });
+
+  it("checks the route decision and the tools actually called", () => {
+    const checks = evaluateScenario("routing", [
+      { type: "tool_call", data: { name: "list_work_orders" } },
+      { type: "tool_call", data: { name: "work_order_statistics" } },
+      { type: "done" },
+    ], {
+      route: "work_order_ops",
+      reason: "Matched keywords: 工单, 状态",
+      expected_tools: ["list_work_orders", "work_order_statistics"],
+      candidates: [],
+    });
+    expect(checks.map((check) => check.status)).toEqual(["pass", "pass"]);
+  });
+
+  it("fails immediately when no plugin matches", () => {
+    const checks = evaluateScenario("routing", [], {
+      route: null,
+      reason: "No plugin routing rule matched the question.",
+      expected_tools: [],
+      candidates: [],
+    });
+    expect(checks.map((check) => check.status)).toEqual(["fail", "fail"]);
+  });
 });

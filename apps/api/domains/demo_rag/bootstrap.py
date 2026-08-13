@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-DOMAIN_META = {"description": "RAG 知识问答示例插件"}
+DOMAIN_META = {"description": "先从知识库查找内容再回答，用于验证知识检索流程"}
 
 from agentbridge_core.registry.graphs import GraphRegistry
 from agentbridge_core.registry.input_builders import InputBuilderRegistry

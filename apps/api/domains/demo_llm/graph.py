@@ -7,7 +7,7 @@ from typing import Annotated, Any
 from agentbridge_core.protocol.context import get_run_context
 from agentbridge_core.protocol.fragments import OUTBOUND_EXTENSIONS_KEY
 from agentbridge_core.protocol.tool_meta import attach_tool_meta
-from langchain_core.messages import AIMessage
+from langchain_core.messages import AIMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import InjectedToolArg, tool
 from langgraph.graph import END, START, StateGraph
@@ -29,7 +29,7 @@ async def ask_model(
     reply = await gw.chat(
         [{"role": "user", "content": question}],
         ctx=ctx,
-        model=None,
+        model=ctx.metadata.get("llm_model_alias") or None,
     )
     return str(reply)
 
@@ -65,7 +65,13 @@ def _prepare(state: DemoLlmState) -> dict[str, Any]:
 
 
 def _finish(state: DemoLlmState) -> dict[str, Any]:
+    reply = ""
+    for message in reversed(state.get("messages") or []):
+        if isinstance(message, ToolMessage):
+            reply = str(message.content or "")
+            break
     return {
+        "messages": [AIMessage(content=reply)],
         OUTBOUND_EXTENSIONS_KEY: [
             {"type": "x.demo_llm.finished", "data": {"route": "demo_llm", "ok": True}}
         ]

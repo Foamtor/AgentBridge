@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import AsyncIterator
+from contextlib import suppress
 from typing import Any
 
 from agentbridge_core.adapters.event_mapper import (
@@ -46,11 +47,17 @@ def _content_to_text(content: Any) -> str | None:
 def _text_from_chain_output(output: Any) -> str | None:
     """Generic domain-agnostic extraction (no hard-coded node names)."""
     if isinstance(output, dict):
-        if output.get("result") is not None:
-            return str(output["result"])
+        result = output.get("result")
+        # ``result`` is a conventional text slot for simple graphs such as
+        # echo. Structured results belong in domain extension events, not in
+        # the assistant reply.
+        if isinstance(result, str) and result:
+            return result
         messages = output.get("messages")
         if isinstance(messages, list) and messages:
             last = messages[-1]
+            if _is_tool_result_message(last):
+                return None
             text = _content_to_text(getattr(last, "content", None))
             if text:
                 return text
@@ -64,6 +71,12 @@ def _text_from_chain_output(output: Any) -> str | None:
     if text:
         return text
     return None
+
+
+def _is_tool_result_message(message: Any) -> bool:
+    if isinstance(message, dict):
+        return bool(message.get("tool_call_id")) or message.get("type") == "tool"
+    return isinstance(getattr(message, "tool_call_id", None), str)
 
 
 def _summary_from_tool_output(output: Any) -> str:
@@ -192,6 +205,7 @@ class LangGraphRuntime:
             config = {"configurable": {"thread_id": thread_id}}
         stream = compiled.astream_events(graph_input, config=config, version="v2")
         aiter = stream.__aiter__()
+        next_event: asyncio.Task[Any] | None = None
         streamed_model_text = False
         pending_tool_call_ids: list[str] = []
         run_id_to_tool_call_id: dict[str, str] = {}
@@ -199,14 +213,19 @@ class LangGraphRuntime:
             while True:
                 if isinstance(cancel_token, asyncio.Event) and cancel_token.is_set():
                     break
+                if next_event is None:
+                    next_event = asyncio.create_task(aiter.__anext__())
                 try:
-                    event = await asyncio.wait_for(aiter.__anext__(), timeout=0.05)
+                    event = await asyncio.wait_for(asyncio.shield(next_event), timeout=0.05)
                 except StopAsyncIteration:
                     break
                 except asyncio.TimeoutError:
                     continue
                 except asyncio.CancelledError:
                     raise
+                finally:
+                    if next_event is not None and next_event.done():
+                        next_event = None
 
                 if isinstance(cancel_token, asyncio.Event) and cancel_token.is_set():
                     break
@@ -279,6 +298,10 @@ class LangGraphRuntime:
                         if text and name and name not in _SKIP_CHAIN_NAMES:
                             yield map_text_delta(text)
         finally:
+            if next_event is not None and not next_event.done():
+                next_event.cancel()
+                with suppress(asyncio.CancelledError):
+                    await next_event
             aclose = getattr(aiter, "aclose", None)
             if callable(aclose):
                 try:

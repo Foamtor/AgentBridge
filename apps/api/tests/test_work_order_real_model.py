@@ -17,7 +17,7 @@ from domains.work_order_ops.tools import (
     search_work_order_knowledge,
     work_order_statistics,
 )
-from langchain_core.messages import AIMessage
+from langchain_core.messages import AIMessage, ToolMessage
 
 
 class ReadPlannerGateway:
@@ -62,7 +62,7 @@ async def test_real_case_model_only_sees_guarded_read_tools() -> None:
 
     assert [tool.name for tool in gateway.tools] == ["work_order_statistics"]
     assert result["current_read_call_ids"] == {
-        "work_order_statistics": "tc-real-statistics"
+        "work_order_statistics:status": "tc-real-statistics"
     }
     assert result["messages"][0].tool_calls[0]["name"] == "work_order_statistics"
 
@@ -127,6 +127,52 @@ def test_present_emits_prompt_evidence_from_state() -> None:
         item for item in result["outbound_extensions"] if item["type"] == "x.bridge.prompt"
     )
     assert prompt_event["data"]["prompts"][0]["version"] == 3
+
+
+def test_present_uses_status_statistics_when_model_skips_list_tool() -> None:
+    result = _present(
+        {
+            "messages": [
+                ToolMessage(
+                    content='{"open": 2, "closed": 1}',
+                    tool_call_id="tc-status",
+                    name="work_order_statistics",
+                )
+            ],
+            "current_read_call_ids": {
+                "work_order_statistics:status": "tc-status"
+            },
+        }
+    )
+
+    chart = next(
+        item
+        for item in result["outbound_extensions"]
+        if item["type"] == "x.work_order_ops.chart"
+    )
+    assert chart["data"]["x_axis"]["categories"] == ["closed", "open"]
+    assert chart["data"]["series"] == [{"name": "工单数", "data": [1, 2]}]
+
+
+def test_present_for_knowledge_only_hides_unrelated_list_and_chart() -> None:
+    result = _present(
+        {
+            "messages": [
+                ToolMessage(
+                    content='[{"chunk_id": "sop-1", "text": "Handle safely."}]',
+                    tool_call_id="tc-knowledge",
+                    name="search_work_order_knowledge",
+                )
+            ],
+            "current_read_call_ids": {
+                "search_work_order_knowledge": "tc-knowledge"
+            },
+        }
+    )
+
+    assert [item["type"] for item in result["outbound_extensions"]] == [
+        "x.bridge.citation"
+    ]
 
 
 @pytest.mark.asyncio

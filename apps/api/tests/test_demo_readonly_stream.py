@@ -59,3 +59,8 @@ def test_demo_readonly_stream_queries_with_tenant(
     assert fake.last_params == ("open", "dev")
     assert "1" in result["data"]["summary"]
     assert "other" not in result["data"]["summary"]
+    assert any(
+        "1（open）" in str(event.get("data", {}).get("content", ""))
+        for event in events
+        if event["type"] == "text_delta"
+    )

@@ -58,6 +58,11 @@ async def test_demo_rag_emits_citation(monkeypatch: pytest.MonkeyPatch) -> None:
     assert c0["doc_id"] == "doc-1"
     assert "refund" in c0["text"]
     assert c0["tenant_id"] == "dev"
+    assert any(
+        "refund policy 30 days" in str(event.get("data", {}).get("content", ""))
+        for event in events
+        if event["type"] == "text_delta"
+    )
 
 
 @pytest.mark.asyncio

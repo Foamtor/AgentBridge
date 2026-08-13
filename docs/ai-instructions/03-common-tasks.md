@@ -9,8 +9,8 @@
 ```bash
 pip install -e "packages/core[dev]" -e "apps/api[dev]"
 cp .env.example .env   # Windows PowerShell: copy .env.example .env
-cd apps/api
-uvicorn main:app --reload --port 8000
+python -m uvicorn main:app --app-dir apps/api --reload \
+  --reload-dir apps/api --reload-dir packages/core/src --port 8000
 ```
 
 成功：`GET http://127.0.0.1:8000/health` → 类似 `{"status":"ok"}`。

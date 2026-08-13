@@ -11,6 +11,7 @@ Checkpointer / schema migrations.
 | `007_work_order_demo_tenant.sql` | Synthetic `rag-agent-demo` work-order reference data |
 | `008_v01_demo.sql` | Synthetic `dev` tenant data for the default v0.1.0 Compose demo |
 | `009_console_auth.sql` | Local console administrator, opaque sessions and login throttling state |
+| `020_demo_readonly_dev_seed.sql` | Synthetic `dev` tenant orders for the read-only plugin demo |
 
 ## Knowledge (R-A)
 

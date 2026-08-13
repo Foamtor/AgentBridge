@@ -49,7 +49,7 @@ function Chart({ option }: { option: unknown }) {
     return () => chart.dispose();
   }, [option]);
 
-  if (invalid) return <p className="muted">Chart data is unavailable; inspect the JSON timeline below.</p>;
+  if (invalid) return <p className="muted">{t("noBusinessResult")}</p>;
   const series = (option as { series?: unknown }).series;
   const hasData = Array.isArray(series) && series.some((item) => {
     if (!item || typeof item !== "object") return false;
@@ -58,6 +58,11 @@ function Chart({ option }: { option: unknown }) {
   });
   if (!hasData) return <p className="golden-empty-result">{t("noChartData")}</p>;
   return <div className="golden-chart" ref={node} aria-label="Work-order chart" />;
+}
+
+function citationLabel(hit: Record<string, unknown>, fallback: string): string {
+  const value = hit.title ?? hit.doc_id ?? hit.chunk_id ?? fallback;
+  return typeof value === "string" && value.trim() ? value : fallback;
 }
 
 export function GoldenCasePanel({ events, token, onPreset, onApprovalResolved, showPresets = true, showHeading = true }: Props) {
@@ -114,22 +119,22 @@ export function GoldenCasePanel({ events, token, onPreset, onApprovalResolved, s
         </div> : null}
       </div> : null}
 
-      {rows.length ? (
+      {list ? (
         <div className="golden-card">
           <h3>{t("workOrders")}</h3>
-          <div className="table-scroll"><table><thead><tr>{columns.map((column) => {
+          {rows.length ? <div className="table-scroll"><table><thead><tr>{columns.map((column) => {
             const key = String(column.key ?? "");
             return <th key={key}>{String(column.label ?? key)}</th>;
           })}</tr></thead><tbody>{rows.map((row, index) => <tr key={String(row.id ?? index)}>{columns.map((column) => {
             const key = String(column.key ?? "");
             return <td key={key}>{String(row[key] ?? "—")}</td>;
-          })}</tr>)}</tbody></table></div>
+          })}</tr>)}</tbody></table></div> : <p className="golden-empty-result">{t("noBusinessResult")}</p>}
         </div>
       ) : null}
 
       {chart ? <div className="golden-card"><h3>{t("statistics")}</h3><Chart option={chart.echarts_option} /></div> : null}
 
-      {citations.length ? <div className="golden-card"><h3>{t("citations")}</h3><ul>{citations.map((hit, index) => <li key={String(hit.id ?? index)}>{String(hit.title ?? hit.source ?? t("citations"))}</li>)}</ul></div> : null}
+      {citation ? <div className="golden-card"><h3>{t("citations")}</h3>{citations.length ? <ul>{citations.map((hit, index) => <li key={String(hit.chunk_id ?? hit.doc_id ?? index)}><strong>{citationLabel(hit, t("citations"))}</strong>{typeof hit.text === "string" && hit.text ? <p>{hit.text}</p> : null}</li>)}</ul> : <p className="golden-empty-result">{t("noCitations")}</p>}</div> : null}
 
       {draft ? <div className="golden-card"><h3>{t("ledgerPreview")}</h3><pre>{JSON.stringify(draft, null, 2)}</pre></div> : null}
 

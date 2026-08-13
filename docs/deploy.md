@@ -80,7 +80,7 @@ cp .env.example .env
 # 仅限隔离测试或离线 Fake 演示；P1/P2 验收使用 false。
 # USE_MEMORY_CHECKPOINTER=true
 # OBSERVABILITY_STORE_BACKEND=memory
-cd apps/api && uvicorn main:app --reload --port 8000
+python -m uvicorn main:app --app-dir apps/api --reload --reload-dir apps/api --reload-dir packages/core/src --port 8000
 ```
 
 调试台：`cd apps/web && npm install && npm run dev`  

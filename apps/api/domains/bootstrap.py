@@ -13,7 +13,7 @@ from domains.demo_tools import bootstrap as demo_tools
 from domains.echo import bootstrap as echo
 from domains.work_order_ops import bootstrap as work_order_ops
 
-DOMAIN_META_MAP: dict[str, dict[str, str]] = {
+DOMAIN_META_MAP: dict[str, dict[str, Any]] = {
     "echo": echo.DOMAIN_META,
     "demo_tools": demo_tools.DOMAIN_META,
     "demo_readonly": demo_readonly.DOMAIN_META,

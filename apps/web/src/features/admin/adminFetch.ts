@@ -46,7 +46,10 @@ export async function adminFetch<T>(
       error.field = typeof field === "string" && field !== "body" ? field : undefined;
       error.validationType = typeof validation?.type === "string" ? validation.type : undefined;
     }
-    if (res.status === 401 || (res.status === 403 && error.code === "forbidden")) {
+    if (
+      (res.status === 401 && error.code !== "current_password_required" && error.code !== "reauth_invalid_credentials")
+      || (res.status === 403 && error.code === "forbidden")
+    ) {
       window.dispatchEvent(new CustomEvent("agentbridge:auth-error", { detail: { status: res.status } }));
     }
     throw error;

@@ -17,6 +17,8 @@ type Model = {
   updated_at?: string;
 };
 
+type CheckState = "pass" | "pending" | "fail";
+
 type Form = {
   alias: string;
   api_base: string;
@@ -38,10 +40,15 @@ const emptyForm = (): Form => ({
 export function ModelsPage() {
   const { locale } = useI18n();
   const copy = locale === "en" ? {
+    // Model service configuration and capability checks live on this page.
     title: "Model management", intro: "Configure OpenAI-compatible models. API keys are submitted only when saved, encrypted in PostgreSQL, and never returned to the console.", missingTitle: "Model credential encryption is not configured", missingSetup: "Generate a key here, or paste an existing Fernet key. The value is written only to the mounted .env file and is never stored in PostgreSQL.", missingRestart: "The key becomes active immediately. Restart the API after saving so it is recovered after a container replacement. Back it up; losing it makes saved credentials unrecoverable.", containerSetup: "This API is containerized without a persistent environment-file mount. Set the key in the deployment secret store or host environment instead.", currentPassword: "Confirm current password", existingKey: "Encryption key (paste or generate)", generateKey: "Generate random key", saveKey: "Save encryption key", keySaved: "Encryption key saved and active. Back it up, then restart the API when convenient.", keySaveError: "Could not save the key. Generate a new key or paste a valid Fernet key, and confirm the mounted .env is writable.", add: "Add model", edit: "Edit", alias: "Alias", base: "API base", model: "Model name", key: "API key", replaceKey: "Replace API key (blank keeps it)", temperature: "Temperature", enabled: "Enable for the verification workbench", save: "Save changes", cancel: "Cancel", configured: "Configured models", empty: "No models configured. Fake demo remains available in the verification workbench.", loaded: "Loaded", unavailable: "Credential unavailable", disabled: "Disabled", keyConfigured: "key configured", test: "Test connection and tool calling", testing: "Testing…", testPassed: "Connection and tool calling passed", testNeedsRefresh: "Run the new tool-call test", testFailed: "Tool calling test failed", toolCallHint: "The provider rejected the tool-call test request or did not return a tool call. This does not by itself prove the model lacks tool calling.", connectionTestError: "The model endpoint could not complete the basic connection check. Check the API address, network access, API key, and model name.", saved: "Model saved. The key will not be shown again.", updated: "Model updated.", remove: "Delete", confirm: "Delete model alias", date: "Updated",
   } : {
     title: "模型管理", intro: "配置 OpenAI 兼容模型。API Key 仅在保存时提交，数据库只保存加密密文，控制台不会返回明文。", missingTitle: "尚未配置模型凭据加密密钥", missingSetup: "可在这里生成密钥，也可以粘贴已有 Fernet 密钥。密钥只写入挂载的 .env 文件，不会保存到 PostgreSQL。", missingRestart: "保存后会立即在当前 API 生效。为保证容器替换后仍能恢复，请备份密钥，并在方便时重启 API。密钥丢失后，已保存的模型凭据无法恢复。", containerSetup: "当前 API 运行在容器中，且没有持久化的环境文件挂载。请改在部署密钥管理或宿主机环境中设置该密钥。", currentPassword: "确认当前密码", existingKey: "加密密钥（可粘贴或生成）", generateKey: "生成随机密钥", saveKey: "保存加密密钥", keySaved: "加密密钥已保存并在当前 API 生效。请备份密钥，并在方便时重启 API。", keySaveError: "密钥保存失败。请点击“生成随机密钥”或粘贴有效 Fernet 密钥，并确认挂载的 .env 可写。", add: "添加模型", edit: "编辑", alias: "别名", base: "API 地址", model: "模型名称", key: "API Key", replaceKey: "替换 API Key（留空则保留）", temperature: "温度", enabled: "启用并用于验证工作台", save: "保存变更", cancel: "取消", configured: "已配置模型", empty: "尚未配置模型。Fake 演示仍可在验证工作台中运行。", loaded: "已加载", unavailable: "凭据不可用", disabled: "已停用", keyConfigured: "密钥已配置", test: "测试连接与工具调用", testing: "正在测试…", testPassed: "连接和工具调用已通过", testNeedsRefresh: "需要重新执行工具调用测试", testFailed: "工具调用测试未通过", toolCallHint: "模型服务拒绝了工具调用测试请求，或没有返回工具调用。这并不能单独证明模型不支持工具调用。", connectionTestError: "模型服务没有完成基础连接检查。请检查 API 地址、网络连通性、API Key 和模型名称。", saved: "模型配置已保存。密钥不会再次显示。", updated: "模型配置已更新。", remove: "删除", confirm: "删除模型别名", date: "更新时间",
   };
+  const pageTitle = locale === "en" ? "Model services" : "模型服务";
+  const pageIntro = locale === "en"
+    ? "Configure a real model and verify API access, normal replies, and tool calling before using it in the workbench."
+    : "配置真实模型，并在进入验证工作台前检查 API 可访问、模型可回复和工具调用能力。API Key 只保存加密密文，控制台不会返回明文。";
   const [models, setModels] = useState<Model[]>([]);
   const [encryptionReady, setEncryptionReady] = useState(false);
   const [keySetupAvailable, setKeySetupAvailable] = useState(true);
@@ -209,8 +216,21 @@ export function ModelsPage() {
       : null;
   }
 
+  function checks(model: Model): Array<{ label: string; state: CheckState }> {
+    const failed = model.last_test_status === "failed";
+    const toolFailure = failed && model.last_test_error?.startsWith("tool_call_");
+    const tested = model.last_test_status === "success";
+    return [
+      { label: locale === "en" ? "API reachable" : "API 可访问", state: model.runtime_ready && (!failed || toolFailure) ? "pass" : failed ? "fail" : "pending" },
+      { label: locale === "en" ? "Model can reply" : "模型可回复", state: tested || toolFailure ? "pass" : failed && !toolFailure ? "fail" : "pending" },
+      { label: locale === "en" ? "Tool calling" : "支持工具调用", state: tested ? "pass" : failed ? "fail" : "pending" },
+    ];
+  }
+
+  const checkLabel = (state: CheckState) => state === "pass" ? (locale === "en" ? "Passed" : "已通过") : state === "fail" ? (locale === "en" ? "Failed" : "未通过") : (locale === "en" ? "Not tested" : "尚未测试");
+
   return <main className="page models-page">
-    <header><h1>{copy.title}</h1><p className="lede">{copy.intro}</p></header>
+    <header><h1>{pageTitle}</h1><p className="lede">{pageIntro}</p></header>
     {!encryptionReady ? <aside className="model-key-warning" role="alert">
       <strong>{copy.missingTitle}</strong>
       <p>{copy.missingSetup}</p>
@@ -237,7 +257,7 @@ export function ModelsPage() {
       <div className="actions"><button type="button" className="primary" disabled={!encryptionReady || !form.alias || !form.api_base || !form.model_name || (!editing && !form.api_key)} onClick={() => void submit()}>{editing ? copy.save : copy.add}</button>{editing ? <button type="button" className="secondary-command" onClick={() => { setEditing(null); setForm(emptyForm()); }}>{copy.cancel}</button> : null}</div>
     </section>
     <section className="model-list"><h2>{copy.configured}</h2>
-      {!models.length ? <p className="muted">{copy.empty}</p> : <table className="config-table"><thead><tr><th>{copy.alias}</th><th>{copy.model}</th><th>{copy.base}</th><th>{copy.enabled}</th><th>{copy.date}</th><th /></tr></thead><tbody>{models.map((model) => <tr key={model.alias}><td><code>{model.alias}</code></td><td>{model.model_name}</td><td><code>{model.api_base}</code></td><td>{modelStatus(model)}{testFailureHint(model) ? <small className="model-test-hint">{testFailureHint(model)}</small> : null}</td><td>{model.updated_at ? new Date(model.updated_at).toLocaleString() : "-"}</td><td className="model-actions"><button type="button" className="text-command" disabled={!model.enabled || testingAlias === model.alias} onClick={() => void testConnection(model.alias)}>{testingAlias === model.alias ? copy.testing : copy.test}</button><button type="button" className="text-command" onClick={() => startEdit(model)}>{copy.edit}</button><button type="button" className="text-command delete-command" onClick={() => void remove(model.alias)}>{copy.remove}</button></td></tr>)}</tbody></table>}
+      {!models.length ? <p className="muted">{copy.empty}</p> : <table className="config-table"><thead><tr><th>{copy.alias}</th><th>{copy.model}</th><th>{copy.base}</th><th>{copy.enabled}</th><th>{copy.date}</th><th /></tr></thead><tbody>{models.map((model) => <tr key={model.alias}><td><code>{model.alias}</code></td><td>{model.model_name}</td><td><code>{model.api_base}</code></td><td><div className="model-status-summary">{modelStatus(model)}<ul className="model-checks">{checks(model).map((check) => <li key={check.label} className={`model-check-${check.state}`}><span aria-hidden="true">{check.state === "pass" ? "✓" : check.state === "fail" ? "×" : "·"}</span>{check.label}: {checkLabel(check.state)}</li>)}</ul></div>{testFailureHint(model) ? <small className="model-test-hint">{testFailureHint(model)}</small> : null}</td><td>{model.updated_at ? new Date(model.updated_at).toLocaleString() : "-"}</td><td className="model-actions"><button type="button" className="text-command model-test-command" disabled={!model.enabled || testingAlias === model.alias} onClick={() => void testConnection(model.alias)}>{testingAlias === model.alias ? copy.testing : copy.test}</button><button type="button" className="text-command" onClick={() => startEdit(model)}>{copy.edit}</button><button type="button" className="text-command delete-command" onClick={() => void remove(model.alias)}>{copy.remove}</button></td></tr>)}</tbody></table>}
     </section>
   </main>;
 }

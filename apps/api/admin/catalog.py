@@ -65,6 +65,7 @@ def build_domain_catalog(
             {
                 "name": name,
                 "description": str(meta.get("description") or ""),
+                "routing": dict(meta.get("routing") or {}),
                 "tools": sorted(_tool_name(t) for t in raw_tools),
                 "required_permissions": _collect_permissions(raw_tools),
                 "required_permissions_all": _collect_permissions(
