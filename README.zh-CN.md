@@ -175,7 +175,7 @@ SKILL.md                Vibe Coding 接入指南（喂给 AI 助手用）
 - 🚧 真实 Docker Compose 黄金冒烟仍需要具备 Docker Engine 与镜像网络的环境执行
 - ✅ 包含可运行的 `work_order_ops` 参考实现
 - ⚠️ CI 遗留问题正在清理
-- 🚧 生产 IdP、多机验证、迁移恢复和包发布尚未完成
+- 🚧 生产部署演练、迁移恢复、具体 IdP 接入、多机验证和包发布属于 1.0 之后的后续工作
 
 ## 🤝 参与贡献
 

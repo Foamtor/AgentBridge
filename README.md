@@ -175,7 +175,7 @@ SKILL.md                Vibe Coding integration guide (for AI assistants)
 - 🚧 Real Docker Compose golden smoke still needs an environment with Docker Engine and registry access
 - ✅ Reference `work_order_ops` implementation included
 - ⚠️ CI cleanup is in progress
-- 🚧 Production IdP, multi-instance validation, migration/recovery, and package publishing are deferred
+- 🚧 Production deployment drills, migration/recovery, concrete IdP integration, multi-instance validation, and package publishing are post-1.0 follow-up work
 
 ## 🤝 Contributing
 
