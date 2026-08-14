@@ -6,7 +6,7 @@
 >
 > **一句话**：平台统一处理 JSON/SSE、权限、审批、审计、生命周期和 RAG Port；业务开发者与 AI 只实现自己的流程、工具和结构化结果。
 >
-> **当前发布范围**：以 [v1.0.0 发布规划](./release-plan.md) 为准；历史 v0.1.0 Spec 与对应 Plan 保留在 `docs/superpowers/` 作为实施记录。下面的能力架构仍是长期约定；SDK、多 Agent、多机与生产部署是进阶能力，不是单机新人路径。
+> **当前发布范围**：以 [v1.0.0 发布规划](./release-plan.md) 为准。下面的能力架构仍是长期约定；SDK、多 Agent、多机与生产部署是进阶能力，不是单机新人路径。
 
 ---
 
@@ -48,7 +48,7 @@ AgentBridge 提供**统一的公共能力**；业务作者只注册流程、工�
 ### 2.1 首发路径（优先）
 
 ```text
-读仓规则 → 写/改 domain 与 tools → Compose 启动 → 在 AI 控制台验证业务事件
+读仓规则 → 写/改 domain 与 tools → Compose 启动 → 在开发者控制台验证业务事件
 ```
 
 `work_order_ops` 用脱敏数据演示查询、图表、citation、台账草稿与人工审批。它是给人和 AI 的参考实现，不是客户业务前端。
@@ -484,7 +484,7 @@ slowapi → 自研/Redis；Langfuse 不强制自托管；Guardrails 不必装。
 | **M9** | 多机 | 双实例互斥与限流 |
 | **M10** | Eval、策略包版本、合规导出 | CI Eval；回滚；导出 |
 | **M11** | 多知识后端（平台库、摄取、外部检索） | 实现已合入，待真实环境与发布验收 |
-| **M12** | AI 控制台（总览、工具、提示词、用量、知识） | 实现已合入，待 Web 与权限发布验收 |
+| **M12** | 开发者控制台（验证、插件调试、总览、工具、提示词、用量、知识） | Web 构建、权限与管理闭环已完成发布验收 |
 
 **对外版本（写死）**：
 
@@ -590,20 +590,20 @@ slowapi → 自研/Redis；Langfuse 不强制自托管；Guardrails 不必装。
 3. 增加附录 D：五份实施 Plan 映射  
 4. DataSource 开关与 memory checkpointer **解耦**（见 database-integration / Plan2）  
 5. ThreadLock 在多机下参数为 **storage_key**（与 checkpointer 键同公式，见 Plan5）  
-6. **Plan r3**：硬/软依赖矩阵见 `docs/superpowers/plans/DEPENDENCIES.md`；Plan4 硬依赖 Plan1 **RunStore**；Plan1 起锁即用 storage_key  
+6. **阶段依赖**：智能与治理能力依赖安全接入阶段提供的 **RunStore**；安全接入阶段起锁即使用 storage_key
 
-## 附录 D：实施 Plan 映射
+## 附录 D：实施阶段映射
 
-| Plan | 文件 | 里程碑 | 版本 |
-|------|------|--------|------|
-| 1 可安全接入 | `docs/superpowers/plans/2026-07-24-plan1-secure-access.md` | M1+M2a+M2b | → v0.2 |
-| 2 可查库 | `.../2026-07-24-plan2-datasource.md` | M3 | → v0.3 |
-| 3 单机生产 | `.../2026-07-24-plan3-single-node-prod.md` | M4 | → **v1.0.0** |
-| 4 智能与治理 | `.../2026-07-24-plan4-intelligence-governance.md` | M5–M7 | → v1.x |
-| 5 协作与扩展 | `.../2026-07-24-plan5-collaboration-scale.md` | M8–M10 | → 多机/v2.0 |
+| 阶段 | 里程碑 | 版本 |
+|------|--------|------|
+| 1 可安全接入 | M1+M2a+M2b | → v0.2 |
+| 2 可查库 | M3 | → v0.3 |
+| 3 单机生产 | M4 | → **v1.0.0** |
+| 4 智能与治理 | M5–M7 | → v1.x |
+| 5 协作与扩展 | M8–M10 | → 多机/v2.0 |
 
-索引：`docs/superpowers/plans/README.md`。依赖矩阵：`docs/superpowers/plans/DEPENDENCIES.md`。  
-与本文冲突时：**契约以本文 §4 为准，任务切分以 Plan 为准，开工顺序以 DEPENDENCIES 硬/软表为准**。
+当前完成状态见 [发布规划](./release-plan.md)，后续方向见 [路线图](./roadmap.md)。
+与本文冲突时：**契约以本文 §4 为准，当前发布边界以发布规划为准，后续优先级以路线图为准**。
 
 ### 依赖摘要（v4.1.1 / Plan r3）
 

@@ -90,7 +90,7 @@
 
 成功：`200` + `{"ok": true}`；无进行中 run：`404` + `code: run_not_found`。
 
-### 1.3 管理面 HTTP（C0–C4，真源见 [admin-backend-final-spec](./superpowers/specs/2026-07-27-admin-backend-final-spec.md) §4）
+### 1.3 管理面 HTTP（C0–C4）
 
 | 方法 | 路径 | 说明 | 状态 |
 |------|------|------|------|

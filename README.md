@@ -20,13 +20,6 @@ Built for [Vibe Coding](#-vibe-coding-integration): let AI coding assistants wri
 >
 > **No changes to existing systems. No data migration. No cloud dependency.** Runs on your own machines, MIT licensed.
 
-<!-- TODO: Record GIF demo → docker compose up → browser → describe a need → dynamic result appears -->
-<!--
-<p align="center">
-  <img src="docs/assets/demo.gif" alt="AgentBridge Demo" width="700" />
-</p>
--->
-
 ## 🏗️ How it works without changing your code
 
 AgentBridge doesn't touch your business systems. It adds an adapter layer next to your existing APIs — you write a plugin that describes what your APIs can do, and AgentBridge handles everything else.
@@ -63,9 +56,17 @@ Client → FastAPI route → RunLifecycle → registered business graph/tools
        ← Nginx / SSE ← recorded outbound events and structured extensions
 ```
 
+<p align="center">
+  <img src="docs/assets/AgentBridge-api-EN.png" alt="AgentBridge API contracts" width="900" />
+</p>
+
 `apps/api/lifespan.py` is the production composition root: it creates adapters, registers plugins, and injects implementations into the runtime. `packages/core` never imports a concrete business plugin, and plugins do not create infrastructure adapters or emit SSE directly. See [the architecture summary](docs/architecture.md), [event contracts](docs/contracts.md), and [non-negotiable rules](AGENTS.md).
 
 The default Compose stack starts the React console, FastAPI service, and PostgreSQL with pgvector. Redis and Authentik are optional profiles. The v1.0.0 single-node release includes an offline model stub and fake knowledge backend for deterministic verification, while Postgres-backed business data and approval execution exercise the complete demo flow. Real OpenAI-compatible models and external RAG are opt-in integrations. For an environment default, set `LLM_MODE=openai_compatible` with an OpenAI-compatible endpoint, model, and key. The repository `.env` is persistently mounted into the API, so an administrator can re-authenticate in the console's Models page to generate and save `MODEL_CONFIG_ENCRYPTION_KEY` during both direct development and Compose use. Model API keys are encrypted at rest and never returned to the browser.
+
+<p align="center">
+  <img src="docs/assets/AgentBridge-Admin-EN.png" alt="AgentBridge Admin center" width="900" />
+</p>
 
 ## 🤖 Vibe Coding Integration
 
@@ -122,7 +123,16 @@ docker compose logs api
 
 Sign in as `admin`, set a strong new password, then use the Verification Workbench to run `work_order_ops`.
 
+<p align="center">
+  <img src="docs/assets/AgentBridge-Home-EN.png" alt="AgentBridge Verification Workbench" width="1000" />
+</p>
+
 For daily plugin work, open `/playground`: it keeps request composition, thread history, live SSE, timing, tool traces, contract checks, JSONL export, and badcase annotations together. See [Plugin Playground](docs/plugin-playground.md) for Fake versus real-model reference-case setup.
+
+<p align="center">
+  <img src="docs/assets/AgentBridge-Plugin-EN.png" alt="AgentBridge Plugin Playground" width="900" />
+</p>
+
 If you set `WEB_PORT`, use that port instead.
 
 > 💡 No API key or cloud service needed. The Compose demo includes PostgreSQL, an offline model, and synthetic demo data. The initial password is never committed or fixed in the image.

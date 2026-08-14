@@ -2,7 +2,7 @@
 
 新业务场景只加一个插件目录，尽量不要改 `packages/core`。
 
-产品约定见 [00-AgentBridge完整方案.md](./00-AgentBridge完整方案.md)。历史材料在 `docs/superpowers/`（冲突时以完整方案为准）。
+产品约定见 [00-AgentBridge完整方案.md](./00-AgentBridge完整方案.md)；当前发布范围见 [release-plan.md](./release-plan.md)。
 
 ## 「业务插件」是什么
 
@@ -18,7 +18,7 @@
 3. 在该目录的 `bootstrap.py` 里注册：tools / graphs / input_builders
 4. 在 `apps/api/domains/bootstrap.py` 的 `register_all` 里调用上面的 `register`
 5. 工具若挂 `required_permissions`：调用方不够权限的不要进 LLM 可见列表；执行时仍会再鉴权
-6. 重启 API，用调试台或 `POST /chat/stream`，`route` 填你的名字做验证
+6. 重启 API，登录后用 `/playground?route=<名字>` 验证；自动化调用 `POST /chat/stream` 时必须携带合法认证上下文
 
 可参考的示例：
 
@@ -60,7 +60,7 @@
 - 不同业务插件之间默认不要互相 import
 - 核心库的 `application` 不能 import 业务代码；核心源码里不能写死业务名（例如 `demo_tools`）
 - 图自己的 recursion_limit 等配置写在业务的 `graph.py`，不要塞进 HTTP 路由层
-# Approval actions
+## 审批动作
 
 Register approved writes by the pair `(route, action.type)`, validate the
 versioned payload before preview and again before execution, and use

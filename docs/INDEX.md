@@ -14,7 +14,7 @@
 | [2. 快速开始](./guide/02-quickstart.md) | 安装、启动、怎么确认成功 |
 | [3. 基本概念](./guide/03-concepts.md) | domain、route、会话等词是什么意思 |
 | [4. 第一个插件](./guide/04-first-plugin.md) | 自己的业务往哪放、怎么验收 |
-| [5. AI 控制台](./guide/05-console.md) | 调试页边界、菜单；和业务前端的区别（快速开始里可能已用过） |
+| [5. 开发者控制台](./guide/05-console.md) | 验证、插件调试、管理入口与业务前端的区别 |
 
 ## AI 编程（给 Codex / Cursor / Claude 等助手）
 
@@ -44,7 +44,4 @@
 | [知识库](./knowledge-base.md) | 检索与引用细节 |
 | [路线图](./roadmap.md) | 做到哪一步了 |
 | [发布规划](./release-plan.md) | v1.0.0 单机稳定版范围、门槛与后续边界 |
-| [v0.1.0 首发 Spec](./superpowers/specs/2026-08-01-p3a-open-source-release-readiness-design.md) | 历史发布规格 |
-| [v0.1.0 首发 Plan](./superpowers/plans/2026-08-01-p3a-open-source-release-preparation.md) | 历史实施计划 |
 | [v1.0.0 发布说明](./releases/v1.0.0.md) | 了解当前稳定版能力、已知限制与后续路线 |
-| [superpowers/](./superpowers/plans/README.md) | **历史**设计与分期计划（归档，日常别从这入门） |

@@ -99,17 +99,28 @@ your_bootstrap.register(
 
 ### 3.4 验证
 
-```bash
-# 启动服务
-cd apps/api && uvicorn main:app --reload
+正常自托管验证使用默认的 `AUTH_MODE=local`：
 
-# 冒烟测试
+```bash
+# 在仓库根目录启动 API
+python -m uvicorn main:app --app-dir apps/api --reload \
+  --reload-dir apps/api --reload-dir packages/core/src --port 8000
+
+# 另开终端启动 Web
+cd apps/web && npm install && npm run dev
+```
+
+从 API 启动日志取得仅显示一次的 `admin` 初始密码，打开 `http://127.0.0.1:5173` 登录并完成强制改密，再进入 `/playground?route=你的业务名` 发起请求。看到 SSE 流式返回和完成状态，说明接入成功。
+
+只有在**非生产隔离开发环境**明确以 `AUTH_MODE=disabled` 启动 API 时，才能使用下面这种不带登录态的冒烟请求：
+
+```bash
 curl -X POST http://localhost:8000/chat/stream \
   -H "Content-Type: application/json" \
   -d '{"query": "你的测试问题", "route": "你的业务名", "thread_id": "test-1"}'
 ```
 
-看到 SSE 流式返回和 `done` 事件，说明接入成功。
+生产环境禁止使用 `AUTH_MODE=disabled`。自动化调用默认认证实例时，应携带合法的会话 Cookie 或 OIDC Bearer Token。
 
 ---
 
@@ -252,7 +263,7 @@ AgentBridge 调用方的登录与权限由平台处理。业务插件通过 `Run
 
 ### Q: 前端怎么集成？
 
-AgentBridge 提供标准的 SSE 接口（`POST /chat/stream`）。你的前端只需要能接收 SSE 就行。仓库里的 `apps/web` 是调试用的，不是最终前端。
+AgentBridge 提供标准的 SSE 接口（`POST /chat/stream`）。你的前端只需要能接收 SSE 就行。仓库里的 `apps/web` 包含验证工作台、插件调试台和管理入口，是开发者控制台，不是最终客户业务前端。
 
 ### Q: 怎么接入真实的大模型？
 
@@ -264,10 +275,12 @@ v1.0.0 默认使用离线 FakeChatModel，保证演示和测试不依赖外部�
 
 插件写完后，逐项检查：
 
-- [ ] `POST /chat/stream` + `route=<业务名>` 能返回结果
+- [ ] 带合法认证上下文的 `POST /chat/stream` + `route=<业务名>` 能返回结果，或登录后在 `/playground?route=<业务名>` 验证通过
 - [ ] 没有违反 AGENTS.md 的五条 MUST
-- [ ] 测试通过：`pytest packages/core/tests apps/api/tests -q`
+- [ ] 后端测试通过：`python -m pytest packages/core/tests apps/api/tests -q`
+- [ ] 导入契约通过：`python -c "from importlinter.cli import lint_imports; raise SystemExit(lint_imports())"`
 - [ ] 导入检查通过：`python scripts/import_scan_core.py`
+- [ ] 若改 Web：在 `apps/web` 运行 `npm test` 与 `npm run build`
 - [ ] 知识相关测试用 `KNOWLEDGE_BACKEND=fake`
 
 全部通过，接入完成。

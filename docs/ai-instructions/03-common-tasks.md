@@ -15,17 +15,19 @@ python -m uvicorn main:app --app-dir apps/api --reload \
 
 成功：`GET http://127.0.0.1:8000/health` → 类似 `{"status":"ok"}`。
 
-可选调试台：
+可选 Web 控制台：
 
 ```bash
 cd apps/web && npm install && npm run dev
 ```
 
-打开 `http://127.0.0.1:5173`，选 `echo` 发一句。
+打开 `http://127.0.0.1:5173`。默认 `AUTH_MODE=local` 时，先使用 API 启动日志里仅显示一次的 `admin` 初始密码登录并完成强制改密；随后在根页面运行 `work_order_ops` 黄金验证场景。开发自己的插件时打开 `/playground?route=<名字>`；只测最小链路可用 `/playground?route=echo`。
 
 依赖已装好时可用：`.\start-dev.ps1` / `./start-dev.sh`（**不**负责 `pip install` / 复制 `.env`）。
 
 ## 冒烟 echo（不依赖网页）
+
+下面的裸 `curl` 和 `scripts/smoke_echo.*` 不携带登录态，只适用于启动 API 前已明确设置 `AUTH_MODE=disabled` 的**非生产隔离开发环境**。默认 `AUTH_MODE=local` 请优先使用登录后的 `/playground`，或为自动化请求实现合法的 Cookie / OIDC 凭据；生产环境禁止关闭认证。
 
 **Windows（PowerShell）：**
 

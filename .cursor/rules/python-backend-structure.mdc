@@ -63,5 +63,5 @@ graphs.register("echo", build_echo_graph)
 - 内核：`packages/core/src/agentbridge_core/{application,ports,adapters,registry,protocol}`
 - 组装根：`apps/api/lifespan.py`（唯一集中 new 适配器处）
 - 业务：`apps/api/domains/<name>/`（`bootstrap.py` + graph/tools）
-- 详解：`docs/superpowers/specs/2026-07-23-backend-oop-architecture.md`
-- 完整目录树：`docs/superpowers/specs/2026-07-23-code-structure.md`
+- 架构详解：`docs/architecture.md`
+- 分层规则与反模式：`docs/ai-instructions/01-architecture-rules.md`

@@ -16,7 +16,7 @@ description: >-
 ## 先做
 
 1. 读仓库根目录 `AGENTS.md`（与 `CLAUDE.md` 同步）五条 MUST。  
-2. 按任务打开手册（勿把 `docs/superpowers/` 当现行规格）：
+2. 按任务打开公开手册：
    - 地图 / 权威：`docs/ai-instructions/00-project-overview.md`
    - 分层 / 反模式：`01-architecture-rules.md`
    - 加插件：`02-domain-development.md` + `docs/add-a-domain.md`
@@ -40,6 +40,8 @@ description: >-
 4. 冒烟：`POST /chat/stream`，`route=<name>`，见 `done`  
 5. 建议补测：参考 `apps/api/tests/test_chat_stream.py`
 
+默认 `AUTH_MODE=local`：正常手工验证先登录 Web，再使用 `/playground?route=<name>`。裸 `POST /chat/stream` 只适用于带合法认证上下文的请求，或 `AUTH_MODE=disabled` 的非生产隔离测试；生产环境禁止关闭认证。
+
 ## 验证（改代码后）
 
 ```bash
@@ -47,6 +49,8 @@ python -m pytest packages/core/tests apps/api/tests -q
 python -c "from importlinter.cli import lint_imports; raise SystemExit(lint_imports())"
 python scripts/import_scan_core.py
 ```
+
+若改 Web，在 `apps/web` 运行 `npm test` 与 `npm run build`。
 
 知识相关自测：优先 `KNOWLEDGE_BACKEND=fake`。
 

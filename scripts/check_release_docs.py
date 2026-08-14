@@ -13,19 +13,25 @@ REQUIRED = (
     ROOT / "README.zh-CN.md",
     ROOT / "AGENTS.md",
     ROOT / "CLAUDE.md",
+    ROOT / "SKILL.md",
     ROOT / "docs" / "INDEX.md",
-    ROOT / "docs" / "superpowers" / "README.md",
-    ROOT / "docs" / "superpowers" / "specs" / "2026-08-01-p3a-open-source-release-readiness-design.md",
-    ROOT / "docs" / "superpowers" / "plans" / "2026-08-01-p3a-open-source-release-preparation.md",
 )
 PUBLIC_DOCS = (
     ROOT / "README.md",
     ROOT / "README.zh-CN.md",
+    ROOT / "AGENTS.md",
+    ROOT / "CLAUDE.md",
+    ROOT / "SKILL.md",
     ROOT / "docs" / "INDEX.md",
+    ROOT / "docs" / "add-a-domain.md",
+    ROOT / "docs" / "architecture.md",
+    ROOT / "docs" / "contracts.md",
+    ROOT / "docs" / "deploy.md",
     ROOT / "docs" / "release-plan.md",
     ROOT / "docs" / "roadmap.md",
-    ROOT / "docs" / "superpowers" / "README.md",
-    ROOT / "docs" / "superpowers" / "plans" / "README.md",
+    ROOT / "docs" / "guide" / "02-quickstart.md",
+    ROOT / "docs" / "guide" / "05-console.md",
+    *(ROOT / "docs" / "ai-instructions").glob("*.md"),
 )
 LINK = re.compile(r"\[[^]]+\]\(([^)#]+)(?:#[^)]+)?\)")
 
@@ -43,6 +49,8 @@ def main() -> int:
 
     for path in PUBLIC_DOCS:
         text = path.read_text(encoding="utf-8")
+        if "superpowers/" in text or "docs/prototypes/" in text:
+            errors.append(f"public document references an internal path: {path.relative_to(ROOT)}")
         for target in LINK.findall(text):
             if target.startswith(("https://", "http://", "mailto:")):
                 continue

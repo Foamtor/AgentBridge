@@ -29,7 +29,8 @@
 不要违反：application/domains 不自己 new 适配器；domains 不握 EventSink 乱推；
 核心库不写死业务名；适配器接线只在 apps/api/lifespan.py；
 调用方不具备权限的工具不进 LLM 工具列表（列表过滤后，调用时仍须再鉴权）。
-改完跑：pytest（core+api）+ import-linter + scripts/import_scan_core.py。
+改完按范围验证：后端跑 pytest（core+api）+ import-linter + scripts/import_scan_core.py；
+Web 跑 npm test + npm run build；仅文档按 04 做文档检查。
 知识相关测试用 KNOWLEDGE_BACKEND=fake。
 我的任务：<在这里写具体需求>
 ```
@@ -86,7 +87,8 @@ docs/ai-instructions/01-architecture-rules.md 改到 lifespan 注入。
 
 ```text
 按 docs/ai-instructions/03-common-tasks.md，在本机起 API，用 echo 冒烟。
-我是 Windows / macOS（选一个）。不要改业务代码，只给命令与成功标准。
+我是 Windows / macOS（选一个）。默认 AUTH_MODE=local 时走登录后的 /playground；
+只有非生产隔离测试才允许 AUTH_MODE=disabled。不要改业务代码，只给命令与成功标准。
 ```
 
 ### E. 新增只读查询 tool
@@ -123,7 +125,7 @@ docs/ai-instructions/01-architecture-rules.md 改到 lifespan 注入。
 | 项目根 = 仓库根 | 稳定读到 `AGENTS.md`、`docs/` |
 | 任务写清「只改 domain / 允许改 lifespan」 | 减少助手去改 core |
 | 产品约定冲突时点名完整方案 | `docs/00-AgentBridge完整方案.md` |
-| 不要以 `docs/superpowers/` 为现行规格 | 历史归档 |
+| 默认认证先看 `AUTH_MODE` | `local` 是自托管默认；`disabled` 只限非生产隔离测试 |
 | 不依赖 Cursor Skill 也能开发 | Skill 只是 Cursor 下的加速器 |
 
 人类入门仍看 [docs/guide/](../guide/README.md)。

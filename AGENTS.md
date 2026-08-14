@@ -1,7 +1,7 @@
 # AgentBridge
 
 给业务系统接一层 AI 对话能力（软件装在你自己的机器/机房上，叫**自托管**）：  
-业务做成插件；流式输出、同一会话别抢跑等由平台统一做。登录校验、权限、审计等能力平台也备好了，可按需打开。
+业务做成插件；流式输出、同一会话别抢跑等由平台统一做。默认 Compose 启用本地管理员认证；业务身份也可按需接入 OIDC，权限与审计由平台统一处理。
 
 **v1.0.0 的首发用法：** clone/fork 后让 AI 先读本文件与 `docs/ai-instructions/`，参考 `apps/api/domains/work_order_ops/`，按规则编写自己的 domain/tools/tests，再用根目录 Compose 验证。`work_order_ops` 是真实业务模式参考，不是要复制进 core 的默认业务。
 
@@ -55,7 +55,9 @@
 | 把当前调用方用不了的工具仍塞进 LLM tools 列表 | 权限过滤后再暴露给模型；调用时再 `decide` |
 | 为「方便」改核心去迁就一个业务 | 先加/改 domain；确需改核心则按完整方案评审 |
 
-## 验证命令（改完至少跑）
+## 验证命令（按改动范围跑）
+
+后端代码改动：
 
 ```bash
 python -m pytest packages/core/tests apps/api/tests -q
@@ -63,7 +65,15 @@ python -c "from importlinter.cli import lint_imports; raise SystemExit(lint_impo
 python scripts/import_scan_core.py
 ```
 
-知识相关自测：优先 `KNOWLEDGE_BACKEND=fake`（避免本机 `.env` 指到 `external` / `langchain_pg` 把平台测搞怪）。
+Web 代码改动：
+
+```bash
+cd apps/web
+npm test
+npm run build
+```
+
+知识相关自测：优先 `KNOWLEDGE_BACKEND=fake`（避免本机 `.env` 指到 `external` / `langchain_pg` / `rag_agent_pg` 把平台测搞怪）。仅文档改动按 `docs/ai-instructions/04-testing.md` 做文档检查，不强制运行代码测试。
 
 细则：`docs/ai-instructions/`。人类门面：`README.md`、`docs/guide/`。
 

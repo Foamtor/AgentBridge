@@ -13,7 +13,6 @@
 | 写代码时的分层禁令 | `AGENTS.md`（应与完整方案一致；若发现不一致，**改文档**对齐完整方案，不要先违 MUST） |
 | 人类怎么入门 | `docs/guide/` + 根 `README.md` |
 | 本目录 | 任务清单与命令；**不发明**新硬规则（细则只能解释 AGENTS） |
-| `docs/superpowers/` | 历史设计/计划，**勿当现行规格** |
 
 ## 仓库三块（别混）
 
@@ -21,7 +20,7 @@
 |----|------|------|
 | 底座 | `packages/core` + `apps/api` 的平台部分 | 编排、约定、HTTP |
 | 业务插件 | `apps/api/domains/<名字>/` | 一个文件夹 ≈ 一个请求里的 `route` |
-| 调试台 | `apps/web` | 集成方调试用，**不是**客户业务前端 |
+| 开发者控制台 | `apps/web` | 验证工作台、插件调试台和管理入口；**不是**客户业务前端 |
 
 首发黄金参考：`apps/api/domains/work_order_ops/`。它演示查询、图表、引用、台账预览与审批写入；新业务从 `_scaffold` 起步，只在需要真实模式时参考它，不整目录复制。
 
@@ -38,7 +37,7 @@ apps/api/lifespan.py     # 组装根：创建适配器、注册 domain
 apps/api/adapters/       # API 侧适配器/工厂（同样只由 lifespan 调用接线）
 apps/api/domains/<name>/ # 业务插件（echo、demo_*、_scaffold）
 apps/api/routes/         # HTTP；可组装 sink 交给生命周期（不是 domain）
-apps/web/                # AI 控制台
+apps/web/                # 开发者控制台：验证工作台、插件调试台、管理入口
 docs/guide/              # 人类白话
 docs/ai-instructions/    # 本手册
 docs/contracts.md        # SSE 事件约定
@@ -49,7 +48,8 @@ docs/add-a-domain.md     # 加插件逐步清单
 
 - 代码 import：`agentbridge_core`；发行名常写作 `agentbridge-core` / `agentbridge-api`
 - `AGENTBRIDGE_FAKE_RUNTIME`：测试用假运行时（见 `04-testing.md`）
-- `KNOWLEDGE_BACKEND`：`fake` / `langchain_pg` / `external`（见 `03`、`.env.example`）
+- `AUTH_MODE`：默认 `local`；`disabled` 只用于非生产的隔离测试；业务身份可用 `oidc`
+- `KNOWLEDGE_BACKEND`：`fake` / `langchain_pg` / `external` / `rag_agent_pg`（见 `03`、`.env.example`）
 
 ## 本手册读序
 

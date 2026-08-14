@@ -20,13 +20,6 @@
 >
 > **不动现有系统，不迁移数据，不依赖云服务。** 装在你自己的机器上，MIT 开源。
 
-<!-- TODO: 录 GIF demo → docker compose up → 浏览器 → 输入需求 → 动态生成结果 -->
-<!--
-<p align="center">
-  <img src="docs/assets/demo.gif" alt="AgentBridge Demo" width="700" />
-</p>
--->
-
 ## 🏗️ 怎么做到不改现有代码
 
 AgentBridge 不碰你的业务系统。它在你现有接口旁边加一层适配——你写一个插件描述你的 API 能做什么，AgentBridge 负责让 Agent 能调用它，并管好权限、审批、审计这些公共的事。
@@ -63,9 +56,17 @@ AgentBridge 是一个源码优先的 Python 平台，刻意把可复用运行时
        ← Nginx / SSE ← 已记录的出站事件和结构化扩展结果
 ```
 
+<p align="center">
+  <img src="docs/assets/AgentBridge-api-CN.png" alt="AgentBridge 接口规范" width="900" />
+</p>
+
 `apps/api/lifespan.py` 是生产组装根：负责创建适配器、注册插件，并把实现注入运行时。`packages/core` 不导入任何具体业务插件；业务插件也不自行创建基础设施适配器或直接发送 SSE。详细说明见[架构摘要](docs/architecture.md)、[事件契约](docs/contracts.md)和[不可违反的规则](AGENTS.md)。
 
 默认 Compose 会启动 React 调试台、FastAPI 服务和带 pgvector 的 PostgreSQL；Redis 与 Authentik 是可选 profile。v1.0.0 单机稳定版保留离线模型桩和 fake 知识后端用于确定性验证，同时以 PostgreSQL 业务数据和审批执行跑通完整演示闭环；真实 OpenAI 兼容模型和外部 RAG 可按需接入。可通过 `LLM_MODE=openai_compatible`、兼容 OpenAI 的模型地址、模型名和密钥配置环境默认模型；根目录 `.env` 会持久挂载给 API，管理员可在控制台“模型”页二次验证密码后生成并保存 `MODEL_CONFIG_ENCRYPTION_KEY`，本地开发和 Compose 都可使用。模型 API Key 会加密后保存，绝不会返回浏览器。
+
+<p align="center">
+  <img src="docs/assets/AgentBridge-Admin-CN.png" alt="AgentBridge 管理中心" width="900" />
+</p>
 
 ## 🤖 用 Vibe Coding 方式接入你的业务系统
 
@@ -122,7 +123,16 @@ docker compose logs api
 
 使用 `admin` 登录，先设置一个强密码；随后在验证工作台运行 `work_order_ops`。
 
+<p align="center">
+  <img src="docs/assets/AgentBridge-Home-CN.png" alt="AgentBridge 验证工作台" width="1000" />
+</p>
+
 日常插件调试请打开 `/playground`：请求编辑、会话历史、实时 SSE、时序、工具轨迹、契约检查、JSONL 导出和 Badcase 标注都在同一视图。Fake 与真实模型案例的配置见 [Plugin Playground](docs/plugin-playground.md)。
+
+<p align="center">
+  <img src="docs/assets/AgentBridge-Plugin-CN.png" alt="AgentBridge 插件调试工作台" width="900" />
+</p>
+
 如设置了 `WEB_PORT`，请使用对应端口。
 
 > 💡 跑起来不需要 API Key 或云服务。Compose 自带 PostgreSQL、离线模型和脱敏演示数据；初始密码不会写入仓库或镜像。

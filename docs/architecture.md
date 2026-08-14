@@ -44,4 +44,4 @@ HTTP 请求 → 运行生命周期 → LangGraph 执行 → 用 SSE 推给客户
 6. 跨租户访问应在接口层失败  
 7. 走到 gateway 模式后，模型调用应经过统一出口  
 
-历史材料在 `docs/superpowers/`；冲突时以完整方案为准。
+当前发布边界见 [release-plan.md](./release-plan.md)；产品约定冲突时以完整方案为准。

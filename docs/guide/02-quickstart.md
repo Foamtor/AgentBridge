@@ -6,15 +6,14 @@
 
 ## 读完这篇你要达到的状态
 
-本机 API 能起来；用示例插件 **`echo`** 发出一句，能收到流式回复。  
+用根目录 Compose 启动自托管实例，完成首次管理员登录，并在验证工作台跑通 `work_order_ops`。
 
-`echo` 只是把你的话原样回出来，**不需要**数据库，也**不需要**真实大模型。  
-默认 `.env` 够本地试；其它 demo（如要调模型的）以后再配。
+默认体验不需要真实大模型或外部知识库；PostgreSQL、离线模型和合成业务数据由 Compose 一起启动。`echo` 仍保留为插件调试台中的最小链路测试。
 
 ## 你需要什么
 
 - Python **3.12+**
-- （可选）Node **18+**：只为打开调试网页
+- （可选）Node **18+**：仅在不用 Compose、单独开发 Web 时需要
 - 本机端口 **8000**（API）、**5173**（网页）尽量空着
 
 如果你装有 Docker，v1.0.0 推荐直接在仓库根目录运行：
@@ -23,7 +22,7 @@
 docker compose up --build
 ```
 
-再打开 <http://127.0.0.1:8080>，选择 `work_order_ops` 体验脱敏工单、图表和审批黄金案例。以下是无需 Docker 的本地开发路径。
+从 `docker compose logs api` 取得仅显示一次的 `admin` 初始密码，再打开 <http://127.0.0.1:8080> 登录并完成强制改密。根页面就是 Verification Workbench，可直接体验 `work_order_ops` 的脱敏工单、图表、知识检索和审批黄金案例。以下是不用 Compose 启动代码进程的本地开发路径。
 
 建议在虚拟环境里装依赖（可选但省事）：`python -m venv .venv` 后激活再执行下面的 `pip`。
 
@@ -42,7 +41,7 @@ Windows PowerShell 复制环境文件：
 copy .env.example .env
 ```
 
-默认 `.env` 用内存即可本地试；以后要接数据库再改。详见 [部署说明](../deploy.md)。
+默认 `.env` 使用本地管理员认证和 PostgreSQL 持久化；本地开发前需要准备可访问的 PostgreSQL，并按需填写 `PG_*`。如只做无认证、无外部调用的隔离测试，可临时使用 `AUTH_MODE=disabled`，但生产环境禁止关闭认证。详见 [部署说明](../deploy.md)。
 
 ## 2. 启动 API
 
@@ -59,7 +58,7 @@ http://127.0.0.1:8000/health
 
 应看到类似：`{"status":"ok"}`。
 
-## 3.（可选）启动调试台
+## 3.（可选）启动 Web 控制台
 
 新开一个终端：
 
@@ -69,10 +68,11 @@ npm install
 npm run dev
 ```
 
-打开 <http://127.0.0.1:5173> → 选插件 **`echo`** → 发「你好」。  
-能收到回复，就算**本篇**通了（更严的插件验收会看 SSE 里是否出现 `done`，见 [第一个插件](./04-first-plugin.md)）。
+打开 <http://127.0.0.1:5173>，使用 API 启动日志中的一次性 `admin` 密码登录并完成强制改密。根页面运行黄金验证场景；测试最小插件链路时进入 `/playground?route=echo` 发「你好」。能看到流式回复和完成状态，就算**本篇**通了（更严的插件验收见 [第一个插件](./04-first-plugin.md)）。
 
 ## 4. 不用网页：直接打接口
+
+以下命令不携带登录态，只适用于启动 API 前已明确设置 `AUTH_MODE=disabled` 的**非生产隔离开发环境**。默认 `AUTH_MODE=local` 应携带合法会话 Cookie；OIDC 模式应携带合法 Bearer Token。
 
 PowerShell 示例：
 
@@ -107,6 +107,7 @@ curl -N -X POST http://127.0.0.1:8000/chat/stream \
 | 知识相关测试行为怪 | 本地 `.env` 若写了 `KNOWLEDGE_BACKEND=external`，测平台自测请改回 `fake` 或先去掉该变量 |
 | `import agentbridge_core` 指到旧目录 | 在本仓库根目录重装：`pip install -e "packages/core[dev]" -e "apps/api[dev]"` |
 | 网页能开但接口不通 | 确认 API 已起在 8000；开发时代理默认指向 `127.0.0.1:8000` |
+| `/chat/stream` 返回 401 | 默认是 `AUTH_MODE=local`；先登录 Web，或为自动化请求提供合法 Cookie / OIDC Token |
 
 更完整的部署（Postgres、鉴权、多机）见 [deploy.md](../deploy.md)、[multi-instance.md](../multi-instance.md)。
 

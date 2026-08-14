@@ -1,6 +1,6 @@
 # 第一个业务插件
 
-← [基本概念](./03-concepts.md) · [文档目录](../INDEX.md) · 下一篇：[AI 控制台](./05-console.md) →
+← [基本概念](./03-concepts.md) · [文档目录](../INDEX.md) · 下一篇：[开发者控制台](./05-console.md) →
 
 ---
 
@@ -12,8 +12,8 @@
 
 ## 成功标准
 
-- 调试台下拉框里能选到你的 `route`，发一句有回复；**或**
-- `POST /chat/stream` 里 `"route":"<你的名字>"` 能收到 SSE，并出现结束事件（类型名一般是 `done`）
+- `/playground?route=<你的名字>` 能选中插件并完成一次请求；**或**
+- 带合法认证上下文的 `POST /chat/stream` 使用 `"route":"<你的名字>"` 能收到 SSE，并出现结束事件（类型名一般是 `done`）
 
 ## 建议最短路径
 
@@ -39,7 +39,7 @@
 
 5. **跑起来验收**  
    - 按 [快速开始](./02-quickstart.md) 起 API（改完插件后重启一次，让新注册生效）  
-   - 调试台选你的 `route`，或用 curl 打 `/chat/stream`  
+   - 登录后进入 `/playground?route=<你的名字>`，或使用带合法认证上下文的客户端调用 `/chat/stream`
    - 看到有回复 / 有 `done` 即可
 
 6. **补一条测试（建议）**  
@@ -60,4 +60,4 @@
 
 ---
 
-← [基本概念](./03-concepts.md) · [文档目录](../INDEX.md) · 下一篇：[AI 控制台](./05-console.md) →
+← [基本概念](./03-concepts.md) · [文档目录](../INDEX.md) · 下一篇：[开发者控制台](./05-console.md) →

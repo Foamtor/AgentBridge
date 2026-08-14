@@ -140,7 +140,7 @@ pip install -e "packages/core[postgres]"
 
 ## 知识后端（R-A · M11）
 
-> 设计：[platform-ra-design](./superpowers/specs/2026-07-27-platform-ra-design.md)；计划：[platform-ra](./superpowers/plans/2026-07-27-platform-ra.md)。  
+> 设计与接入说明见 [知识库与 RAG Port](./knowledge-base.md)。
 > **默认仍是 Fake**；下列变量在 `KNOWLEDGE_BACKEND=langchain_pg` 时生效。
 
 | 变量 | 说明 |

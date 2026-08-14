@@ -8,7 +8,7 @@
 
 ## 怎样算成功（最低）
 
-1. `POST /chat/stream` 使用 `"route":"<名字>"` 能跑通，并出现 `done`（或调试台可选中并发一句有回复）  
+1. `POST /chat/stream` 使用 `"route":"<名字>"` 能跑通，并出现 `done`（或在 `/playground?route=<名字>` 发起请求并看到完成状态）
 2. 未违反 [`AGENTS.md`](../../AGENTS.md)  
 
 **建议（强烈）：** 补一条 API 冒烟测试（清单第 8 步）；没有测试不算「可合并」，但本地探路可以先做到第 1～2 条。
@@ -35,7 +35,7 @@
 | `graphs.register(名字, build_xxx_graph)` | 该 `route` 的流程图 |
 | `tools.register(名字, [tool, ...])` | 该路由挂上的工具（可为空列表，视插件而定） |
 | `input_builders.register(...)` | 把 `query` 等收成图的初始 state |
-| `DOMAIN_META` / `DOMAIN_META_MAP` | 说明文字；调试台展示用 |
+| `DOMAIN_META` / `DOMAIN_META_MAP` | 说明文字；插件调试台和管理页展示用 |
 
 ## 常见错误
 
