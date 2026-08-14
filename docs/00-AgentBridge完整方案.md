@@ -437,7 +437,7 @@ slowapi → 自研/Redis；Langfuse 不强制自托管；Guardrails 不必装。
 | 模式 | 锁 | 限流 | EventLog | 说明 |
 |------|----|------|---------|------|
 | 本地 | 进程内 | 可选 | 内存或 PG | 开发 |
-| 单机生产 | 进程内 | 进程内或 Redis | Postgres | **v1.0 主承诺** |
+| 单机生产 | 进程内 | 进程内或 Redis | Postgres | **v1.0.0 主承诺** |
 | 多机 | Redis/DB | Redis | 集中 PG | **M9** |
 
 ---
@@ -491,7 +491,7 @@ slowapi → 自研/Redis；Langfuse 不强制自托管；Guardrails 不必装。
 | 标签 | 含义 |
 |------|------|
 | **v0.1.0** | 历史技术预览版本 |
-| **v1.0** | **M0–M4、黄金案例、P2-A 与 P3 全部验收通过**（单机主承诺）；P2-B 部署恢复、具体 IdP 与多机验证不属于 1.0 门槛 |
+| **v1.0.0** | **M0–M4、黄金案例、P2-A 与 P3 全部验收通过**（单机主承诺）；P2-B 部署恢复、具体 IdP 与多机验证不属于 1.0.0 门槛 |
 | v1.x | 叠加已交付的 M5–M8 |
 | v1.x+M9 | 多机 |
 | v2.0 | M10 平台完备 |
@@ -580,7 +580,7 @@ slowapi → 自研/Redis；Langfuse 不强制自托管；Guardrails 不必装。
 5. **HIL 与锁**：等待时释放锁、同 run_id resume、超时 deny  
 6. Gateway **`LLM_BACKEND` 过渡**  
 7. 管理面鉴权、多 Agent 单流、出口治理边界、EventLog 保留  
-8. M2 拆 **M2a/M2b**；**v1.0 = M0–M4**  
+8. M2 拆 **M2a/M2b**；**v1.0.0 = M0–M4**
 9. Metrics/OTel 改为执行期打点，不强制 EventLog 投影  
 
 ### v4.1.1（与 Plan r2 对齐）
@@ -598,7 +598,7 @@ slowapi → 自研/Redis；Langfuse 不强制自托管；Guardrails 不必装。
 |------|------|--------|------|
 | 1 可安全接入 | `docs/superpowers/plans/2026-07-24-plan1-secure-access.md` | M1+M2a+M2b | → v0.2 |
 | 2 可查库 | `.../2026-07-24-plan2-datasource.md` | M3 | → v0.3 |
-| 3 单机生产 | `.../2026-07-24-plan3-single-node-prod.md` | M4 | → **v1.0** |
+| 3 单机生产 | `.../2026-07-24-plan3-single-node-prod.md` | M4 | → **v1.0.0** |
 | 4 智能与治理 | `.../2026-07-24-plan4-intelligence-governance.md` | M5–M7 | → v1.x |
 | 5 协作与扩展 | `.../2026-07-24-plan5-collaboration-scale.md` | M8–M10 | → 多机/v2.0 |
 
@@ -611,5 +611,5 @@ slowapi → 自研/Redis；Langfuse 不强制自托管；Guardrails 不必装。
 |------|--------|------|
 | Plan2 | Plan1 M2a | 可与 Plan1 M2b 并行 |
 | Plan3 | Plan1 | Pipeline / 建议含 EventLog |
-| Plan4 | Plan1（含 **RunStore**）+ Plan3 | HIL 依赖 RunStore；v1.0 后再称 v1.x |
+| Plan4 | Plan1（含 **RunStore**）+ Plan3 | HIL 依赖 RunStore；v1.0.0 后再称 v1.x |
 | Plan5 | Plan1；条件 + Plan4 T4 | Redis 锁键 = Plan1 storage_key |
