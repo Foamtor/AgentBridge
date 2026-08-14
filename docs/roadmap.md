@@ -4,6 +4,15 @@
 > 这里按「能力做到哪一步」划分，不按人天估工期。  
 > 实施记录：[superpowers/plans/README.md](./superpowers/plans/README.md)
 
+## 当前状态快照（2026-08-14）
+
+- **已发布：** `v1.0.0`，tag 指向发布提交 `a6e07ba`；`main` 的后续文档口径修订为 `49a4566`。
+- **发布门禁：** Python/API/Core `445 passed, 9 skipped`；Web `52 passed`；Web 生产构建、import-linter、核心导入扫描、发布文档检查、`docker compose config --quiet` 和 `git diff --check` 均通过。
+- **当前承诺：** 单机稳定版，覆盖业务插件、工具权限、审计、审批、JSON/SSE、工作台、管理中心、模型配置加密与 `work_order_ops` 黄金案例。
+- **开发方式：** 日常开发保持一个 API（`127.0.0.1:8000`）和一个 Vite Web（`localhost:5173`）热更新实例；不需要重建容器。
+- **明确未执行：** 真实 Docker Compose golden smoke。它依赖目标机器的 Docker Engine、镜像网络与数据卷，由部署者在目标环境执行；不得宣称该 smoke 已通过。
+- **后续工程：** P2-B 的部署演练、迁移恢复、具体 IdP、厂商 external RAG 和双实例/多机验证；这些不阻塞单机 `v1.0.0`，也不构成默认多机承诺。
+
 ## 怎么拆成几期做
 
 | 顺序 | 内容 | 对应能力 | 版本含义 |
